@@ -7,7 +7,7 @@ app.use(cors());
 app.use(express.json());
 
 // Token y Chat ID de tu bot de Telegram (puedes usar variables de entorno en Render)
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8631519853:AAEFJVeQtj_jlbCUOnimlVXWDeOL0qrttU";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "-5559170176";
 
 // 1. Endpoint principal que recibe las peticiones para notificar a Telegram
