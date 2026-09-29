@@ -27,7 +27,7 @@ async function enviarAlertaTelegram(mensaje) {
         if (!response.ok) {
             console.error("Error al enviar a Telegram:", data);
         }
-    } else (err) {
+    } catch (err) {
         console.error("Fallo de red en Telegram:", err);
     }
 }
