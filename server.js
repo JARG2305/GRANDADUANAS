@@ -12,8 +12,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
+// Credenciales del Bot de Telegram
+const TELEGRAM_BOT_TOKEN = "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
+const TELEGRAM_CHAT_ID = "-1003976808854";
+
 // ==========================================
-// 1. FUNCIÓN DE CORREO DIRECTA (RESEND)
+// 1. FUNCIONES DE SERVICIO (CORREO Y TELEGRAM)
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
@@ -76,8 +80,31 @@ async function enviarCorreoSistema(opcionesMail) {
     }
 }
 
+async function enviarAlertaTelegramServidor(mensajeTexto) {
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: mensajeTexto,
+                parse_mode: 'Markdown'
+            })
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            console.error("❌ Error de Telegram en el servidor:", data.description);
+        } else {
+            console.log("✅ Alerta automática enviada a Telegram desde la nube.");
+        }
+    } catch (err) {
+        console.error("❌ Error de red al conectar con Telegram desde el servidor:", err);
+    }
+}
+
 // ==========================================
-// 2. RUTAS DE CORREO
+// 2. RUTAS DE CORREO (MANUALES)
 // ==========================================
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -111,26 +138,35 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
 });
 
 // ==========================================
-// 3. PROGRAMADOR DE ENVÍOS AUTOMÁTICOS (CRON)
+// 3. TAREAS PROGRAMADAS EN SEGUNDO PLANO (CRON)
 // ==========================================
-// Se ejecuta automáticamente todos los días a las 10:00 AM y a las 6:00 PM (18:00)
+
+// Tarea 1: Envío de correos automáticos a las 10:00 AM y 6:00 PM (18:00)
 cron.schedule('0 10,18 * * *', async () => {
     console.log("⏰ [CRON] Ejecutando envío programado de reporte a las 10 AM / 6 PM...");
-    
     try {
         const destinatariosAutomaticos = ["importacionesepga@gmail.com", "hnoguera@gmail.com", "finanzascepga@gmail.com"];
-        
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
-            subject: "📊 Reporte Maestro Unificado de Expedientes - LOGISTATUS PRO (Automático)",
+            subject: "Reporte Maestro Unificado de Expedientes - LOGISTATUS PRO",
             text: "Este es el envío automático programado del reporte consolidado de operaciones.",
-            html: "<p>Este es el envío automático programado del reporte consolidado de operaciones de <strong>Logistatus Pro</strong> a las 10:00 AM / 6:00 PM.</p>"
+            html: "<p>Este es el envío automático programado del reporte consolidado de operaciones de <strong>Logistatus Pro</strong>.</p>"
         };
-
         await enviarCorreoSistema(mailOptionsAuto);
         console.log("✅ [CRON] Correo automático programado enviado con éxito.");
     } catch (error) {
         console.error("❌ [CRON] Error al enviar el correo automático programado:", error);
+    }
+});
+
+// Tarea 2: Alertas de Telegram a las 9, 12, 15, 18, 19 y 20 horas
+cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
+    const horaActual = new Date().getHours();
+    console.log(`⏰ [CRON] Ejecutando verificación de alertas de Telegram (${horaActual}:00 hrs)...`);
+    try {
+        await enviarAlertaTelegramServidor(`⏰ **LOGISTATUS PRO - REVISIÓN AUTOMÁTICA EN NUBE**\n\nVerificación programada de las ${horaActual}:00 horas ejecutada en segundo plano.`);
+    } catch (error) {
+        console.error("❌ [CRON] Error al procesar las alertas automáticas de Telegram:", error);
     }
 });
 
