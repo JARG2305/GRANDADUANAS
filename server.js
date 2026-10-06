@@ -12,12 +12,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
-// Credenciales del Bot de Telegram
+// Credenciales del Bot de Telegram y Firebase
 const TELEGRAM_BOT_TOKEN = "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
 const TELEGRAM_CHAT_ID = "-1003976808854";
+const FIREBASE_PROJECT_ID = "statusylogistica";
 
 // ==========================================
-// 1. FUNCIONES DE SERVICIO (CORREO Y TELEGRAM)
+// 1. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
@@ -96,15 +97,63 @@ async function enviarAlertaTelegramServidor(mensajeTexto) {
         if (!data.ok) {
             console.error("❌ Error de Telegram en el servidor:", data.description);
         } else {
-            console.log("✅ Alerta automática enviada a Telegram desde la nube.");
+            console.log("✅ Alerta enviada a Telegram desde la nube.");
         }
     } catch (err) {
         console.error("❌ Error de red al conectar con Telegram desde el servidor:", err);
     }
 }
 
+// Función para obtener los expedientes directo desde Firebase Firestore vía REST API
+async function obtenerExpedientesFirestore() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (!result.documents) return [];
+
+        return result.documents.map(doc => {
+            let fields = doc.fields || {};
+            let parsedRecord = {};
+            for (let key in fields) {
+                let valObj = fields[key];
+                parsedRecord[key] = valObj.stringValue || valObj.doubleValue || valObj.integerValue || valObj.booleanValue || "";
+            }
+            return parsedRecord;
+        });
+    } catch (err) {
+        console.error("❌ Error al consultar Firestore desde el servidor:", err);
+        return [];
+    }
+}
+
+// Funciones auxiliares de fecha y modo de transporte para el servidor
+function parseFechaLocalServidor(str) {
+    if (!str) return null;
+    str = String(str).trim();
+    if (str.includes('/')) {
+        const p = str.split('/');
+        if (p.length === 3 && p[2].length === 4) {
+            return new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`);
+        }
+    } else if (str.includes('-')) {
+        const p = str.split('-');
+        if (p.length === 3 && p[0].length === 4) {
+            return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);
+        }
+    }
+    return null;
+}
+
+function identificarEsMaritimoServidor(rec = {}) {
+    const modo = (rec.modo_transporte || "").toLowerCase();
+    if (modo.includes("aéreo") || modo.includes("aereo")) return false;
+    return true;
+}
+
 // ==========================================
-// 2. RUTAS DE CORREO (MANUALES)
+// 2. RUTAS DE LA API
 // ==========================================
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -137,11 +186,25 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
     }
 });
 
+app.post('/api/notificar', async (req, res) => {
+    try {
+        const { mensaje } = req.body;
+        if (!mensaje) {
+            return res.status(400).json({ success: false, message: 'Falta el mensaje de alerta.' });
+        }
+        await enviarAlertaTelegramServidor(mensaje);
+        res.json({ success: true, message: "Alerta enviada a Telegram con éxito." });
+    } catch (error) {
+        console.error("❌ Error en /api/notificar:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // ==========================================
 // 3. TAREAS PROGRAMADAS EN SEGUNDO PLANO (CRON)
 // ==========================================
 
-// Tarea 1: Envío de correos automáticos a las 10:00 AM y 6:00 PM (18:00)
+// Envío de correos automáticos a las 10:00 AM y 6:00 PM
 cron.schedule('0 10,18 * * *', async () => {
     console.log("⏰ [CRON] Ejecutando envío programado de reporte a las 10 AM / 6 PM...");
     try {
@@ -159,14 +222,109 @@ cron.schedule('0 10,18 * * *', async () => {
     }
 });
 
-// Tarea 2: Alertas de Telegram a las 9, 12, 15, 18, 19 y 20 horas
+// Evaluación autónoma idéntica a checkAlerts (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const horaActual = new Date().getHours();
-    console.log(`⏰ [CRON] Ejecutando verificación de alertas de Telegram (${horaActual}:00 hrs)...`);
+    console.log(`⏰ [CRON NUBE] Evaluando alertas operativas idénticas a la interfaz (${horaActual}:00 hrs)...`);
+    
     try {
-        await enviarAlertaTelegramServidor(`⏰ **LOGISTATUS PRO - REVISIÓN AUTOMÁTICA EN NUBE**\n\nVerificación programada de las ${horaActual}:00 horas ejecutada en segundo plano.`);
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) {
+            console.log("ℹ️ [CRON NUBE] No hay registros en Firestore para evaluar.");
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        let expSet = new Set();
+        let blSet = new Set();
+        let contSet = new Set();
+        let alertasEnviadasCount = 0;
+
+        for (const rec of records) {
+            const expVal = (rec.num_expediente || "").trim().toLowerCase();
+            const blVal = (rec.awb_bl || "").trim().toLowerCase();
+            const contRaw = (rec.numero_contenedor || "").trim();
+            let contenedoresList = contRaw ? contRaw.split(',').map(c => c.trim().toLowerCase()).filter(Boolean) : [];
+
+            // 1. Detección de Duplicados en el Servidor
+            if (expVal) {
+                if (expSet.has(expVal)) {
+                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El N.º de Expediente **${rec.num_expediente}** está repetido en el sistema.`);
+                    alertasEnviadasCount++;
+                }
+                expSet.add(expVal);
+            }
+            if (blVal && blVal !== 's/n') {
+                if (blSet.has(blVal)) {
+                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El N.º de B/L o AWB **${rec.awb_bl}** ya está usado en otro expediente.`);
+                    alertasEnviadasCount++;
+                }
+                blSet.add(blVal);
+            }
+            contenedoresList.forEach(async (contVal) => {
+                if (contSet.has(contVal)) {
+                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El Contenedor **${contVal.toUpperCase()}** ya está registrado en otro expediente.`);
+                    alertasEnviadasCount++;
+                }
+                contSet.add(contVal);
+            });
+
+            if (rec.despacho) continue;
+
+            const expName = rec.num_expediente || 'S/N';
+            const clientName = rec.cliente || 'S/C';
+            const esMaritimo = identificarEsMaritimoServidor(rec);
+            const fechaLlegadaStr = rec.fecha_llegada;
+            const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
+
+            const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
+            const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
+
+            if (!hasLlegadaRegistrada) {
+                // 2. Vencimiento de DAI próximo
+                const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                if (dVencimientoDai) {
+                    const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                    if (diffVencDays >= 1 && diffVencDays <= 4) {
+                        let textoCountdown = diffVencDays === 1 ? "¡VENCE MAÑANA!" : `Faltan ${diffVencDays} día(s) para vencer`;
+                        const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.`;
+                        
+                        await enviarAlertaTelegramServidor(textTelegram);
+                        alertasEnviadasCount++;
+                    }
+                }
+
+                // 3. Cuenta regresiva de llegada/ETA y validación de DAI pendiente
+                if (dArriboObj) {
+                    const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                    const maxDiasAnticipacion = esMaritimo ? 5 : 4;
+                    const minDiasAnticipacion = esMaritimo ? 2 : 1;
+
+                    if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
+                        const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
+                        const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
+                        const textTelegram = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+
+                        await enviarAlertaTelegramServidor(textTelegram);
+                        alertasEnviadasCount++;
+                    }
+
+                    const noTieneDai = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
+                    if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
+                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.`;
+
+                        await enviarAlertaTelegramServidor(textTelegramDai);
+                        alertasEnviadasCount++;
+                    }
+                }
+            }
+        }
+
+        console.log(`✅ [CRON NUBE] Verificación finalizada. Se despacharon ${alertasEnviadasCount} alertas idénticas a las de la aplicación.`);
     } catch (error) {
-        console.error("❌ [CRON] Error al procesar las alertas automáticas de Telegram:", error);
+        console.error("❌ [CRON NUBE] Error al procesar las alertas automáticas de Telegram:", error);
     }
 });
 
