@@ -8,7 +8,7 @@ const XLSX = require('xlsx');
 const app = express();
 
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES
+// 0. CONFIGURACIÓN DE MIDDLEWARES (OBLIGATORIO)
 // ==========================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -68,23 +68,37 @@ try {
 }
 
 // ==========================================
-// 2. FUNCIÓN DE CORREO DINÁMICA
+// 2. FUNCIÓN DE CORREO DINÁMICA (CON FALLBACK)
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
-        const configDoc = await db.collection('config_correos').doc('correo_settings').get();
-        if (!configDoc.exists) {
-            throw new Error("No se encontró la configuración del correo en Firestore.");
-        }
-        const config = configDoc.data();
-        const apiKey = config.apiKey; 
-        const remitente = config.remitente || 'onboarding@resend.dev';
+        let apiKey = "";
+        let remitente = "onboarding@resend.dev";
 
+        // Intenta leer la configuración de Firestore, si falla usa la clave directa
+        try {
+            if (db) {
+                const configDoc = await db.collection('config_correos').doc('correo_settings').get();
+                if (configDoc.exists) {
+                    const config = configDoc.data();
+                    apiKey = config.apiKey;
+                    if (config.remitente) remitente = config.remitente;
+                }
+            }
+        } catch (e) {
+            console.log("⚠️ Leyendo configuración desde Firestore omitido, usando respaldo directo.");
+        }
+
+        // 🔴 CAMBIA ESTO POR TU API KEY DE RESEND SI NO USAS FIRESTORE:
         if (!apiKey) {
-            throw new Error("Falta configurar la apiKey del servicio HTTP en Firestore.");
+            apiKey = "re_7rncGU7w_ASmyeAvAeYhSacWkDydPEons"; 
         }
 
-        let destinatarios = opcionesMail.to || config.emails || [];
+        if (!apiKey || apiKey.includes("TU_API_KEY")) {
+            throw new Error("Falta configurar una apiKey válida de Resend.");
+        }
+
+        let destinatarios = opcionesMail.to;
         if (!Array.isArray(destinatarios)) {
             destinatarios = [destinatarios];
         }
@@ -141,7 +155,7 @@ async function enviarCorreoSistema(opcionesMail) {
 }
 
 // ==========================================
-// 3. RUTAS DE NOTIFICACIÓN Y CORREO
+// 3. RUTAS DE CORREO
 // ==========================================
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -155,7 +169,7 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
     const mailOptions = {
         to: destinatario,
         subject: asunto || '📊 Reporte de Expedientes - LOGISTATUS PRO',
-        text: mensaje,
+        text: mensaje || 'Adjunto encontrarás el reporte de expedientes actualizado.',
         attachments: [
             {
                 filename: nombreArchivo || 'Reporte_Logistatus.xlsx',
