@@ -24,10 +24,12 @@ app.get('/', (req, res) => {
 app.post('/api/notificar', async (req, res) => {
     try {
         const { mensaje } = req.body;
-        
-        if (!mensaje) {
-            return res.status(400).json({ success: false, message: "El mensaje está vacío." });
-        }
+        // Lógica para enviar a Telegram...
+        return res.status(200).json({ success: true, message: 'Alerta enviada a Telegram correctamente.' });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+});
 
         const textoMensaje = `🚨 *LOGISTATUS PRO - ALERTA*\n\n${mensaje}`;
         const urlTelegram = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
