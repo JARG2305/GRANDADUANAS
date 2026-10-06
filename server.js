@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors'); // <--- 1. Importar cors
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const path = require('path');
@@ -6,6 +7,7 @@ const cron = require('node-cron');
 const XLSX = require('xlsx');
 
 const app = express();
+app.use(cors()); // <--- 2. Activar cors para que Netlify pueda comunicarse con Render
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
