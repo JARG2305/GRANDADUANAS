@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const XLSX = require('xlsx');
+const cron = require('node-cron');
 
 const app = express();
 
@@ -16,8 +17,7 @@ app.use(express.static(path.join(__dirname)));
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
-        // 🔴 PEGA TU CLAVE REAL DE RESEND AQUÍ:
-        const apiKey = "re_7rncGU7w_ASmyeAvAeYhSacWkDydPEons"; 
+        const apiKey = "re_fvWGsDmy_CxGHq2taybxAxuQ9Eb2fadPQ"; 
         const remitente = "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
@@ -111,7 +111,31 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
 });
 
 // ==========================================
-// 3. INICIO DEL SERVIDOR
+// 3. PROGRAMADOR DE ENVÍOS AUTOMÁTICOS (CRON)
+// ==========================================
+// Se ejecuta automáticamente todos los días a las 10:00 AM y a las 6:00 PM (18:00)
+cron.schedule('0 10,18 * * *', async () => {
+    console.log("⏰ [CRON] Ejecutando envío programado de reporte a las 10 AM / 6 PM...");
+    
+    try {
+        const destinatariosAutomaticos = ["importacionesepga@gmail.com", "hnoguera@gmail.com", "finanzascepga@gmail.com"];
+        
+        const mailOptionsAuto = {
+            to: destinatariosAutomaticos,
+            subject: "📊 Reporte Maestro Unificado de Expedientes - LOGISTATUS PRO (Automático)",
+            text: "Este es el envío automático programado del reporte consolidado de operaciones.",
+            html: "<p>Este es el envío automático programado del reporte consolidado de operaciones de <strong>Logistatus Pro</strong> a las 10:00 AM / 6:00 PM.</p>"
+        };
+
+        await enviarCorreoSistema(mailOptionsAuto);
+        console.log("✅ [CRON] Correo automático programado enviado con éxito.");
+    } catch (error) {
+        console.error("❌ [CRON] Error al enviar el correo automático programado:", error);
+    }
+});
+
+// ==========================================
+// 4. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
