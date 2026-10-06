@@ -1,56 +1,61 @@
 const express = require('express');
 const cors = require('cors');
-const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
-const path = require('path');
-const cron = require('node-cron');
-const XLSX = require('xlsx');
-
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname)));
 
-// ==========================================
-// 1. CONFIGURACIÓN DE FIREBASE ADMIN (SEGURO PARA RENDER Y LOCAL)
-// ==========================================
-let serviceAccount;
+// Configuración de CORS para permitir peticiones desde Netlify y entorno local
+const corsOptions = {
+    origin: ['https://grandaduanas.netlify.app', 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+};
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    try {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    } catch (error) {
-        console.error("❌ Error al parsear la variable FIREBASE_SERVICE_ACCOUNT:", error);
-    }
-} else {
-    try {
-        serviceAccount = require('./serviceAccountKey.json');
-    } catch (error) {
-        console.warn("⚠️ No se encontró el archivo serviceAccountKey.json local.");
-    }
-}
+app.use(cors(corsOptions));
+app.use(express.json());
 
-let db = null;
-try {
-    if (serviceAccount) {
-        initializeApp({ credential: cert(serviceAccount) });
-        db = getFirestore();
-        console.log("🔥 Firebase inicializado correctamente.");
-    } else {
-        console.error("❌ No se pudieron cargar las credenciales de Firebase.");
-    }
-} catch (error) {
-    console.error("❌ Error al inicializar Firebase:", error);
-}
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "-1003976808854";
 
-// ==========================================
-// 2. RUTA DE BIENVENIDA (RAÍZ)
-// ==========================================
+// Ruta raíz o de estado para UptimeRobot (devuelve texto plano o JSON en lugar de HTML)
 app.get('/', (req, res) => {
-    res.send('¡Servidor de GRANDADUANAS en línea y operativo! 🚀');
+    res.status(200).json({ status: "online", message: "Servidor de Logistatus Pro activo en la nube" });
+});
+
+// Ruta de notificaciones
+app.post('/api/notificar', async (req, res) => {
+    try {
+        const { mensaje } = req.body;
+        
+        if (!mensaje) {
+            return res.status(400).json({ success: false, message: "El mensaje está vacío." });
+        }
+
+        const textoMensaje = `🚨 *LOGISTATUS PRO - ALERTA*\n\n${mensaje}`;
+        const urlTelegram = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        
+        const response = await fetch(urlTelegram, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: textoMensaje,
+                parse_mode: 'Markdown'
+            })
+        });
+
+        const data = await response.json();
+
+        if (!data.ok) {
+            return res.status(400).json({ success: false, message: data.description || "Error al conectar con Telegram." });
+        }
+
+        return res.status(200).json({ success: true, message: 'Alerta enviada a Telegram correctamente.' });
+    } catch (error) {
+        console.error('❌ Error interno en el servidor:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
