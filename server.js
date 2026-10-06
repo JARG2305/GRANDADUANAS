@@ -61,3 +61,87 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+const cron = require('node-cron');
+const nodemailer = require('nodemailer');
+
+// Configuración del servicio de correo (puedes usar Gmail o cualquier SMTP corporativo)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.CORREO_USER || 'statusepga@gmail.com', // Tu correo
+        pass: process.env.CORREO_PASS || 'kambpqjmczwfmtyj' // Contraseña de aplicación de Gmail
+    }
+});
+
+// Función para enviar el reporte consolidado por correo
+async function enviarCorreoAutomatico(datosAlertas) {
+    if (!datosAlertas || datosAlertas.length === 0) return;
+
+    // Ordenar las alertas por ETA en orden ascendente
+    datosAlertas.sort((a, b) => new Date(a.fechaObj) - new Date(b.fechaObj));
+
+    let htmlContenido = `
+        <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+            <h2 style="color: #0056b3;">📊 Logistatus Pro - Reporte Consolidado de Alertas</h2>
+            <p>A continuación se detallan las alertas operativas ordenadas por fecha de llegada (ETA) más cercana:</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <thead>
+                    <tr style="background-color: #0056b3; color: white;">
+                        <th style="padding: 10px; border: 1px solid #ddd;">Expediente</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Cliente</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Tipo / Modo</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Detalle / ETA</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    datosAlertas.forEach(alerta => {
+        htmlContenido += `
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;"><b>${alerta.expediente}</b></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${alerta.cliente}</td>
+                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${alerta.modo}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${alerta.detalle}</td>
+            </tr>
+        `;
+    });
+
+    htmlContenido += `
+                </tbody>
+            </table>
+            <p style="margin-top: 20px; font-size: 12px; color: #777;">Este es un reporte automático generado por Logistatus Pro en la nube.</p>
+        </div>
+    `;
+
+    const mailOptions = {
+        from: '"Logistatus Pro" <statusepga@gmail.com>',
+        to: 'importacionesepga@gmail.com',
+        subject: '🚀 Reporte Automático de Alertas Operativas - Logistatus Pro',
+        html: htmlContenido
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log("📧 Correo automático enviado exitosamente.");
+    } catch (error) {
+        console.error("❌ Error al enviar el correo automático:", error);
+    }
+}
+
+// ==========================================
+// PROGRAMACIÓN AUTOMÁTICA CON NODE-CRON
+// ==========================================
+// Se ejecuta todos los días a las 10:00 a.m. y a las 6:00 p.m. (Hora del servidor)
+cron.schedule('0 10,18 * * *', async () => {
+    console.log("⏰ Ejecutando tarea programada: Verificando y enviando alertas...");
+    
+    // Aquí puedes conectar tu lógica para extraer los registros activos de Firebase 
+    // o recibirlos desde tu frontend, ordenarlos por ETA ascendente y pasarlos a la función:
+    // const registrosPendientes = await obtenerRegistrosDeBaseDe Datos();
+    // await enviarCorreoAutomatico(registrosPendientes);
+    
+}, {
+    scheduled: true,
+    timezone: "America/Caracas" // Ajusta a tu zona horaria local
+});
