@@ -1,9 +1,4 @@
 const express = require('express');
-const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-app.use(express.static(path.join(__dirname)));
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const path = require('path');
@@ -11,7 +6,12 @@ const cron = require('node-cron');
 const XLSX = require('xlsx');
 
 const app = express();
+
+// ==========================================
+// 0. CONFIGURACIÓN DE MIDDLEWARES
+// ==========================================
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // ==========================================
@@ -64,7 +64,7 @@ try {
     db = getFirestore();
     console.log("🔥 Firebase inicializado correctamente.");
 } catch (error) {
-    console.log("⚠️ Nota: Firebase se omitió temporalmente por compatibilidad con OpenSSL, pero el servidor y Telegram funcionarán perfectamente.");
+    console.log("⚠️ Nota: Firebase se omitió temporalmente.");
 }
 
 // ==========================================
@@ -91,7 +91,7 @@ async function enviarCorreoSistema(opcionesMail) {
         destinatarios = destinatarios.map(e => typeof e === 'string' ? e.trim() : '').filter(e => e.length > 0);
 
         if (destinatarios.length === 0) {
-            throw new Error("No hay destinatarios válidos configurados para enviar el correo.");
+            throw new Error("No hay destinatarios válidos configurados.");
         }
 
         let attachmentsFormatted = [];
@@ -103,10 +103,7 @@ async function enviarCorreoSistema(opcionesMail) {
                 } else if (typeof att.content === 'string') {
                     base64Content = att.content.includes('base64,') ? att.content.split('base64,')[1] : att.content;
                 }
-                return {
-                    filename: att.filename,
-                    content: base64Content
-                };
+                return { filename: att.filename, content: base64Content };
             });
         }
 
@@ -144,89 +141,8 @@ async function enviarCorreoSistema(opcionesMail) {
 }
 
 // ==========================================
-// 3. RUTAS DE NOTIFICACIÓN (TELEGRAM)
+// 3. RUTAS DE NOTIFICACIÓN Y CORREO
 // ==========================================
-app.post('/api/notificar', async (req, res) => {
-    const { mensaje } = req.body;
-    
-    const TELEGRAM_BOT_TOKEN = "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
-    const TELEGRAM_CHAT_ID = "-1003976808854";
-
-    try {
-        const urlTelegram = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-        const response = await fetch(urlTelegram, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                text: "🚨 <b>LOGISTATUS PRO - ALERTA FORZADA</b>\n\n" + (mensaje || "Sincronización de alertas ejecutada correctamente."),
-                parse_mode: 'HTML'
-            })
-        });
-
-        const data = await response.json();
-        console.log("Respuesta de Telegram:", data);
-
-        if (!data.ok) {
-            throw new Error(`Telegram error: ${data.description}`);
-        }
-
-        console.log("✅ Alerta de Telegram enviada con éxito.");
-        res.json({ success: true, message: 'Alerta enviada a Telegram correctamente.' });
-    } catch (error) {
-        console.error('❌ Error al enviar alerta a Telegram:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-// ==========================================
-// 4. RUTAS DE GESTIÓN DE USUARIOS (CRUD)
-// ==========================================
-app.put('/api/usuarios/:id', async (req, res) => {
-    const { id } = req.params;
-    const { nombre, rol, password } = req.body;
-    try {
-        const updateData = { nombre, rol };
-        if (password) updateData.password = password;
-        await db.collection('usuarios').doc(id).update(updateData);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error al actualizar usuario:', error);
-        res.status(500).json({ success: false, message: 'Error al actualizar' });
-    }
-});
-
-app.delete('/api/usuarios/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await db.collection('usuarios').doc(id).delete();
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error al eliminar usuario:', error);
-        res.status(500).json({ success: false, message: 'Error al eliminar' });
-    }
-});
-
-// ==========================================
-// 5. RUTAS DE CORREO (SISTEMA)
-// ==========================================
-app.post('/api/enviar-alerta-correo', async (req, res) => {
-    const { destinatario, asunto, mensaje } = req.body;
-    const mailOptions = {
-        to: destinatario,
-        subject: asunto || '🚨 Alerta Crítica - LOGISTATUS PRO',
-        text: mensaje
-    };
-
-    try {
-        await enviarCorreoSistema(mailOptions);
-        res.json({ success: true, message: 'Correo enviado automáticamente con éxito.' });
-    } catch (error) {
-        console.error('Error al enviar correo automático:', error);
-        res.status(500).json({ success: false, message: 'Error al enviar el correo.' });
-    }
-});
-
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
     
@@ -253,60 +169,13 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
         await enviarCorreoSistema(mailOptions);
         res.json({ success: true, message: 'Correo con Excel adjunto enviado con éxito.' });
     } catch (error) {
-        console.error('Error al enviar el correo con el archivo adjunto:', error);
-        res.status(500).json({ success: false, message: 'Error al enviar el correo con el Excel.' });
+        console.error('Error al enviar el correo:', error);
+        res.status(500).json({ success: false, message: error.message || 'Error al enviar el correo.' });
     }
 });
 
 // ==========================================
-// 6. PROGRAMACIÓN DE REPORTES AUTOMÁTICOS (CRON)
-// ==========================================
-cron.schedule('0 * * * *', async () => {
-    console.log('⏰ Ejecutando envío automático de reporte de Excel...');
-    
-    try {
-        const configDoc = await db.collection('config_correos').doc('correo_settings').get();
-        if (!configDoc.exists) {
-            console.log('⚠️ No hay configuración de correo guardada en Firestore.');
-            return;
-        }
-        const config = configDoc.data();
-        const listaDestinatarios = config.emails ? config.emails.join(', ') : config.destinatarios;
-
-        if (!listaDestinatarios) {
-            console.log('⚠️ No hay destinatarios configurados para el envío automático.');
-            return;
-        }
-
-        const snapshot = await db.collection('expedientes').get();
-        const listaExpedientes = [];
-        snapshot.forEach(doc => listaExpedientes.push(doc.data()));
-
-        if (listaExpedientes.length === 0) return;
-
-        const worksheet = XLSX.utils.json_to_sheet(listaExpedientes);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Expedientes");
-        const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-        const nombreArchivo = `Reporte_Automatico_${new Date().toISOString().slice(0,10)}.xlsx`;
-
-        const mailOptions = {
-            to: listaDestinatarios,
-            subject: '📊 Reporte Automático Programado - LOGISTATUS PRO',
-            text: 'Adjunto encontrarás el reporte automático de expedientes generado por el sistema.',
-            attachments: [{ filename: nombreArchivo, content: excelBuffer }]
-        };
-
-        await enviarCorreoSistema(mailOptions);
-        console.log('✅ ¡Reporte automático enviado con éxito!');
-
-    } catch (error) {
-        console.error('❌ Error en el proceso automático:', error);
-    }
-});
-
-// ==========================================
-// 7. INICIO DEL SERVIDOR
+// 4. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
