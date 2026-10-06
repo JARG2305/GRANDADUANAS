@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const XLSX = require('xlsx');
@@ -12,9 +13,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
-// Credenciales del Bot de Telegram y Firebase
-const TELEGRAM_BOT_TOKEN = "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
-const TELEGRAM_CHAT_ID = "-1003976808854";
+// Credenciales y configuraciones desde variables de entorno
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const FIREBASE_PROJECT_ID = "statusylogistica";
 
 // ==========================================
@@ -22,11 +23,11 @@ const FIREBASE_PROJECT_ID = "statusylogistica";
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
-        const apiKey = "re_fvWGsDmy_CxGHq2taybxAxuQ9Eb2fadPQ"; 
+        const apiKey = process.env.RESEND_API_KEY; 
         const remitente = "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
-            throw new Error("Falta configurar tu apiKey de Resend en el servidor.");
+            throw new Error("Falta configurar tu RESEND_API_KEY en el archivo .env.");
         }
 
         let destinatarios = opcionesMail.to;
@@ -208,7 +209,7 @@ app.post('/api/notificar', async (req, res) => {
 cron.schedule('0 10,18 * * *', async () => {
     console.log("⏰ [CRON] Ejecutando envío programado de reporte a las 10 AM / 6 PM...");
     try {
-        const destinatariosAutomaticos = ["importacionesepga@gmail.com", "hnoguera@gmail.com", "finanzascepga@gmail.com"];
+        const destinatariosAutomaticos = ["importacionesepga@gmail.com", "hnoguera@gmail.com", "finanzasepga@gmail.com"];
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
             subject: "Reporte Maestro Unificado de Expedientes - LOGISTATUS PRO",
@@ -230,7 +231,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
-            console.log("ℹ️ [CRON NUBE] No hay registros en Firestore para evaluar.");
+            console.log("ℹ️️ [CRON NUBE] No hay registros en Firestore para evaluar.");
             return;
         }
 
@@ -315,7 +316,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
                         const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.`;
 
-                        await enviarAlertaTelegramServidor(textTelegramDai);
+                        await enviarAlertaTelegramServidor(textTelegramDatos = textTelegramDai);
                         alertasEnviadasCount++;
                     }
                 }
