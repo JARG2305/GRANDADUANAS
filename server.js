@@ -1,101 +1,27 @@
 const express = require('express');
-const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
 const path = require('path');
-const cron = require('node-cron');
 const XLSX = require('xlsx');
 
 const app = express();
 
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES (OBLIGATORIO)
+// 0. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // ==========================================
-// 1. CONFIGURACIÓN DE FIREBASE ADMIN
-// ==========================================
-const serviceAccount = {
-  "type": "service_account",
-  "project_id": "statusylogistica",
-  "private_key_id": "dcf3c1a7767394ad3461fff280bac03e9da5d1ca",
-  "private_key": `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDTicxAZsNrM2Lq
-mCXUzBZl26YTeWCPpyaD4ZZpivBrd+OwCjwoy2ivL7n35zhA4XxQo/oRCLYprV6G
-SAP705WublRiY1HXO/w9L46oxYcY6Y5PYQcHrZAsAQQdFfo8GuQr09byuSzqxGwj
-sOzciR8NvHUEVCbBMSnCAC53e4/XkEZzgprfn+ZX4OdIiz/2fTGq9nIPcwG7NBSb
-FfVmgi5IJS3b3JNpRgDu6ZxnRwnprPE2ZAbGITY5RW3cchEWrbkFVcQtZsbWZSC3
-fzgFUm4kdzqrqwhAcI+gCK8Xls+aqUXdt2pFy96PODsPUrUGa5QckS1d3xV6jI78
-qesCVHaNAgMBAAECggEASV5pV8rsq4FKpRg5Qtm4SQLKUsXN7nUogCRdgWS9p2CR
-OY0LOZD3UY+pnih1k9dBQUzmXkMZv1HQz50puI21xCajIO7Ww2KcRXJ5teKwzTyw
-baq2//w8XW7KyPXG8VLYYbUbP9tnD1QqN6TVOlZazW5YXbR8LpSJKa7bbviNttND
-lAK5xHpzOMdqdsIm7rw3lyMaOvuQcSkLzYWNFssKgtAVoivZPcdlYKxLyMpyOT3t
-oXmDRvpwxQqPR4Wi4dh263QswdiL6W1eGd6VopQTUgRVOGLqsU8wxPN0mxRmA6qS
-YMO9uJx2ThGHQwEJQ8MZKRhulkM5/Za0shWIA/JflwKBgQDrlAR1VWiNiYeIzANQ
-DhiX7EgN16oRHkDQ9LU96PyDc2ya8dYQq4kvQLL0XglefgQ/yCZ6zA1ytxSiHj4c
-0yiMS3YxCbg/R9XKTe2R6bGFzxA6sRd6IZHTLwjJip9XYHW84yIsJH7gnJhjlgBS
-5h4xLwE5dYPcdRANHFFnmLXJlwKBgQDl4EiI07H+ABf0TuZrwBsNrQ8b3JWVjdYU
-AlqVSFQPAvrwLNtSBMG42g5at/85nhQ6WUYadpYSkK/u+fqlgYhgOWyyJnF5H9js
-/l8O3+PxR9FzD6nnjYHwTCtEfgbtHQq/bzQsFuGG8AfAIdlZUMy7NMSOsLSNod5D
-AxIgud2dewKBgQDa+KHQQoxFi4GM2T13CzM2++zZ2Q3+jWVoFR3mpwsYUJCx0XrN
-0fRZFMWCuWnyCCaA9tU1rTgO2jh2nK/VcT0ucvIwkL1PLMF/I0JhL5zQKPEH7RZK
-cquuZfjABXco68NkyKc56s54j3ZikspIRBfqVavIsf/YSoOZ/Cl6pwrKjwKBgGI2
-UMckqwc6QwG+M/QVP3m4VpwwwjgDQVOLLehZ3pALVesHPyzrm1i+0SMxOXoEb9/+
-BFWKFNQZvRD8/Hl5vipeXnI+unxlfujCRRq1zU1owbPHHXAwpTNlV5cLwSnNHqpr
-neH7dx70/EBCmZZYjT1UsVk4gcQOSBMPcrAIPZv/BAoGAe0aXs4lBTFop5Pr3fJbK
-SVy5G/1mkLQk4SV4v7D3EYiEw4nJNEezcmXEo16IJpQxUHL9hs3irE62vPBCWKLo
-phOCXNkGH6ooW7InsPNeeAnG3DDjyiUYeiWD6UF3m2r5ExuAXcMnRLh0CgUGZIyy
-o/l5U2PYpS81BU2bn/4OFH8=
------END PRIVATE KEY-----`,
-  "client_email": "firebase-adminsdk-fbsvc@statusylogistica.iam.gserviceaccount.com",
-  "client_id": "108295776344384360383",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40statusylogistica.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-};
-
-let db = null;
-try {
-    initializeApp({ credential: cert(serviceAccount) });
-    db = getFirestore();
-    console.log("🔥 Firebase inicializado correctamente.");
-} catch (error) {
-    console.log("⚠️ Nota: Firebase se omitió temporalmente.");
-}
-
-// ==========================================
-// 2. FUNCIÓN DE CORREO DINÁMICA (CON FALLBACK)
+// 1. FUNCIÓN DE CORREO DIRECTA (RESEND)
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
-        let apiKey = "";
-        let remitente = "onboarding@resend.dev";
-
-        // Intenta leer la configuración de Firestore, si falla usa la clave directa
-        try {
-            if (db) {
-                const configDoc = await db.collection('config_correos').doc('correo_settings').get();
-                if (configDoc.exists) {
-                    const config = configDoc.data();
-                    apiKey = config.apiKey;
-                    if (config.remitente) remitente = config.remitente;
-                }
-            }
-        } catch (e) {
-            console.log("⚠️ Leyendo configuración desde Firestore omitido, usando respaldo directo.");
-        }
-
-        // 🔴 CAMBIA ESTO POR TU API KEY DE RESEND SI NO USAS FIRESTORE:
-        if (!apiKey) {
-            apiKey = "re_7rncGU7w_ASmyeAvAeYhSacWkDydPEons"; 
-        }
+        // 🔴 PEGA TU CLAVE REAL DE RESEND AQUÍ:
+        const apiKey = "re_7rncGU7w_ASmyeAvAeYhSacWkDydPEons"; 
+        const remitente = "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
-            throw new Error("Falta configurar una apiKey válida de Resend.");
+            throw new Error("Falta configurar tu apiKey de Resend en el servidor.");
         }
 
         let destinatarios = opcionesMail.to;
@@ -103,10 +29,6 @@ async function enviarCorreoSistema(opcionesMail) {
             destinatarios = [destinatarios];
         }
         destinatarios = destinatarios.map(e => typeof e === 'string' ? e.trim() : '').filter(e => e.length > 0);
-
-        if (destinatarios.length === 0) {
-            throw new Error("No hay destinatarios válidos configurados.");
-        }
 
         let attachmentsFormatted = [];
         if (opcionesMail.attachments && Array.isArray(opcionesMail.attachments)) {
@@ -155,7 +77,7 @@ async function enviarCorreoSistema(opcionesMail) {
 }
 
 // ==========================================
-// 3. RUTAS DE CORREO
+// 2. RUTAS DE CORREO
 // ==========================================
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -189,7 +111,7 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
 });
 
 // ==========================================
-// 4. INICIO DEL SERVIDOR
+// 3. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
