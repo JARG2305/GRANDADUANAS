@@ -43,6 +43,13 @@ try {
     console.error("❌ Error al inicializar Firebase:", error);
 }
 
+// ==========================================
+// 2. RUTA DE BIENVENIDA (RAÍZ)
+// ==========================================
+app.get('/', (req, res) => {
+    res.send('¡Servidor de GRANDADUANAS en línea y operativo! 🚀');
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
