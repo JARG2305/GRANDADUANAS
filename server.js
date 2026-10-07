@@ -16,10 +16,23 @@ app.use(express.static(path.join(__dirname)));
 // Credenciales y configuraciones desde variables de entorno
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const FIREBASE_PROJECT_ID = "statusylogistica";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
 
 // ==========================================
-// 1. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
+// 1. RUTA ESENCIAL DE CONFIGURACIÓN DINÁMICA
+// ==========================================
+app.get('/api/config', (req, res) => {
+    res.json({
+        firebaseApiKey: FIREBASE_API_KEY,
+        firebaseProjectId: FIREBASE_PROJECT_ID,
+        telegramBotToken: TELEGRAM_BOT_TOKEN || '',
+        telegramChatId: TELEGRAM_CHAT_ID || ''
+    });
+});
+
+// ==========================================
+// 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
@@ -27,7 +40,7 @@ async function enviarCorreoSistema(opcionesMail) {
         const remitente = "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
-            throw new Error("Falta configurar tu RESEND_API_KEY en el archivo .env.");
+            throw new Error("Falta configurar tu RESEND_API_KEY en el archivo .env o en Render.");
         }
 
         let destinatarios = opcionesMail.to;
@@ -154,7 +167,7 @@ function identificarEsMaritimoServidor(rec = {}) {
 }
 
 // ==========================================
-// 2. RUTAS DE LA API
+// 3. RUTAS DE LA API
 // ==========================================
 app.post('/api/enviar-excel-correo', async (req, res) => {
     const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -202,7 +215,7 @@ app.post('/api/notificar', async (req, res) => {
 });
 
 // ==========================================
-// 3. TAREAS PROGRAMADAS EN SEGUNDO PLANO (CRON)
+// 4. TAREAS PROGRAMADAS EN SEGUNDO PLANO (CRON)
 // ==========================================
 
 // Envío de correos automáticos a las 10:00 AM y 6:00 PM
@@ -231,7 +244,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
-            console.log("ℹ️️ [CRON NUBE] No hay registros en Firestore para evaluar.");
+            console.log("ℹ [CRON NUBE] No hay registros en Firestore para evaluar.");
             return;
         }
 
@@ -316,7 +329,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
                         const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.`;
 
-                        await enviarAlertaTelegramServidor(textTelegramDatos = textTelegramDai);
+                        await enviarAlertaTelegramServidor(textTelegramDai);
                         alertasEnviadasCount++;
                     }
                 }
@@ -330,7 +343,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 });
 
 // ==========================================
-// 4. INICIO DEL SERVIDOR
+// 5. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
