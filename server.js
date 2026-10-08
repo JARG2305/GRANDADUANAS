@@ -308,6 +308,9 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
 
+            // Variable ETA para incluir en las alertas de DAI y arribos
+            const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+
             const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
             const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
 
@@ -317,7 +320,9 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                     if (diffVencDays >= 1 && diffVencDays <= 4) {
                         let textoCountdown = diffVencDays === 1 ? "¡VENCE MAÑANA!" : `Faltan ${diffVencDays} día(s) para vencer`;
-                        const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.`;
+                        
+                        // Alerta DAI con ETA al final
+                        const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*\n🚢 *ETA:* *${fechaEta}*.`;
                         
                         await enviarAlertaTelegramServidor(textTelegram);
                         alertasEnviadasCount++;
@@ -340,7 +345,8 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
                     const noTieneDai = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
-                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.`;
+                        // Alerta Falta Registrar DAI con ETA al final
+                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.\n🚢 *ETA:* *${fechaEta}*.`;
 
                         await enviarAlertaTelegramServidor(textTelegramDai);
                         alertasEnviadasCount++;
