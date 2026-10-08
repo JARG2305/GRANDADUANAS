@@ -20,6 +20,19 @@ const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
 
 // ==========================================
+// 0. CONFIGURACIÓN DE CORS Y MIDDLEWARES
+// ==========================================
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
+// ==========================================
 // 1. RUTA ESENCIAL DE CONFIGURACIÓN DINÁMICA
 // ==========================================
 app.get('/api/config', (req, res) => {
