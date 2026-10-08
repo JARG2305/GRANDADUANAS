@@ -44,6 +44,10 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Ruta raíz para que UptimeRobot detecte el servidor encendido
+app.get('/', (req, res) => {
+    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
+});
 // ==========================================
 // 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
 // ==========================================
