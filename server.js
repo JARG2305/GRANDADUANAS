@@ -46,13 +46,24 @@ app.get('/api/config', (req, res) => {
 });
 
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES
+// 0. CONFIGURACIÓN DE MIDDLEWARES Y CORS
 // ==========================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🛑 IMPORTANTE: NO pongas app.use(express.static(__dirname)) aquí arriba 
-// si tienes un index.html viejo en la carpeta, porque Express lo leerá primero.
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
+// ==========================================
+// 🛑 COLÓCALO AQUÍ ARRIBA ANTES DE CUALQUIER OTRA RUTA:
+// ==========================================
 
 // Ruta raíz principal que entrega la interfaz ligera de Soto Aduanas por obligación
 app.get('/', (req, res) => {
@@ -64,8 +75,17 @@ app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
-// El static se coloca DESPUÉS de tus rutas principales para que no las sobrescriba
-app.use(express.static(path.join(__dirname)));
+// ==========================================
+// 1. RUTA ESENCIAL DE CONFIGURACIÓN DINÁMICA
+// ==========================================
+app.get('/api/config', (req, res) => {
+    res.json({
+        firebaseApiKey: FIREBASE_API_KEY,
+        firebaseProjectId: FIREBASE_PROJECT_ID,
+        telegramBotToken: TELEGRAM_BOT_TOKEN || '',
+        telegramChatId: TELEGRAM_CHAT_ID || ''
+    });
+});
 
 // ==========================================
 // 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
