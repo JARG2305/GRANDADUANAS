@@ -327,52 +327,64 @@ cron.schedule('0 10,18 * * *', async () => {
         }
 
         const wb = XLSX.utils.book_new();
-        const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
-        
-        const range = XLSX.utils.decode_range(wsMaster['!ref']);
-        wsMaster['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
-        wsMaster['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
+const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
 
-        let currentSection = 1;
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-            if (cellA && cellA.v && String(cellA.v).includes("▶")) {
-                if (String(cellA.v).includes("TRÁMITES")) currentSection = 2;
-                if (String(cellA.v).includes("DESPACHADOS")) currentSection = 3;
-                cellA.s = { font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } }, alignment: { vertical: "center", horizontal: "left" } };
-                continue;
-            }
+const range = XLSX.utils.decode_range(wsMaster['!ref']);
+wsMaster['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
+wsMaster['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
 
-            for (let C = range.s.c; C <= range.e.c; ++C) {
-                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!wsMaster[cellAddress]) continue;
+wsMaster['!rows'] = [];
+for (let R = range.s.r; R <= range.e.r; ++R) {
+    const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+    if (cellA && cellA.v && String(cellA.v).includes("▶")) {
+        wsMaster['!rows'].push({ hpt: 30 });
+    } else if (cellA && cellA.v && excelHeaders.includes(cellA.v)) {
+        wsMaster['!rows'].push({ hpt: 43 });
+    } else {
+        wsMaster['!rows'].push({ hpt: 26.50 });
+    }
+}
 
-                let cellStyle = {
-                    border: blackBorder,
-                    alignment: { vertical: "center", horizontal: "center", wrapText: true },
-                    font: { name: "Segoe UI", sz: 10 }
-                };
+let currentSection = 1;
+for (let R = range.s.r; R <= range.e.r; ++R) {
+    const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+    if (cellA && cellA.v && String(cellA.v).includes("▶")) {
+        if (String(cellA.v).includes("TRÁMITES")) currentSection = 2;
+        if (String(cellA.v).includes("DESPACHADOS")) currentSection = 3;
+        cellA.s = { font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } }, alignment: { vertical: "center", horizontal: "left" } };
+        continue;
+    }
 
-                const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                if (headerCheck && excelHeaders.includes(headerCheck.v)) {
-                    cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
-                    cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
-                } else {
-                    cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
-                    if (currentSection === 3) {
-                        cellStyle.fill = { fgColor: { rgb: "FEE2E2" } }; // Rojo claro para despachados
-                    } else if (currentSection === 2) {
-                        cellStyle.fill = { fgColor: { rgb: "D9E1F2" } }; // Azul claro para trámites
-                    } else {
-                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; // Amarillo claro para por llegar
-                    }
-                }
-                wsMaster[cellAddress].s = cellStyle;
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!wsMaster[cellAddress]) continue;
+
+        let cellStyle = {
+            border: blackBorder,
+            alignment: { vertical: "center", horizontal: "center", wrapText: true },
+            font: { name: "Segoe UI", sz: 10 }
+        };
+
+        const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+        if (headerCheck && excelHeaders.includes(headerCheck.v)) {
+            cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
+            cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
+        } else {
+            cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
+            if (currentSection === 3) {
+                cellStyle.fill = { fgColor: { rgb: "FEE2E2" } }; // Rojo claro para despachados
+            } else if (currentSection === 2) {
+                cellStyle.fill = { fgColor: { rgb: "D9E1F2" } }; // Azul claro para trámites
+            } else {
+                cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; // Amarillo claro para por llegar
             }
         }
+        wsMaster[cellAddress].s = cellStyle;
+    }
+}
 
-        XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
-        const excelBase64String = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
+const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
 
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
