@@ -45,15 +45,27 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// ==========================================
+// 0. CONFIGURACIÓN DE MIDDLEWARES
+// ==========================================
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 🛑 IMPORTANTE: NO pongas app.use(express.static(__dirname)) aquí arriba 
+// si tienes un index.html viejo en la carpeta, porque Express lo leerá primero.
+
+// Ruta raíz principal que entrega la interfaz ligera de Soto Aduanas por obligación
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'sotoaduanas.html'));
+});
+
 // Ruta de verificación para UptimeRobot
 app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
-// Ruta raíz principal que entrega la interfaz ligera al entrar a la web
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'sotoaduanas.html'));
-});
+// El static se coloca DESPUÉS de tus rutas principales para que no las sobrescriba
+app.use(express.static(path.join(__dirname)));
 
 // ==========================================
 // 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
