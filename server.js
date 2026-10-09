@@ -16,8 +16,8 @@ app.use(express.static(path.join(__dirname)));
 // Credenciales y configuraciones desde variables de entorno
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
 
 // ==========================================
 // 0. CONFIGURACIÓN DE CORS Y MIDDLEWARES
