@@ -553,6 +553,13 @@
 
         window.saveExp = async function(e) {
             e.preventDefault();
+            
+            // Verificamos que la base de datos esté lista antes de operar
+            if (!window.db) {
+                alert("⚠️ La conexión con Firestore aún se está estableciendo. Por favor, espera un segundo e intenta guardar de nuevo.");
+                return;
+            }
+
             const idVal = document.getElementById("recordId").value;
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
