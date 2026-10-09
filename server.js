@@ -1,28 +1,16 @@
 require('dotenv').config();
 const express = require('express');
 const app = express(); 
-app.use(express.static(__dirname)); 
 const path = require('path');
 const XLSX = require('xlsx');
 const cron = require('node-cron');
 
-
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES
+// 0. CONFIGURACIÓN DE MIDDLEWARES Y RUTA RAÍZ
 // ==========================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname)));
 
-// Credenciales y configuraciones desde variables de entorno
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
-
-// ==========================================
-// 0. CONFIGURACIÓN DE CORS Y MIDDLEWARES
-// ==========================================
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -31,6 +19,16 @@ app.use((req, res, next) => {
         return res.sendStatus(200);
     }
     next();
+});
+
+// Forzar de manera absoluta que la raíz sirva tu interfaz ligera
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'sotoaduanas.html'));
+});
+
+// Ruta de verificación para UptimeRobot
+app.get('/health', (req, res) => {
+    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
 // ==========================================
