@@ -45,9 +45,14 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// Ruta raíz para que UptimeRobot detecte el servidor encendido
-app.get('/', (req, res) => {
+// Ruta de verificación para UptimeRobot
+app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
+});
+
+// Ruta raíz principal que entrega la interfaz ligera al entrar a la web
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'sotoaduanas.html'));
 });
 
 // ==========================================
