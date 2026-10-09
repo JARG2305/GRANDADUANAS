@@ -240,7 +240,7 @@ app.post('/api/notificar', async (req, res) => {
 cron.schedule('0 10,18 * * *', async () => {
     console.log("⏰ [CRON] Ejecutando generación y envío automático del reporte Excel con estilos idénticos...");
     try {
-        const destinatariosAutomaticos = ["importacionesepga@gmail.com", "hnoguera@gmail.com", "finanzasepga@gmail.com"];
+        const destinatariosAutomaticos = ["statusepga@gmail.com"];
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
@@ -371,8 +371,9 @@ cron.schedule('0 10,18 * * *', async () => {
             }
         }
 
-        XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
+       XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+        const excelBase64String = Buffer.from(excelBuffer).toString('base64'); // <--- Convertir a base64
 
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
@@ -382,7 +383,7 @@ cron.schedule('0 10,18 * * *', async () => {
             attachments: [
                 {
                     filename: 'Reporte_Logistatus_Automatico.xlsx',
-                    content: excelBuffer,
+                    content: excelBase64String, // <--- Usar la variable en base64
                     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 }
             ]
