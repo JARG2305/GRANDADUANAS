@@ -1,10 +1,11 @@
 require('dotenv').config();
 const express = require('express');
+const app = express(); 
+app.use(express.static(__dirname)); 
 const path = require('path');
 const XLSX = require('xlsx');
 const cron = require('node-cron');
 
-const app = express();
 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
