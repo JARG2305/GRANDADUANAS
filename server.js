@@ -241,18 +241,23 @@ app.post('/api/notificar', async (req, res) => {
 
 // Envío automático programado de correos con Excel estilizado (10:00 AM y 6:00 PM Hora Venezuela)
 // Si no hay un correo configurado en Render, el sistema no intentará adivinar ni enviará nada genérico
-const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
-if (!correoCliente) {
-    console.log("⚠️ [CRON] No hay un CORREO_DESTINATARIO_AUTOMATICO configurado para este servicio.");
-    return; // Evita enviar correos a destinos incorrectos
-}
-const destinatariosAutomaticos = [correoCliente];
+cron.schedule('0 10,18 * * *', async () => {
+    console.log("⏰ [CRON] Ejecutando generación y envío automático...");
+    try {
+        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
+        if (!correoCliente) {
+            console.log("⚠️ [CRON] No hay un CORREO_DESTINATARIO_AUTOMATICO configurado para este servicio.");
+            return;
+        }
+        const destinatariosAutomaticos = [correoCliente];
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
             console.log("⚠️ [CRON] No hay registros en Firestore para generar el reporte automático.");
             return;
         }
+        
+        // ... (el resto del código del cron sigue aquí abajo)
 
         const excelHeaders = [
             "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "REGISTRO DAI", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
