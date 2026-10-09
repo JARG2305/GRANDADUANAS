@@ -54,12 +54,15 @@ app.get('/', (req, res) => {
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
+        // Lee la API Key específica del servicio de Render del cliente actual
         const apiKey = process.env.RESEND_API_KEY; 
-        const remitente = "onboarding@resend.dev";
+        const remitente = process.env.RESEND_REMITE || "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
-            throw new Error("Falta configurar tu RESEND_API_KEY en el archivo .env o en Render.");
+            throw new Error("Falta configurar la RESEND_API_KEY en las variables de entorno de Render para este cliente.");
         }
+
+        // ... (el resto de tu lógica de conversión de adjuntos sigue igual) ...
 
         let destinatarios = opcionesMail.to;
         if (!Array.isArray(destinatarios)) {
@@ -237,10 +240,13 @@ app.post('/api/notificar', async (req, res) => {
 // ==========================================
 
 // Envío automático programado de correos con Excel estilizado (10:00 AM y 6:00 PM Hora Venezuela)
-cron.schedule('0 10,18 * * *', async () => {
-    console.log("⏰ [CRON] Ejecutando generación y envío automático del reporte Excel con estilos idénticos...");
-    try {
-        const destinatariosAutomaticos = ["statusepga@gmail.com"];
+// Si no hay un correo configurado en Render, el sistema no intentará adivinar ni enviará nada genérico
+const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
+if (!correoCliente) {
+    console.log("⚠️ [CRON] No hay un CORREO_DESTINATARIO_AUTOMATICO configurado para este servicio.");
+    return; // Evita enviar correos a destinos incorrectos
+}
+const destinatariosAutomaticos = [correoCliente];
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
