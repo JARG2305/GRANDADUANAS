@@ -333,18 +333,6 @@ cron.schedule('0 10,18 * * *', async () => {
         wsMaster['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
         wsMaster['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
 
-        wsMaster['!rows'] = [];
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-            if (cellA && cellA.v && String(cellA.v).includes("▶")) {
-                wsMaster['!rows'].push({ hpt: 30 });
-            } else if (cellA && cellA.v && excelHeaders.includes(cellA.v)) {
-                wsMaster['!rows'].push({ hpt: 43 });
-            } else {
-                wsMaster['!rows'].push({ hpt: 26.50 });
-            }
-        }
-
         let currentSection = 1;
         for (let R = range.s.r; R <= range.e.r; ++R) {
             const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
@@ -383,9 +371,8 @@ cron.schedule('0 10,18 * * *', async () => {
             }
         }
 
-       XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-        const excelBase64String = Buffer.from(excelBuffer).toString('base64'); // <--- Convertir a base64
+        XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
+        const excelBase64String = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
