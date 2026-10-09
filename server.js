@@ -23,7 +23,14 @@ app.use((req, res, next) => {
 
 // Forzar de manera absoluta que la raíz sirva tu interfaz ligera
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'sotoaduanas.html'));
+    const archivoSoto = path.resolve(__dirname, 'sotoaduanas.html');
+    console.log("Intentando servir archivo en raíz:", archivoSoto);
+    res.sendFile(archivoSoto, (err) => {
+        if (err) {
+            console.error("Error al servir sotoaduanas.html:", err);
+            res.status(500).send("Error al cargar la interfaz ligera.");
+        }
+    });
 });
 
 // Ruta de verificación para UptimeRobot
