@@ -117,6 +117,7 @@ async function enviarCorreoSistema(opcionesMail) {
     }
 }
 
+// 1. Mantienes tu función original para enviar el mensaje real a Telegram
 async function enviarAlertaTelegramServidor(mensajeTexto) {
     try {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -137,6 +138,54 @@ async function enviarAlertaTelegramServidor(mensajeTexto) {
         }
     } catch (err) {
         console.error("❌ Error de red al conectar con Telegram desde el servidor:", err);
+    }
+}
+
+// 2. Agregas esta nueva función justo debajo para bloquear los duplicados
+async function enviarAlertaTelegramUnicaServidor(recId, tipoAlerta, mensajeTexto) {
+    const ahora = new Date();
+    const horaActual = ahora.getHours();
+
+    let slotId = "";
+    if (horaActual >= 9 && horaActual < 12) slotId = "slot_9am";
+    else if (horaActual >= 12 && horaActual < 15) slotId = "slot_12pm";
+    else if (horaActual >= 15 && horaActual < 18) slotId = "slot_3pm";
+    else if (horaActual === 18) slotId = "slot_6pm";
+    else if (horaActual === 19) slotId = "slot_7pm";
+    else if (horaActual === 20) slotId = "slot_8pm";
+    else slotId = `slot_${horaActual}h`;
+
+    const hoyStr = ahora.toISOString().split('T')[0];
+    const controlDocId = `alerta_${recId}_${tipoAlerta}_${hoyStr}_${slotId}`;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+
+    try {
+        const checkUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/historial_alertas/${controlDocId}`;
+        const checkRes = await fetch(checkUrl);
+        
+        if (checkRes.ok) {
+            return; // Ya se envió en esta franja horaria, se omite para evitar duplicados
+        }
+
+        await enviarAlertaTelegramServidor(mensajeTexto);
+
+        const createUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/historial_alertas?documentId=${controlDocId}`;
+        await fetch(createUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fields: {
+                    expedienteId: { stringValue: String(recId) },
+                    tipo: { stringValue: String(tipoAlerta) },
+                    fechaEnvio: { stringValue: String(hoyStr) },
+                    horarioSlot: { stringValue: String(slotId) }
+                }
+            })
+        });
+
+    } catch (err) {
+        console.error("❌ Error al gestionar el control de duplicados en la nube:", err);
+        await enviarAlertaTelegramServidor(mensajeTexto);
     }
 }
 
@@ -413,6 +462,7 @@ cron.schedule('0 10,18 * * *', async () => {
 });
 
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)[cite: 4]
+// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
     const horaActual = new Date(ahoraVzla).getHours();
@@ -436,23 +486,25 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             const contRaw = (rec.numero_contenedor || "").trim();
             let contenedoresList = contRaw ? contRaw.split(',').map(c => c.trim().toLowerCase()).filter(Boolean) : [];
 
+            const recIdUnico = rec.id || rec.num_expediente || 'gen';
+
             if (expVal) {
                 if (expSet.has(expVal)) {
-                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El N.º de Expediente **${rec.num_expediente}** está repetido en el sistema.`);
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_exp', `❗ **DUPLICADO:** El N.º de Expediente **${rec.num_expediente}** está repetido en el sistema.`);
                     alertasEnviadasCount++;
                 }
                 expSet.add(expVal);
             }
             if (blVal && blVal !== 's/n') {
                 if (blSet.has(blVal)) {
-                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El N.º de B/L o AWB **${rec.awb_bl}** ya está usado en otro expediente.`);
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_bl', `❗ **DUPLICADO:** El N.º de B/L o AWB **${rec.awb_bl}** ya está usado en otro expediente.`);
                     alertasEnviadasCount++;
                 }
                 blSet.add(blVal);
             }
             contenedoresList.forEach(async (contVal) => {
                 if (contSet.has(contVal)) {
-                    await enviarAlertaTelegramServidor(`❗ **DUPLICADO:** El Contenedor **${contVal.toUpperCase()}** ya está registrado en otro expediente.`);
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, `duplicado_cont_${contVal}`, `❗ **DUPLICADO:** El Contenedor **${contVal.toUpperCase()}** ya está registrado en otro expediente.`);
                     alertasEnviadasCount++;
                 }
                 contSet.add(contVal);
@@ -478,7 +530,8 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                         let textoCountdown = diffVencDays === 1 ? "¡VENCE MAÑANA!" : `Faltan ${diffVencDays} día(s) para vencer`;
                         const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
                         
-                        await enviarAlertaTelegramServidor(textTelegram);
+                        // Usamos la función de única vez por slot
+                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_venc', textTelegram);
                         alertasEnviadasCount++;
                     }
                 }
@@ -493,7 +546,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                         const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
                         const textTelegram = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
 
-                        await enviarAlertaTelegramServidor(textTelegram);
+                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textTelegram);
                         alertasEnviadasCount++;
                     }
 
@@ -501,7 +554,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
                         const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.\n🚢 *ETA:* *${fechaEta}*.`;
 
-                        await enviarAlertaTelegramServidor(textTelegramDai);
+                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textTelegramDai);
                         alertasEnviadasCount++;
                     }
                 }
