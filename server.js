@@ -1,11 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const app = express(); 
-app.use(express.static(__dirname)); 
 const path = require('path');
 const XLSX = require('xlsx');
 const cron = require('node-cron');
-
 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
@@ -17,8 +15,8 @@ app.use(express.static(path.join(__dirname)));
 // Credenciales y configuraciones desde variables de entorno
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
 
 // ==========================================
 // 0. CONFIGURACIÓN DE CORS Y MIDDLEWARES
@@ -45,8 +43,13 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-// Ruta raíz para que UptimeRobot detecte el servidor encendido
+// Ruta raíz que entrega la interfaz principal index.html
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Ruta de verificación para UptimeRobot
+app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
@@ -55,15 +58,12 @@ app.get('/', (req, res) => {
 // ==========================================
 async function enviarCorreoSistema(opcionesMail) {
     try {
-        // Lee la API Key específica del servicio de Render del cliente actual
         const apiKey = process.env.RESEND_API_KEY; 
         const remitente = process.env.RESEND_REMITE || "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
             throw new Error("Falta configurar la RESEND_API_KEY en las variables de entorno de Render para este cliente.");
         }
-
-        // ... (el resto de tu lógica de conversión de adjuntos sigue igual) ...
 
         let destinatarios = opcionesMail.to;
         if (!Array.isArray(destinatarios)) {
@@ -117,7 +117,6 @@ async function enviarCorreoSistema(opcionesMail) {
     }
 }
 
-// 1. Mantienes tu función original para enviar el mensaje real a Telegram
 async function enviarAlertaTelegramServidor(mensajeTexto) {
     try {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -141,7 +140,7 @@ async function enviarAlertaTelegramServidor(mensajeTexto) {
     }
 }
 
-// 2. Agregas esta nueva función justo debajo para bloquear los duplicados
+// Función avanzada para control de duplicados en la nube por slots de hora
 async function enviarAlertaTelegramUnicaServidor(recId, tipoAlerta, mensajeTexto) {
     const ahora = new Date();
     const horaActual = ahora.getHours();
@@ -189,10 +188,8 @@ async function enviarAlertaTelegramUnicaServidor(recId, tipoAlerta, mensajeTexto
     }
 }
 
-// Función para obtener los expedientes directo desde Firebase Firestore vía REST API
 async function obtenerExpedientesFirestore() {
     try {
-        // Usa la variable de entorno multicliente configurada en Render
         const projectId = process.env.FIREBASE_PROJECT_ID;
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
         const response = await fetch(url);
@@ -215,7 +212,6 @@ async function obtenerExpedientesFirestore() {
     }
 }
 
-// Funciones auxiliares de fecha y modo de transporte para el servidor
 function parseFechaLocalServidor(str) {
     if (!str) return null;
     str = String(str).trim();
@@ -292,7 +288,6 @@ app.post('/api/notificar', async (req, res) => {
 // ==========================================
 
 // Envío automático programado de correos con Excel estilizado (10:00 AM y 6:00 PM Hora Venezuela)
-// Si no hay un correo configurado en Render, el sistema no intentará adivinar ni enviará nada genérico
 cron.schedule('0 10,18 * * *', async () => {
     console.log("⏰ [CRON] Ejecutando generación y envío automático...");
     try {
@@ -308,8 +303,6 @@ cron.schedule('0 10,18 * * *', async () => {
             console.log("⚠️ [CRON] No hay registros en Firestore para generar el reporte automático.");
             return;
         }
-        
-        // ... (el resto del código del cron sigue aquí abajo)
 
         const excelHeaders = [
             "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "REGISTRO DAI", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
@@ -423,20 +416,20 @@ cron.schedule('0 10,18 * * *', async () => {
                 } else {
                     cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
                     if (currentSection === 3) {
-                        cellStyle.fill = { fgColor: { rgb: "FEE2E2" } }; // Rojo claro para despachados
+                        cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
                     } else if (currentSection === 2) {
-                        cellStyle.fill = { fgColor: { rgb: "D9E1F2" } }; // Azul claro para trámites
+                        cellStyle.fill = { fgColor: { rgb: "D9E1F2" } };
                     } else {
-                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; // Amarillo claro para por llegar
+                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } };
                     }
                 }
                 wsMaster[cellAddress].s = cellStyle;
             }
         }
 
-       XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
+        XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-        const excelBase64String = Buffer.from(excelBuffer).toString('base64'); // <--- Convertir a base64
+        const excelBase64String = Buffer.from(excelBuffer).toString('base64');
 
         const mailOptionsAuto = {
             to: destinatariosAutomaticos,
@@ -446,7 +439,7 @@ cron.schedule('0 10,18 * * *', async () => {
             attachments: [
                 {
                     filename: 'Reporte_Logistatus_Automatico.xlsx',
-                    content: excelBase64String, // <--- Usar la variable en base64
+                    content: excelBase64String,
                     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 }
             ]
@@ -461,7 +454,6 @@ cron.schedule('0 10,18 * * *', async () => {
     timezone: "America/Caracas"
 });
 
-// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)[cite: 4]
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
@@ -530,7 +522,6 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                         let textoCountdown = diffVencDays === 1 ? "¡VENCE MAÑANA!" : `Faltan ${diffVencDays} día(s) para vencer`;
                         const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
                         
-                        // Usamos la función de única vez por slot
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_venc', textTelegram);
                         alertasEnviadasCount++;
                     }
