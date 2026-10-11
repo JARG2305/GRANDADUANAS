@@ -410,17 +410,30 @@ cron.schedule('0 10,18 * * *', async () => {
                 };
 
                 const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+                const nombreColumnaActual = wsMaster[XLSX.utils.encode_cell({ r: R, c: C })]?.v; // O evaluar el header superior en la fila de cabeceras
+
                 if (headerCheck && excelHeaders.includes(headerCheck.v)) {
                     cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
                     cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
                 } else {
                     cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
-                    if (currentSection === 3) {
-                        cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
-                    } else if (currentSection === 2) {
-                        cellStyle.fill = { fgColor: { rgb: "D9E1F2" } };
+                    
+                    // 🎨 RESALTADO DE COLUMNAS COMPLETAS POR NOMBRE DE CABECERA
+                    const textoCabeceraColumna = wsMaster[XLSX.utils.encode_cell({ r: 1, c: C })]?.v || wsMaster[XLSX.utils.encode_cell({ r: 2, c: C })]?.v || "";
+                    
+                    if (textoCabeceraColumna.includes("ETA") || textoCabeceraColumna.includes("DÍAS LIBRES")) {
+                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; // 🟡 Amarillo para ETA / Vencimientos
+                    } else if (textoCabeceraColumna.includes("LLEGADA") || textoCabeceraColumna.includes("FECHA DE LLEGADA")) {
+                        cellStyle.fill = { fgColor: { rgb: "2563EB" } }; // 🔵 Azul Rey para Fecha de Llegada
+                        cellStyle.font.color = { rgb: "FFFFFF" }; // Texto blanco para que resalte bien en azul rey
                     } else {
-                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } };
+                        if (currentSection === 3) {
+                            cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
+                        } else if (currentSection === 2) {
+                            cellStyle.fill = { fgColor: { rgb: "D9E1F2" } };
+                        } else {
+                            cellStyle.fill = { fgColor: { rgb: "F8FAFC" } };
+                        }
                     }
                 }
                 wsMaster[cellAddress].s = cellStyle;
