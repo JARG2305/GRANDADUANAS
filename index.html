@@ -1858,7 +1858,7 @@
                 return;
             }
 
-            aactiveData.forEach((rec, index) => {
+            activeData.forEach((rec, index) => {
                 const tr = document.createElement("tr");
                 const isDespachado = Boolean(rec.despacho);
                 let stickyBgColor = isDespachado ? "#fee2e2" : (index % 2 === 0 ? "#ffffff" : "#f8fafc");
