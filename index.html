@@ -2141,18 +2141,7 @@
             if (rec) openModal(rec); 
         }
 
-        window.deleteRecord = async function(id) { 
-            if (confirm("¿Eliminar expediente de la nube?")) 
-                await deleteDoc(doc(db, COLLECTION_NAME, id)); 
-        }
-    
-        window.toggleStats = function() {
-            const statsSection = document.getElementById('statsSection');
-            if (!statsSection) return;
-            statsSection.classList.toggle('hidden');
-        };
-
-        // FUNCIÓN AUXILIAR PARA GENERAR EL EXCEL EN BASE64 REUTILIZANDO EL REPORTE MAESTRO
+               // FUNCIÓN AUXILIAR PARA GENERAR EL EXCEL EN BASE64 REUTILIZANDO EL REPORTE MAESTRO
         window.generarExcelBase64ParaCorreo = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
@@ -2514,6 +2503,22 @@
                 alert("Ocurrió un error al generar el archivo unificado: " + err.message);
             }
         };
+	window.deleteRecord = async function(id) { 
+            if (confirm("¿Eliminar expediente de la nube?")) 
+                await deleteDoc(doc(db, COLLECTION_NAME, id)); 
+        }
+    
+        window.toggleStats = function() {
+            const statsSection = document.getElementById('statsSection');
+            if (!statsSection) return;
+            statsSection.classList.toggle('hidden');
+        };
+
+        // INICIALIZACIÓN DE LA NUBE
+        initCloudDB();
+    </script>
+</body>
+</html>
 
         // INICIALIZACIÓN DE LA NUBE
         initCloudDB();
