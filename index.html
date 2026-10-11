@@ -793,8 +793,8 @@
         let currentTab = 'porLlegar';
         let subTabAlertaActual = 'operativas';
         let selectedRecordId = null;
-        let sortColumnIndex = null;
-        let sortDirection = 'asc';í
+        let sortColumnIndex = null; // 👈 Obligatorio
+        let sortDirection = 'asc';  // 👈 Obligatorio
 
         // Carga la configuración dinámica y arranca Firebase de forma segura
         async function inicializarConfiguracionDinamica() {
