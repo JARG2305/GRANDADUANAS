@@ -1858,7 +1858,7 @@
                 return;
             }
 
-            activeData.forEach((rec, index) => {
+            aactiveData.forEach((rec, index) => {
                 const tr = document.createElement("tr");
                 const isDespachado = Boolean(rec.despacho);
                 let stickyBgColor = isDespachado ? "#fee2e2" : (index % 2 === 0 ? "#ffffff" : "#f8fafc");
@@ -1872,30 +1872,27 @@
                 let htmlCli = `<td class="p-3 font-semibold sticky-col-4" style="background-color: ${stickyBgColor} !important;">${rec.cliente || ''}</td>`;
 
                 let remainingFields = fieldsList.filter(f => !["modo_transporte", "num_expediente", "cliente"].includes(f));
-let htmlFields = remainingFields.map(field => {
-    let val = rec[field] || '';
-    if (field === 'peso_bl' && val !== '') {
-        val = Number(val).toFixed(2);
-    } else if (camposFechas.includes(field) && val) {
-        val = formatearFechaDDMMYYYY(val);
-    }
-    
-    // 🎨 ASIGNAR CLASE DE COLOR SEGÚN EL NOMBRE DEL CAMPO EN LA WEB
-    let estilosExtra = "";
-    if (field.includes('eta') || field.includes('dias_libres')) {
-        estilosExtra = "bg-amber-200 text-amber-950 font-bold"; // 🟡 Amarillo para ETA y días libres
-    } else if (field === 'fecha_llegada') {
-        estilosExtra = "bg-blue-600 text-white font-bold"; // 🔵 Azul rey para Fecha de Llegada
-    }
+                let htmlFields = remainingFields.map(field => {
+                    let val = rec[field] || '';
+                    if (field === 'peso_bl' && val !== '') {
+                        val = Number(val).toFixed(2);
+                    } else if (camposFechas.includes(field) && val) {
+                        val = formatearFechaDDMMYYYY(val);
+                    }
+                    
+                    let estilosExtra = "";
+                    if (field.includes('eta') || field.includes('dias_libres')) {
+                        estilosExtra = "bg-amber-200 text-amber-950 font-bold";
+                    } else if (field === 'fecha_llegada') {
+                        estilosExtra = "bg-blue-600 text-white font-bold";
+                    }
 
-    return `<td class="p-3 border-r border-slate-200 snap-col ${estilosExtra}" title="${val}">${val}</td>`;
-}).join('');
+                    return `<td class="p-3 border-r border-slate-200 snap-col ${estilosExtra}" title="${val}">${val}</td>`;
+                }).join('');
 
-tr.innerHTML = htmlActions + htmlTracking + htmlModo + htmlExp + htmlCli + htmlFields;
-tbody.appendChild(tr);
-
-        let sortColumnIndex = null;
-        let sortDirection = 'asc';
+                tr.innerHTML = htmlActions + htmlTracking + htmlModo + htmlExp + htmlCli + htmlFields;
+                tbody.appendChild(tr);
+            });
 
         window.sortTableByColumn = function(colName) {
             if (sortColumnIndex === colName) {
