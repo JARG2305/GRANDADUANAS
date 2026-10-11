@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const app = express(); 
 const path = require('path');
-const XLSX = require('xlsx');
+const XLSX = require('xlsx-js-style');
 const cron = require('node-cron');
 
 // ==========================================
