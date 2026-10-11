@@ -1940,15 +1940,10 @@
                     return sortDirection === 'asc' ? comp : -comp;
                 }
 
-                if (currentTab === 'porLlegar') {
-                    let fA = parseFechaLocal(a.fecha_llegada || a.eta_la_guaira) || new Date('9999-12-31');
-                    let fB = parseFechaLocal(b.fecha_llegada || b.eta_la_guaira) || new Date('9999-12-31');
-                    return fA - fB;
-                } else {
-                    let fA = parseFechaLocal(a.despacho || a.validacion || a.reconocimiento || a.fecha_transmision || a.fecha_registro_dai || a.fecha_llegada) || new Date('9999-12-31');
-                    let fB = parseFechaLocal(b.despacho || b.validacion || b.reconocimiento || b.fecha_transmision || b.fecha_registro_dai || b.fecha_llegada) || new Date('9999-12-31');
-                    return fA - fB;
-                }
+                // 📌 ORDENAMIENTO AUTOMÁTICO POR ETA O FECHA DE LLEGADA
+                let fA = parseFechaLocal(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31');
+                let fB = parseFechaLocal(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31');
+                return fA - fB;
             });
 
             return targetRecords;
