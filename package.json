@@ -1,7 +1,7 @@
 {
-  "name": "logistatus-pro",
+  "name": "grandaduanas",
   "version": "1.0.0",
-  "description": "",
+  "description": "Logistatus Pro - Control Logístico y Aduanas",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -14,3 +14,4 @@
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   }
+}
