@@ -54,8 +54,28 @@ app.get('/health', (req, res) => {
 });
 
 // Ruta dual (GET y POST) para compatibilidad total del botón de forzar alertas
+// Ruta dual para procesar tanto las alertas enviadas manualmente desde la web como las peticiones GET
 app.all('/api/calcular-alertas', async (req, res) => {
     try {
+        const { alertas } = req.body || {};
+        
+        // Si el cliente web envía un arreglo directo de alertas manuales forzadas
+        if (alertas && Array.isArray(alertas) && alertas.length > 0) {
+            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
+            
+            alertas.forEach((alertText, index) => {
+                let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
+                mensajeConsolidado += `${index + 1}. ${textoLimpio}`;
+                if (index < alertas.length - 1) {
+                    mensajeConsolidado += "\n\n──────────────────────\n\n";
+                }
+            });
+
+            await enviarAlertaTelegramServidor(mensajeConsolidado);
+            return res.json({ success: true, count: alertas.length, message: `¡Alertas forzadas y enviadas con éxito! (${alertas.length} enviadas)` });
+        }
+
+        // Si se invoca sin cuerpo POST, realizamos el escaneo automático en Firestore
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
             return res.json({ success: true, count: 0, message: "No hay registros en Firestore." });
