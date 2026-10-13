@@ -54,6 +54,7 @@ app.get('/health', (req, res) => {
 });
 
 // Ruta auxiliar para procesar y enviar las alertas desde la interfaz web de forma manual
+// Ruta auxiliar para procesar y enviar las alertas desde la interfaz web de forma manual
 app.post('/api/calcular-alertas', async (req, res) => {
     try {
         const { alertas } = req.body;
