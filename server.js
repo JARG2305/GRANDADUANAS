@@ -53,9 +53,27 @@ app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
-// Ruta auxiliar para compatibilidad del botón de forzar alertas manuales
-app.get('/api/calcular-alertas', (req, res) => {
-    res.json({ success: true, alerts: [] });
+// Ruta auxiliar para procesar y enviar las alertas desde la interfaz web de forma manual
+app.post('/api/calcular-alertas', async (req, res) => {
+    try {
+        const { alertas } = req.body;
+        if (!alertas || !Array.isArray(alertas) || alertas.length === 0) {
+            return res.json({ success: true, count: 0, message: "No hay alertas pendientes para enviar." });
+        }
+
+        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
+        alertas.forEach((alertText, index) => {
+            let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
+            mensajeConsolidado += `${index + 1}. ${textoLimpio}\n\n`;
+        });
+
+        await enviarAlertaTelegramServidor(mensajeConsolidado);
+
+        res.json({ success: true, count: alertas.length, message: "¡Alertas forzadas y enviadas a Telegram con éxito!" });
+    } catch (error) {
+        console.error("❌ Error al procesar alertas manuales:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // ==========================================
@@ -332,6 +350,12 @@ cron.schedule('0 10,18 * * *', async () => {
             right: { style: "thin", color: { rgb: "FFFFFF" } }
         };
 
+        const anchosEspecificosXLSX = [
+            10, 11, 31, 21, 15, 15, 21, 21, 18, 12, 18, 13, 14, 14, 14, 15, 14, 
+            14.5, 14.5, 14.5, 16, 16, 12, 14.5, 14.5, 14.5, 16, 12, 12, 12, 
+            14, 14, 14, 17, 15, 15, 17, 14, 14, 14, 15, 17, 14.5, 14.5, 14.5, 14.5, 20
+        ];
+
         const buildRowsServidor = (listaRecs) => {
             return listaRecs.map(rec => {
                 return fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
@@ -409,8 +433,6 @@ cron.schedule('0 10,18 * * *', async () => {
                 };
 
                 const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                const nombreColumnaActual = wsMaster[XLSX.utils.encode_cell({ r: R, c: C })]?.v;
-
                 if (headerCheck && excelHeaders.includes(headerCheck.v)) {
                     cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
                     cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
@@ -466,6 +488,7 @@ cron.schedule('0 10,18 * * *', async () => {
 });
 
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
+// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
     const horaActual = new Date(ahoraVzla).getHours();
@@ -517,6 +540,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
+            const blInfo = rec.awb_bl || 'S/N'; // 👈 B/L o AWB incorporado
             const esMaritimo = identificarEsMaritimoServidor(rec);
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
@@ -529,14 +553,14 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
                 if (dVencimientoDai) {
                     const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                    // Persistencia: Sigue alertando desde 4 días antes, al vencerse hoy, o si se reasa el plazo indefinidamente
                     if (diffVencDays <= 4) {
                         let textoCountdown = "";
                         if (diffVencDays > 0) textoCountdown = `Faltan ${diffVencDays} día(s) para vencer`;
                         else if (diffVencDays === 0) textoCountdown = "¡VENCE HOY!";
                         else textoCountdown = `⚠️ ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS!`;
 
-                        const textTelegram = `**⚠️ ALERTA DAI - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
+                        // 📄 B/L o AWB incluido en el mensaje de la DAI
+                        const textTelegram = `**⚠️ ALERTA DAI - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
                         
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_venc', textTelegram);
                         alertasEnviadasCount++;
@@ -551,7 +575,9 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
                         const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
                         const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
-                        const textTelegram = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+                        
+                        // 📄 B/L o AWB incluido en la cuenta regresiva del ETA
+                        const textTelegram = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
 
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textTelegram);
                         alertasEnviadasCount++;
@@ -559,7 +585,8 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
                     const noTieneDai = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
-                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano o ya se cumplió (*${fechaArriboObjetivo}*) y el registro DAI sigue pendiente/vacío.\n🚢 *ETA:* *${fechaEta}*.`;
+                        // 📄 B/L o AWB incluido en la alerta de falta de registro DAI
+                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano o ya se cumplió (*${fechaArriboObjetivo}*) y el registro DAI sigue pendiente/vacío.\n🚢 *ETA:* *${fechaEta}*.`;
 
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textTelegramDai);
                         alertasEnviadasCount++;
