@@ -53,26 +53,54 @@ app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
-// Ruta auxiliar para procesar y enviar las alertas desde la interfaz web de forma manual
-// Ruta auxiliar para procesar y enviar las alertas desde la interfaz web de forma manual
-app.post('/api/calcular-alertas', async (req, res) => {
+// Ruta dual (GET y POST) para compatibilidad total del botón de forzar alertas
+app.all('/api/calcular-alertas', async (req, res) => {
     try {
-        const { alertas } = req.body;
-        if (!alertas || !Array.isArray(alertas) || alertas.length === 0) {
-            return res.json({ success: true, count: 0, message: "No hay alertas pendientes para enviar." });
+        const alertas = req.body?.alertas;
+        
+        if (alertas && Array.isArray(alertas) && alertas.length > 0) {
+            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
+            alertas.forEach((alertText, index) => {
+                let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
+                mensajeConsolidado += `${index + 1}. ${textoLimpio}\n\n`;
+            });
+
+            await enviarAlertaTelegramServidor(mensajeConsolidado);
+            return res.json({ success: true, count: alertas.length, message: "¡Alertas forzadas y enviadas a Telegram con éxito!" });
         }
 
-        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
-        alertas.forEach((alertText, index) => {
-            let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
-            mensajeConsolidado += `${index + 1}. ${textoLimpio}\n\n`;
-        });
+        // Si se invoca sin cuerpo POST, evaluamos y disparamos las alertas activas directamente
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) {
+            return res.json({ success: true, alerts: [], message: "No hay registros en Firestore." });
+        }
 
-        await enviarAlertaTelegramServidor(mensajeConsolidado);
+        let alertasEnviadasCount = 0;
+        const today = new Date();
+        today.setHours(0,0,0,0);
 
-        res.json({ success: true, count: alertas.length, message: "¡Alertas forzadas y enviadas a Telegram con éxito!" });
+        for (const rec of records) {
+            if (rec.despacho) continue;
+            const expName = rec.num_expediente || 'S/N';
+            const clientName = rec.cliente || 'S/C';
+            const blInfo = rec.awb_bl || 'S/N';
+            const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
+            const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
+            const recIdUnico = rec.id || rec.num_expediente || 'gen';
+
+            if (!rec.fecha_llegada && dArriboObj) {
+                const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                    const textTelegram = `**⚠️ REPORTE MANUAL - PRÓXIMO ARRIBO**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* (${fechaArriboObjetivo}).`;
+                    await enviarAlertaTelegramServidor(textTelegram);
+                    alertasEnviadasCount++;
+                }
+            }
+        }
+
+        res.json({ success: true, alerts: [], count: alertasEnviadasCount, message: `Sincronización completada. Alertas enviadas: ${alertasEnviadasCount}` });
     } catch (error) {
-        console.error("❌ Error al procesar alertas manuales:", error);
+        console.error("❌ Error en /api/calcular-alertas:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
