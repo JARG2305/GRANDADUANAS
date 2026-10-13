@@ -127,8 +127,8 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
 
                 if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
-                    const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffPlazoDays}d`;
-                    let tarjeta = `⚠️ **PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoPlazo} para transmitir`;
+                    const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Quedan ${diffPlazoDays} días para transmitir`;
+                    let tarjeta = `⚠️ **PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoPlazo} - Riesgo Multa Art. 177 Num. 7 de la L.O.A.`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffPlazoDays < 0) {
                     let tarjeta = `🚨 **EXTEMPORANEIDAD - ART. 47 de la L.O.A.**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⚠️ Sin transmitir a tiempo. **¡Aplica Multa Art. 177 Num. 7 de la L.O.A.!**`;
@@ -166,14 +166,13 @@ app.all('/api/calcular-alertas', async (req, res) => {
             }
         }
 
-        // Unimos los bloques en el orden estricto solicitado: 1° ETA, 2° DAI por hacer, 3° Vencimientos
+        // Unimos los bloques en el orden estricto: 1° ETA, 2° DAI por hacer, 3° Vencimientos
         let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
 
         if (listaFinalOrdenada.length === 0) {
             return res.json({ success: true, count: 0, message: "No hay alertas críticas pendientes." });
         }
 
-        // Enumeramos la lista final secuencialmente solo para la presentación visual del mensaje
         let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
 
         let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE CONSOLIDADO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
