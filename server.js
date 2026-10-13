@@ -67,34 +67,75 @@ app.all('/api/calcular-alertas', async (req, res) => {
         today.setHours(0,0,0,0);
 
         for (const rec of records) {
-            if (rec.despacho) continue;
+            if (rec.despacho) continue; // Ignora los ya despachados
+
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
             const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
-            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
-            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
 
-            if (!hasRegistroDai && dVencimientoDai) {
+            // 1. ALERTA: PLAZO DE DECLARACIÓN (Art. 47 LOA)
+            const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+            
+            if (dLlegada && !hasTransmision) {
+                let dDeadline = new Date(dLlegada.getTime());
+                let diasHabilesAgregados = 0;
+                let intentosMaximos = 0;
+                while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
+                    dDeadline.setDate(dDeadline.getDate() + 1);
+                    const diaSemana = dDeadline.getDay();
+                    if (diaSemana !== 0 && diaSemana !== 6) {
+                        diasHabilesAgregados++;
+                    }
+                    intentosMaximos++;
+                }
+                const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+
+                if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
+                    const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffPlazoDays}d`;
+                    let tarjeta = `${contadorAlerta}️⃣ ⚠️ **PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoPlazo} para transmitir`;
+                    mensajesArray.push(tarjeta);
+                    contadorAlerta++;
+                } else if (diffPlazoDays < 0) {
+                    let tarjeta = `${contadorAlerta}️⃣ 🚨 **EXTEMPORANEIDAD - ART. 47 de la L.O.A.**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⚠️ Sin transmitir a tiempo. **¡Aplica Multa Art. 177 Num. 7 de la L.O.A.!**`;
+                    mensajesArray.push(tarjeta);
+                    contadorAlerta++;
+                }
+            }
+
+            // 2. ALERTA: VENCIMIENTO DE ALMACÉN Y DEMORAS
+            if (rec.culminacion_dias_libres) {
+                const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
+                if (culmDate) {
+                    const diffDaysAlm = Math.round((culmDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffDaysAlm >= 0 && diffDaysAlm <= 2) {
+                        const textoAlm = diffDaysAlm === 0 ? "VENCE HOY" : `Faltan ${diffDaysAlm}d`;
+                        let tarjeta = `${contadorAlerta}️⃣ ⚠️ **ALMACÉN PRÓXIMO A VENCER**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoAlm} (${rec.culminacion_dias_libres})`;
+                        mensajesArray.push(tarjeta);
+                        contadorAlerta++;
+                    } else if (diffDaysAlm < 0) {
+                        let tarjeta = `${contadorAlerta}️⃣ 🚨 **ALMACÉN VENCIDO**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⚠️ Venció hace ${Math.abs(diffDaysAlm)} día(s) el ${rec.culminacion_dias_libres}`;
+                        mensajesArray.push(tarjeta);
+                        contadorAlerta++;
+                    }
+                }
+            }
+
+            // 3. ALERTA: DAI PRÓXIMA A VENCER (La lógica original que ya tenías)
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+            const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+
+            if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                 
-                let tituloAlerta = "";
-                let textoDaiEstado = "";
-
-                if (diffVencDays > 0) {
-                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
-                    textoDaiEstado = `Faltan ${diffVencDays} día(s) (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
-                } else if (diffVencDays === 0) {
-                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
-                    textoDaiEstado = `¡VENCE HOY! (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
-                } else {
-                    tituloAlerta = "🚨 **DAI VENCIDA**";
-                    textoDaiEstado = `Vencida hace ${Math.abs(diffVencDays)} día(s) (Venció el ${rec.vencimiento_dai}) - Multa Art. 177 Num. 9 de la L.O.A.`;
+                if (diffVencDays >= 0 && diffVencDays <= 4) {
+                    const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
+                    let tarjeta = `${contadorAlerta}️⃣ ⚠️ **DAI PRÓXIMA A VENCER**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: **${fechaEta}**`;
+                    mensajesArray.push(tarjeta);
+                    contadorAlerta++;
                 }
-                
-                let tarjeta = `${contadorAlerta}️⃣ ${tituloAlerta}\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoDaiEstado}\n🚢 ETA: **${fechaEta}**`;
-                mensajesArray.push(tarjeta);
-                contadorAlerta++;
             }
         }
 
