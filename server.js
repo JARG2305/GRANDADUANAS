@@ -404,7 +404,7 @@ cron.schedule('0 10,18 * * *', async () => {
                 };
 
                 const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                const nombreColumnaActual = wsMaster[XLSX.utils.encode_cell({ r: R, c: C })]?.v; // O evaluar el header superior en la fila de cabeceras
+                const nombreColumnaActual = wsMaster[XLSX.utils.encode_cell({ r: R, c: C })]?.v;
 
                 if (headerCheck && excelHeaders.includes(headerCheck.v)) {
                     cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
@@ -412,14 +412,13 @@ cron.schedule('0 10,18 * * *', async () => {
                 } else {
                     cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
                     
-                    // 🎨 RESALTADO DE COLUMNAS COMPLETAS POR NOMBRE DE CABECERA
                     const textoCabeceraColumna = wsMaster[XLSX.utils.encode_cell({ r: 1, c: C })]?.v || wsMaster[XLSX.utils.encode_cell({ r: 2, c: C })]?.v || "";
                     
                     if (textoCabeceraColumna.includes("ETA") || textoCabeceraColumna.includes("DÍAS LIBRES")) {
-                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; // 🟡 Amarillo para ETA / Vencimientos
+                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } };
                     } else if (textoCabeceraColumna.includes("LLEGADA") || textoCabeceraColumna.includes("FECHA DE LLEGADA")) {
-                        cellStyle.fill = { fgColor: { rgb: "2563EB" } }; // 🔵 Azul Rey para Fecha de Llegada
-                        cellStyle.font.color = { rgb: "FFFFFF" }; // Texto blanco para que resalte bien en azul rey
+                        cellStyle.fill = { fgColor: { rgb: "2563EB" } };
+                        cellStyle.font.color = { rgb: "FFFFFF" };
                     } else {
                         if (currentSection === 3) {
                             cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
@@ -562,6 +561,8 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     }
                 }
             }
+        } // 👈 ¡Llave de cierre del bucle 'for' añadida aquí!
+
         console.log(`✅ [CRON NUBE] Verificación finalizada. Alertas enviadas: ${alertasEnviadasCount}`);
     } catch (error) {
         console.error("❌ [CRON NUBE] Error al procesar alertas automáticas:", error);
