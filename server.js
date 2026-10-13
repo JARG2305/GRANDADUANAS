@@ -59,23 +59,37 @@ app.all('/api/calcular-alertas', async (req, res) => {
     try {
         const { alertas } = req.body || {};
         
-        // Si el cliente web envía un arreglo directo de alertas manuales forzadas
+        // Si el cliente web envía el listado de alertas activas desde la pantalla
         if (alertas && Array.isArray(alertas) && alertas.length > 0) {
-            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
-            
-            alertas.forEach((alertText, index) => {
+            let mensajesFormateados = [];
+
+            alertas.forEach((alertText) => {
                 let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
-                mensajeConsolidado += `${index + 1}. ${textoLimpio}`;
-                if (index < alertas.length - 1) {
-                    mensajeConsolidado += "\n\n──────────────────────\n\n";
+                
+                // Limpieza y extracción inteligente para ordenar: TÍTULO, EXP, CLIENTE, BL...
+                let lineas = textoLimpio.split('\n').map(l => l.trim()).filter(Boolean);
+                let tituloAlerta = lineas[0] || "⚠️ ALERTA OPERATIVA";
+                let expInfo = lineas.find(l => l.toLowerCase().includes('exp')) || "Exp: S/N";
+                let clienteInfo = lineas.find(l => l.toLowerCase().includes('cliente')) || "Cliente: S/C";
+                let blInfo = lineas.find(l => l.toLowerCase().includes('b/l') || l.toLowerCase().includes('awb')) || `B/L o AWB: S/N`;
+                
+                // Resto de detalles de la alerta (días, fechas, etc.)
+                let restoDetalles = lineas.filter(l => !l.includes(expInfo) && !l.includes(clienteInfo) && !l.includes(blInfo) && !l.includes(tituloAlerta)).join('\n');
+
+                let tarjetaOrdenada = `**${tituloAlerta.toUpperCase()}**\n${expInfo}\n${clienteInfo}\n${blInfo}`;
+                if (restoDetalles) {
+                    tarjetaOrdenada += `\n${restoDetalles}`;
                 }
+                mensajesFormateados.push(tarjetaOrdenada);
             });
+
+            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n" + mensajesFormateados.join("\n\n──────────────────────\n\n");
 
             await enviarAlertaTelegramServidor(mensajeConsolidado);
             return res.json({ success: true, count: alertas.length, message: `¡Alertas forzadas y enviadas con éxito! (${alertas.length} enviadas)` });
         }
 
-        // Si se invoca sin cuerpo POST, realizamos el escaneo automático en Firestore
+        // Si se invoca sin cuerpo POST, escaneamos Firestore automáticamente con el mismo orden estricto
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
             return res.json({ success: true, count: 0, message: "No hay registros en Firestore." });
@@ -96,9 +110,10 @@ app.all('/api/calcular-alertas', async (req, res) => {
 
             if (!hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                let textoDaiEstado = diffVencDays > 0 ? `⏳ Vence en ${diffVencDays} día(s)` : (diffVencDays === 0 ? `⚠️ ¡VENCE HOY!` : `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS!`);
+                let textoDaiEstado = diffVencDays > 0 ? `⏳ Vence en ${diffVencDays} día(s) (${rec.vencimiento_dai})` : (diffVencDays === 0 ? `⚠️ ¡VENCE HOY! (${rec.vencimiento_dai})` : `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS! (Venció el ${rec.vencimiento_dai})`);
                 
-                mensajesArray.push(`📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado} (${rec.vencimiento_dai})\n🚢 *ETA:* *${fechaEta}*`);
+                let tarjeta = `**⚠️ ALERTA DE VENCIMIENTO DAI**\nExp: **${expName}**\nCliente: **${clientName}**\nB/L o AWB: **${blInfo}**\n${textoDaiEstado}\n🚢 ETA: *${fechaEta}*`;
+                mensajesArray.push(tarjeta);
             }
         }
 
@@ -622,7 +637,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     textoDaiEstado = `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS! (Venció el ${rec.vencimiento_dai})`;
                 }
 
-                const textDai = `**⚠️ ALERTA DE VENCIMIENTO DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado}\n🚢 *ETA:* *${fechaEta}*.`;
+                const textDai = `**⚠️ ALERTA DE VENCIMIENTO DAI**\n\n📋 *Expe:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado}\n🚢 *ETA:* *${fechaEta}*.`;
                 await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_vencimiento_permanente', textDai);
                 alertasEnviadasCount++;
             }
@@ -636,7 +651,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
                     const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
                     const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
-                    const textEta = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+                    const textEta = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Exp:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
                     await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textEta);
                     alertasEnviadasCount++;
                 }
