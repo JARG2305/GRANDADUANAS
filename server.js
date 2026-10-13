@@ -56,21 +56,42 @@ app.get('/health', (req, res) => {
 // Ruta dual (GET y POST) para compatibilidad total del botón de forzar alertas
 app.all('/api/calcular-alertas', async (req, res) => {
     try {
-        const { alertas } = req.body;
-        if (!alertas || !Array.isArray(alertas) || alertas.length === 0) {
-            return res.json({ success: true, count: 0, message: "No hay alertas pendientes para enviar." });
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) {
+            return res.json({ success: true, count: 0, message: "No hay registros en Firestore." });
         }
 
-        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n";
-        alertas.forEach((alertText, index) => {
-            let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
-            mensajeConsolidado += `${index + 1}. ${textoLimpio}\n\n`;
-        });
+        let mensajesArray = [];
+        const today = new Date();
+        today.setHours(0,0,0,0);
 
+        for (const rec of records) {
+            if (rec.despacho) continue;
+            const expName = rec.num_expediente || 'S/N';
+            const clientName = rec.cliente || 'S/C';
+            const blInfo = rec.awb_bl || 'S/N';
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+            const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+
+            if (!hasRegistroDai && dVencimientoDai) {
+                const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                let textoDaiEstado = diffVencDays > 0 ? `⏳ Vence en ${diffVencDays} día(s)` : (diffVencDays === 0 ? `⚠️ ¡VENCE HOY!` : `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS!`);
+                
+                mensajesArray.push(`📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado} (${rec.vencimiento_dai})\n🚢 *ETA:* *${fechaEta}*`);
+            }
+        }
+
+        if (mensajesArray.length === 0) {
+            return res.json({ success: true, count: 0, message: "No hay alertas críticas pendientes." });
+        }
+
+        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n" + mensajesArray.join("\n\n──────────────────────\n\n");
         await enviarAlertaTelegramServidor(mensajeConsolidado);
-        res.json({ success: true, count: alertas.length, message: "¡Alertas forzadas y enviadas a Telegram con éxito!" });
+
+        res.json({ success: true, count: mensajesArray.length, message: `¡Alertas forzadas y enviadas con éxito! (${mensajesArray.length} enviadas)` });
     } catch (error) {
-        console.error("❌ Error al procesar alertas manuales:", error);
+        console.error("❌ Error en /api/calcular-alertas:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -488,6 +509,7 @@ cron.schedule('0 10,18 * * *', async () => {
 
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
+// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
     const horaActual = new Date(ahoraVzla).getHours();
@@ -515,81 +537,94 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
             if (expVal) {
                 if (expSet.has(expVal)) {
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_exp', `❗ **DUPLICADO:** El N.º de Expediente **${rec.num_expediente}** está repetido en el sistema.`);
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_exp', `❗ **DUPLICADO:**\n📋 *Expediente:* **${rec.num_expediente}**\n👤 *Cliente:* **${rec.cliente || 'S/C'}**\n📄 *B/L o AWB:* **${rec.awb_bl || 'S/N'}**\n──────────────────────\n─ El N.º de Expediente está repetido en el sistema.`);
                     alertasEnviadasCount++;
                 }
                 expSet.add(expVal);
             }
             if (blVal && blVal !== 's/n') {
                 if (blSet.has(blVal)) {
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_bl', `❗ **DUPLICADO:** El N.º de B/L o AWB **${rec.awb_bl}** ya está usado en otro expediente.`);
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_bl', `❗ **DUPLICADO:**\n📋 *Expediente:* **${rec.num_expediente || 'S/N'}**\n👤 *Cliente:* **${rec.cliente || 'S/C'}**\n📄 *B/L o AWB:* **${rec.awb_bl}**\n──────────────────────\n─ El B/L o AWB ya está usado en otro expediente.`);
                     alertasEnviadasCount++;
                 }
                 blSet.add(blVal);
             }
-            contenedoresList.forEach(async (contVal) => {
-                if (contSet.has(contVal)) {
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, `duplicado_cont_${contVal}`, `❗ **DUPLICADO:** El Contenedor **${contVal.toUpperCase()}** ya está registrado en otro expediente.`);
-                    alertasEnviadasCount++;
-                }
-                contSet.add(contVal);
-            });
 
             if (rec.despacho) continue;
 
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
-            const blInfo = rec.awb_bl || 'S/N'; // 👈 B/L o AWB incorporado
+            const blInfo = rec.awb_bl || 'S/N';
             const esMaritimo = identificarEsMaritimoServidor(rec);
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
 
+            const dLlegada = parseFechaLocalServidor(fechaLlegadaStr);
             const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
             const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
             const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
 
-            if (!hasLlegadaRegistrada) {
-                const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                if (dVencimientoDai) {
-                    const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                    if (diffVencDays <= 4) {
-                        let textoCountdown = "";
-                        if (diffVencDays > 0) textoCountdown = `Faltan ${diffVencDays} día(s) para vencer`;
-                        else if (diffVencDays === 0) textoCountdown = "¡VENCE HOY!";
-                        else textoCountdown = `⚠️ ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS!`;
-
-                        // 📄 B/L o AWB incluido en el mensaje de la DAI
-                        const textTelegram = `**⚠️ ALERTA DAI - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
-                        
-                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_venc', textTelegram);
-                        alertasEnviadasCount++;
+            // 1. Control de Plazo de Declaración / Extemporaneidad (Art. 47 y Art. 177 Num. 7 de la L.O.A.)
+            if (dLlegada && !hasTransmision) {
+                let dDeadline = new Date(dLlegada.getTime());
+                let diasHabilesAgregados = 0;
+                let intentosMaximos = 0;
+                while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
+                    dDeadline.setDate(dDeadline.getDate() + 1);
+                    if (dDeadline.getDay() !== 0 && dDeadline.getDay() !== 6) {
+                        diasHabilesAgregados++;
                     }
+                    intentosMaximos++;
+                }
+                const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+                const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
+
+                if (diffPlazoDays < 0) {
+                    const diasExt = Math.abs(diffPlazoDays);
+                    const textExt = `🚨 **EXTEMPORANEIDAD - ART. 47 / 177 N.º 7 L.O.A.**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Transmisión vencida el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.!*`;
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'extemp_art177', textExt);
+                    alertasEnviadasCount++;
+                }
+            }
+
+            // 2. Control de DAI Vencida o Pendiente (Se mantiene enviándose hasta que se actualice la DAI)
+            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+            if (!hasRegistroDai && dVencimientoDai) {
+                const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                let textoDaiEstado = "";
+                if (diffVencDays > 0) {
+                    textoDaiEstado = `⏳ Vence en ${diffVencDays} día(s) (${rec.vencimiento_dai})`;
+                } else if (diffVencDays === 0) {
+                    textoDaiEstado = `⚠️ ¡VENCE HOY! (${rec.vencimiento_dai})`;
+                } else {
+                    textoDaiEstado = `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS! (Venció el ${rec.vencimiento_dai})`;
                 }
 
-                if (dArriboObj) {
-                    const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
-                    const maxDiasAnticipacion = esMaritimo ? 5 : 4;
-                    const minDiasAnticipacion = esMaritimo ? 2 : 1;
+                const textDai = `**⚠️ ALERTA DE VENCIMIENTO DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado}\n🚢 *ETA:* *${fechaEta}*.`;
+                await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_vencimiento_permanente', textDai);
+                alertasEnviadasCount++;
+            }
 
-                    if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
-                        const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
-                        const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
-                        
-                        // 📄 B/L o AWB incluido en la cuenta regresiva del ETA
-                        const textTelegram = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+            // 3. Cuenta Regresiva ETA y Falta de Registro DAI
+            if (!hasLlegadaRegistrada && dArriboObj) {
+                const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                const maxDiasAnticipacion = esMaritimo ? 5 : 4;
+                const minDiasAnticipacion = esMaritimo ? 2 : 1;
 
-                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textTelegram);
-                        alertasEnviadasCount++;
-                    }
+                if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
+                    const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
+                    const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
+                    const textEta = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textEta);
+                    alertasEnviadasCount++;
+                }
 
-                    const noTieneDai = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
-                    if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
-                        // 📄 B/L o AWB incluido en la alerta de falta de registro DAI
-                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n📄 *B/L o AWB:* **${blInfo}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano o ya se cumplió (*${fechaArriboObjetivo}*) y el registro DAI sigue pendiente/vacío.\n🚢 *ETA:* *${fechaEta}*.`;
-
-                        await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textTelegramDai);
-                        alertasEnviadasCount++;
-                    }
+                if (diffLlegadaDays <= maxDiasAnticipacion && !hasRegistroDai) {
+                    const textFaltaDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Arribo cercano o cumplido sin registro DAI en sistema.\n🚢 *ETA:* *${fechaEta}*.`;
+                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textFaltaDai);
+                    alertasEnviadasCount++;
                 }
             }
         } 
