@@ -305,25 +305,19 @@ cron.schedule('0 10,18 * * *', async () => {
         }
 
         const excelHeaders = [
-            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "REGISTRO DAI", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
         ];
 
         const fieldsList = [
             "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
             "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
             "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
-            "eta_la_guaira", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
-            "registro_dai", "fecha_registro_dai", "vencimiento_dai", "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
+            "eta_la_guaira", "fecha_registro_dai", "vencimiento_dai", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
+            "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
             "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
             "almacen", "recibida_acta_recepcion_almacen", "dias_libres_almacen", "inicio_dias_libres", "culminacion_dias_libres",
             "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
             "observaciones"
-        ];
-
-        const anchosEspecificosXLSX = [
-            10, 11, 31, 21, 15, 15, 21, 21, 18, 12, 18, 13, 14, 14, 14, 15, 14, 
-            14.5, 14.5, 14.5, 16, 16, 12, 14.5, 14.5, 14.5, 16, 12, 12, 12, 
-            14, 14, 14, 17, 15, 15, 17, 14, 14, 14, 15, 17, 14.5, 14.5, 14.5, 14.5, 20
         ];
 
         const blackBorder = {
@@ -531,9 +525,14 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
                 if (dVencimientoDai) {
                     const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                    if (diffVencDays >= 1 && diffVencDays <= 4) {
-                        let textoCountdown = diffVencDays === 1 ? "¡VENCE MAÑANA!" : `Faltan ${diffVencDays} día(s) para vencer`;
-                        const textTelegram = `**⚠️ DAI PRÓXIMA A VENCER - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
+                    // Persistencia: Sigue alertando desde 4 días antes, al vencerse hoy, o si se reasa el plazo indefinidamente
+                    if (diffVencDays <= 4) {
+                        let textoCountdown = "";
+                        if (diffVencDays > 0) textoCountdown = `Faltan ${diffVencDays} día(s) para vencer`;
+                        else if (diffVencDays === 0) textoCountdown = "¡VENCE HOY!";
+                        else textoCountdown = `⚠️ ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS!`;
+
+                        const textTelegram = `**⚠️ ALERTA DAI - ${textoCountdown}**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ Vencimiento: *${rec.vencimiento_dai}*.\n🚢 *ETA:* *${fechaEta}*.`;
                         
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_venc', textTelegram);
                         alertasEnviadasCount++;
@@ -556,14 +555,13 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
                     const noTieneDai = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
                     if (diffLlegadaDays <= maxDiasAnticipacion && noTieneDai) {
-                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano (*${fechaArriboObjetivo}*) y el registro DAI está pendiente o vacío.\n🚢 *ETA:* *${fechaEta}*.`;
+                        const textTelegramDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n⏳ El arribo es cercano o ya se cumplió (*${fechaArriboObjetivo}*) y el registro DAI sigue pendiente/vacío.\n🚢 *ETA:* *${fechaEta}*.`;
 
                         await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textTelegramDai);
                         alertasEnviadasCount++;
                     }
                 }
             }
-        }
         console.log(`✅ [CRON NUBE] Verificación finalizada. Alertas enviadas: ${alertasEnviadasCount}`);
     } catch (error) {
         console.error("❌ [CRON NUBE] Error al procesar alertas automáticas:", error);
