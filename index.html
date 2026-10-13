@@ -2039,23 +2039,30 @@
         }
 
         window.enviarAlertasPendientes = async function() {
-            if (!allRecords || allRecords.length === 0) {
-                alert("⚠️ No hay registros cargados en el sistema.");
+            if (!window._todasLasAlertasActivas || window._todasLasAlertasActivas.length === 0) {
+                alert("⚠️ No hay alertas activas para enviar.");
                 return;
             }
 
             try {
-                const response = await fetch(`${BACKEND_URL}/api/calcular-alertas`);
+                // Preparamos los textos limpios de las alertas activas para enviarlos por POST
+                const listaAlertasTexto = window._todasLasAlertasActivas.map(a => (a.textWeb || "").replace(/<[^>]*>/g, '').trim());
+
+                const response = await fetch(`${BACKEND_URL}/api/calcular-alertas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ alertas: listaAlertasTexto })
+                });
+                
                 const data = await response.json();
 
-                if (data.success && data.alerts && data.alerts.length > 0) {
-                    await enviarAlertaDesdeWeb(`🚨 **LOGISTATUS PRO - REPORTE MANUAL DE ALERTAS**\n\nSe han sincronizado ${data.alerts.length} alerta(s) activas desde el servidor.`);
-                    alert(`✅ ¡Sincronización completada! Se verificaron las alertas con la nube.`);
+                if (response.ok && data.success) {
+                    alert(`✅ ¡Alertas forzadas y enviadas a Telegram con éxito! (${data.count} enviadas)`);
                 } else {
-                    alert(`✅ No hay alertas críticas pendientes en este momento.`);
+                    alert("❌ Error al enviar las alertas: " + (data.message || "Error desconocido"));
                 }
             } catch (err) {
-                console.error("Error al sincronizar alertas:", err);
+                console.error("Error al forzar alertas:", err);
                 alert("❌ Ocurrió un error al conectar con el servidor: " + err.message);
             }
         };
