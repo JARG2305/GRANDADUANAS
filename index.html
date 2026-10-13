@@ -172,7 +172,6 @@
             </div>
 
             <!-- Botones de Acción -->
-            <!-- Botones de Acción Modificados -->
             <div class="flex items-center gap-3">
                 <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow whitespace-nowrap">
                     ➕ Nuevo
@@ -188,9 +187,9 @@
                         <button onclick="openArchiveModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition">
                             📁 Archivo Histórico <span class="text-xs text-slate-400 font-normal">(&gt;30d)</span>
                         </button>
-			<button onclick="openMultasModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-red-700">
-       			 ⚠️ Expedientes con Multas <span class="text-xs text-slate-400 font-normal">(Historial)</span>
-    			</button>
+                        <button onclick="openMultasModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-red-700">
+                            ⚠️ Expedientes con Multas <span class="text-xs text-slate-400 font-normal">(Historial)</span>
+                        </button>
                         <button onclick="exportExcelSeparado()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-teal-700">
                             📊 Excel Separado <span class="text-xs text-slate-400 font-normal">(Pestañas)</span>
                         </button>
@@ -394,10 +393,9 @@
                             <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('eta_transbordo')">ETA<br>Transbordo ↕</th>
                             <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('etd_transbordo')">ETD<br>Transbordo ↕</th>
                             <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('buque_vuelo_ve')">Buque / Vuelo<br>a VE ↕</th>
-				<th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('eta_la_guaira')">ETA<br>La Guaira ↕</th>
-				<th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('fecha_registro_dai')">Fecha Registro<br>DAI ↕</th>
-				<th class="p-3 border-r border-slate-200 bg-blue-950 snap-col cursor-pointer hover:bg-blue-900" onclick="sortTableByColumn('vencimiento_dai')">Vencimiento<br>DAI (+15d) ↕</th>
-				<th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('fecha_llegada')">Fecha de<br>Llegada ↕</th>
+                            <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('eta_la_guaira')">ETA<br>La Guaira ↕</th>
+                            <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('fecha_registro_dai')">Fecha Registro<br>DAI ↕</th>
+                            <th class="p-3 border-r border-slate-200 bg-blue-950 snap-col cursor-pointer hover:bg-blue-900" onclick="sortTableByColumn('vencimiento_dai')">Vencimiento<br>DAI (+15d) ↕</th>
                             <th class="p-3 border-r border-slate-200 snap-col cursor-pointer hover:bg-slate-600" onclick="sortTableByColumn('fecha_llegada')">Fecha de<br>Llegada ↕</th>
                             <th class="p-3 border-r border-slate-200 bg-emerald-950 snap-col cursor-pointer hover:bg-emerald-900" onclick="sortTableByColumn('recibida_acta_recepcion')">Recibida Acta<br>de Recepción ↕</th>
                             <th class="p-3 border-r border-slate-200 bg-amber-950 snap-col cursor-pointer hover:bg-amber-900" onclick="sortTableByColumn('fecha_abandono_legal')">Fecha Abandono<br>Legal (+30d) ↕</th>
@@ -785,8 +783,8 @@
         let currentTab = 'porLlegar';
         let subTabAlertaActual = 'operativas';
         let selectedRecordId = null;
-        let sortColumnIndex = null; // 👈 Obligatorio
-        let sortDirection = 'asc';  // 👈 Obligatorio
+        let sortColumnIndex = null;
+        let sortDirection = 'asc';
 
         // Carga la configuración dinámica y arranca Firebase de forma segura
         async function inicializarConfiguracionDinamica() {
@@ -807,11 +805,9 @@
 
                 console.log("✅ Configuración cargada para el proyecto:", config.firebaseProjectId);
                 
-                // Inicializamos Firebase con los datos reales que dio el servidor
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
 
-                // Arrancamos la base de datos y la tabla
                 initCloudDB();
 
             } catch (error) {
@@ -820,10 +816,8 @@
             }
         }
 
-        // Ejecutamos la inicialización dinámica al abrir la página
         inicializarConfiguracionDinamica();
 
-        // Funciones para el envío por WhatsApp desde el menú superior
         window.enviarWhatsAppPestanaActual = function() {
             if (!window._ultimasAlertasFiltradas || window._ultimasAlertasFiltradas.length === 0) {
                 alert("⚠️ No hay alertas en esta pestaña para enviar.");
@@ -848,18 +842,6 @@
             "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
             "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
             "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
-            "eta_la_guaira", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
-            "registro_dai", "fecha_registro_dai", "vencimiento_dai", "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
-            "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
-            "almacen", "recibida_acta_recepcion_almacen", "dias_libres_almacen", "inicio_dias_libres", "culminacion_dias_libres",
-            "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
-            "observaciones"
-        ];
-
-        const fieldsList = [
-            "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
-            "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
-            "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
             "eta_la_guaira", "fecha_registro_dai", "vencimiento_dai", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
             "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
             "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
@@ -872,6 +854,13 @@
             "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
         ];
 
+        const camposFechas = [
+            "etd_origen", "eta_transbordo", "etd_transbordo", "eta_la_guaira", "fecha_llegada", "recibida_acta_recepcion", 
+            "fecha_abandono_legal", "fecha_recibido_permisologia", "fecha_registro_dai", "vencimiento_dai", 
+            "fecha_transmision", "reconocimiento", "validacion", "despacho", 
+            "recibida_acta_recepcion_almacen", "inicio_dias_libres", "culminacion_dias_libres", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera"
+        ];
+
         async function enviarAlertaDesdeWeb(mensajeTexto) {
             try {
                 const response = await fetch(`${BACKEND_URL}/api/notificar`, {
@@ -881,8 +870,6 @@
                 });
                 const data = await response.json();
                 
-                console.log("Respuesta del servidor:", data);
-
                 if (!response.ok || !data.success) {
                     throw new Error(data.message || "El servidor rechazó la alerta.");
                 }
@@ -1513,16 +1500,10 @@
         window.calcularVencimientoDAI = function() {
             const valReg = document.getElementById("fecha_registro_dai").value.trim();
             const dReg = parseFechaLocal(valReg);
-            const selectDai = document.getElementById("registro_dai");
 
             if (!dReg) {
                 document.getElementById("vencimiento_dai").value = "";
-                if (selectDai) selectDai.value = "No";
                 return;
-            }
-
-            if (selectDai) {
-                selectDai.value = "Sí";
             }
 
             let fechaVenc = new Date(dReg);
@@ -1807,7 +1788,6 @@
                 }
             });
 
-            // Agrupación y filtrado por pestañas internas de alertas
             let listaOperativas = alertsList.filter(a => a.categoria === 'operativa');
             let listaAlmacen = alertsList.filter(a => a.categoria === 'almacen');
             let listaEta = alertsList.filter(a => a.categoria === 'aereo' || a.categoria === 'maritimo');
@@ -1820,7 +1800,6 @@
             if (badgeAlm) badgeAlm.innerText = listaAlmacen.length;
             if (badgeEta) badgeEta.innerText = listaEta.length;
 
-            // Validación segura por si subTabAlertaActual no está declarada
             const pestañaActiva = typeof subTabAlertaActual !== 'undefined' ? subTabAlertaActual : 'operativas';
             let alertasParaMostrar = pestañaActiva === 'operativas' ? listaOperativas : (pestañaActiva === 'almacen' ? listaAlmacen : listaEta);
 
@@ -1944,7 +1923,6 @@
                     return sortDirection === 'asc' ? comp : -comp;
                 }
 
-                // 📌 ORDENAMIENTO AUTOMÁTICO POR ETA O FECHA DE LLEGADA
                 let fA = parseFechaLocal(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31');
                 let fB = parseFechaLocal(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31');
                 return fA - fB;
@@ -1978,7 +1956,7 @@
         }
 
         window.closeModal = function() { document.getElementById("expModal").classList.add("hidden"); }
-// Funciones para la ventana modal de multas
+
         window.openMultasModal = function() {
             document.getElementById("multasModal").classList.remove("hidden");
             renderMultasTable();
@@ -2141,7 +2119,6 @@
             if (rec) openModal(rec); 
         }
 
-               // FUNCIÓN AUXILIAR PARA GENERAR EL EXCEL EN BASE64 REUTILIZANDO EL REPORTE MAESTRO
         window.generarExcelBase64ParaCorreo = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
@@ -2232,290 +2209,5 @@
             }
         };
 
-        // FUNCIÓN PRINCIPAL DE ENVÍO DE CORREO CON LOCALSTORAGE
         window.enviarExcelPorCorreo = async function() {
-            let correoGuardado = localStorage.getItem('ultimo_correo_destinatario') || "importacionesepga@gmail.com, hnoguera@gmail.com, finanzascepga@gmail.com";
-            let destinatario = prompt("Ingresa el correo electrónico del destinatario:", correoGuardado);
-            
-            if (!destinatario || !destinatario.includes("@")) {
-                alert("Operación cancelada o correo inválido.");
-                return;
-            }
-
-            localStorage.setItem('ultimo_correo_destinatario', destinatario.trim());
-
-            try {
-                let excelBase64 = window.generarExcelBase64ParaCorreo ? window.generarExcelBase64ParaCorreo() : "";
-                
-                if (!excelBase64) {
-                    alert("No se pudo generar el archivo Excel para el envío.");
-                    return;
-                }
-
-                let response = await fetch(`${BACKEND_URL}/api/enviar-excel-correo`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        destinatario: destinatario.trim(),
-                        asunto: "📊 Reporte Oficial Consolidado de Exps - Logistatus Pro",
-                        mensaje: "Adjunto encontrarás el reporte consolidado de operaciones ordenado por ETA.",
-                        excelBase64: excelBase64,
-                        nombreArchivo: "Reporte_Logistatus.xlsx"
-                    })
-                });
-
-                let resultado = await response.json();
-                if (response.ok && resultado.success) {
-                    alert("✅ ¡Reporte enviado exitosamente por correo!");
-                } else {
-                    alert("❌ Error al enviar el correo: " + (resultado.message || "Error desconocido"));
-                }
-
-            } catch (error) {
-                console.error("Error en el envío:", error);
-                alert("❌ Ocurrió un error de red al procesar y enviar el archivo.");
-            }
-        };
-
-        // Función buildRows y configuraciones de estilos
-        function buildRows(records, isArchivedSheet = false) {
-            return records.map(rec => {
-                return fieldsList.map(f => {
-                    let val = rec[f] !== undefined && rec[f] !== null ? rec[f] : "";
-                    if (f === 'observaciones' && isArchivedSheet) {
-                        val = getObservacionConTiempoAduanal(rec);
-                    } else if (f === 'peso_bl' && val !== '') {
-                        val = Number(val).toFixed(2);
-                    } else if (camposFechas.includes(f) && val) {
-                        val = formatearFechaDDMMYYYY(val);
-                    }
-                    return val;
-                });
-            });
-        }
-
-        const blackBorder = {
-            top: { style: "thin", color: { rgb: "FFFFFF" } },
-            bottom: { style: "thin", color: { rgb: "FFFFFF" } },
-            left: { style: "thin", color: { rgb: "FFFFFF" } },
-            right: { style: "thin", color: { rgb: "FFFFFF" } }
-        };
-
-        const anchosEspecificosXLSX = [
-            10, 11, 31, 21, 15, 15, 21, 21, 18, 12, 18, 13, 14, 14, 14, 15, 14, 
-            14.5, 14.5, 14.5, 16, 16, 12, 14.5, 14.5, 14.5, 16, 12, 12, 12, 
-            14, 14, 14, 17, 15, 15, 17, 14, 14, 14, 15, 17, 14.5, 14.5, 14.5, 14.5, 20
-        ];
-
-        window.exportExcelSeparado = function() {
-            try {
-                const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
-                 
-                const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
-                const porRegistrar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porRegistrar');
-                const porReconocer = currentFilteredRecords.filter(r => getExpCategory(r) === 'porReconocer');
-                const porValidar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porValidar');
-                const porDespachar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porDespachar');
-                const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
-
-                const wb = XLSX.utils.book_new();
-
-                const formatWorksheet = (ws, tipoSeccion) => {
-                    const range = XLSX.utils.decode_range(ws['!ref']);
-                    ws['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
-                    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
-
-                    ws['!rows'] = [];
-                    for (let R = range.s.r; R <= range.e.r; ++R) {
-                        ws['!rows'].push({ hpt: R === 0 ? 43 : 26.50 });
-                    }
-
-                    for (let R = range.s.r; R <= range.e.r; ++R) {
-                        for (let C = range.s.c; C <= range.e.c; ++C) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                            if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' };
-
-                            let cellStyle = {
-                                border: blackBorder,
-                                alignment: { vertical: "center", horizontal: "center", wrapText: true },
-                                font: { name: "Segoe UI", sz: 10 }
-                            };
-
-                            if (R === 0) {
-                                cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
-                                cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
-                            } else {
-                                cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
-                                if (tipoSeccion === 'despachados') {
-                                    cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
-                                } else if (tipoSeccion === 'porLlegar') {
-                                    cellStyle.fill = { fgColor: { rgb: "FEF08A" } };
-                                } else {
-                                    cellStyle.fill = { fgColor: { rgb: "D9E1F2" } };
-                                }
-                            }
-                            ws[cellAddress].s = cellStyle;
-                        }
-                    }
-                };
-
-                if (porLlegar.length > 0) {
-                    const ws1 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(porLlegar)]);
-                    formatWorksheet(ws1, 'porLlegar');
-                    XLSX.utils.book_append_sheet(wb, ws1, "Por Llegar");
-                }
-                if (porRegistrar.length > 0) {
-                    const ws2 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(porRegistrar)]);
-                    formatWorksheet(ws2, 'porRegistrar');
-                    XLSX.utils.book_append_sheet(wb, ws2, "Por Registrar");
-                }
-                if (porReconocer.length > 0) {
-                    const ws3 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(porReconocer)]);
-                    formatWorksheet(ws3, 'porReconocer');
-                    XLSX.utils.book_append_sheet(wb, ws3, "Por Reconocer");
-                }
-                if (porValidar.length > 0) {
-                    const ws4 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(porValidar)]);
-                    formatWorksheet(ws4, 'porValidar');
-                    XLSX.utils.book_append_sheet(wb, ws4, "Por Validar");
-                }
-                if (porDespachar.length > 0) {
-                    const ws5 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(porDespachar)]);
-                    formatWorksheet(ws5, 'porDespachar');
-                    XLSX.utils.book_append_sheet(wb, ws5, "Por Despachar");
-                }
-                if (despachados.length > 0) {
-                    const ws6 = XLSX.utils.aoa_to_sheet([excelHeaders, ...buildRows(despachados)]);
-                    formatWorksheet(ws6, 'despachados');
-                    XLSX.utils.book_append_sheet(wb, ws6, "Despachados");
-                }
-
-                XLSX.writeFile(wb, "Control_Aduanas_6_Pestanas.xlsx");
-            } catch (err) {
-                console.error("Error al exportar Excel por Pestañas:", err);
-                alert("Ocurrió un error al generar el archivo Excel: " + err.message);
-            }
-        };
-
-        window.exportExcelMaestro = function() {
-            try {
-                const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
-                const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
-                const tramites = currentFilteredRecords.filter(r => {
-                    const cat = getExpCategory(r);
-                    return cat === 'porRegistrar' || cat === 'porReconocer' || cat === 'porValidar' || cat === 'porDespachar';
-                });
-                const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
-                const archivados = currentFilteredRecords.filter(r => esHistoricoArchivado(r));
-
-                let masterRows = [];
-                 
-                if (porLlegar.length > 0) {
-                    masterRows.push(["▶ 1. EXPEDIENTES POR LLEGAR"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(porLlegar));
-                    masterRows.push([]);
-                }
-                if (tramites.length > 0) {
-                    masterRows.push(["▶ 2. TRÁMITES ADUANALES Y EN PROCESO"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(tramites));
-                    masterRows.push([]);
-                }
-                if (despachados.length > 0) {
-                    masterRows.push(["▶ 3. EXPEDIENTES DESPACHADOS"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(despachados));
-                    masterRows.push([]);
-                }
-                if (archivados.length > 0) {
-                    masterRows.push(["▶ 4. ARCHIVO HISTÓRICO (>30 DÍAS DE DESPACHADOS)"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(archivados, true));
-                }
-
-                const wb = XLSX.utils.book_new();
-                const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
-                 
-                const range = XLSX.utils.decode_range(wsMaster['!ref']);
-                wsMaster['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
-                wsMaster['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
-
-                wsMaster['!rows'] = [];
-                for (let R = range.s.r; R <= range.e.r; ++R) {
-                    const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                    if (cellA && cellA.v && String(cellA.v).includes("▶")) {
-                        wsMaster['!rows'].push({ hpt: 30 });
-                    } else if (cellA && cellA.v && excelHeaders.includes(cellA.v)) {
-                        wsMaster['!rows'].push({ hpt: 43 });
-                    } else {
-                        wsMaster['!rows'].push({ hpt: 26.50 });
-                    }
-                }
-
-                let currentSection = 1;
-                for (let R = range.s.r; R <= range.e.r; ++R) {
-                    const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                    if (cellA && cellA.v && String(cellA.v).includes("▶")) {
-                        if (String(cellA.v).includes("TRÁMITES")) currentSection = 2;
-                        if (String(cellA.v).includes("DESPACHADOS")) currentSection = 3;
-                        if (String(cellA.v).includes("ARCHIVO")) currentSection = 4;
-
-                        cellA.s = {
-                            font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } },
-                            alignment: { vertical: "center", horizontal: "left" }
-                        };
-                        continue;
-                    }
-
-                    for (let C = range.s.c; C <= range.e.c; ++C) {
-                        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                        if (!wsMaster[cellAddress]) continue;
-
-                        let cellStyle = {
-                            border: blackBorder,
-                            alignment: { vertical: "center", horizontal: "center", wrapText: true },
-                            font: { name: "Segoe UI", sz: 10 }
-                        };
-
-                        const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
-                        if (headerCheck && excelHeaders.includes(headerCheck.v)) {
-                            cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
-                            cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
-                        } else {
-                            cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
-                            if (currentSection === 3 || currentSection === 4) {
-                                cellStyle.fill = { fgColor: { rgb: "FEE2E2" } }; 
-                            } else if (currentSection === 2) {
-                                cellStyle.fill = { fgColor: { rgb: "D9E1F2" } }; 
-                            } else {
-                                cellStyle.fill = { fgColor: { rgb: "FEF08A" } }; 
-                            }
-                        }
-                        wsMaster[cellAddress].s = cellStyle;
-                    }
-                }
-
-                XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
-                XLSX.writeFile(wb, "Control_Aduanas_Reporte_Maestro.xlsx");
-            } catch (err) {
-                console.error("Error al exportar Excel Maestro:", err);
-                alert("Ocurrió un error al generar el archivo unificado: " + err.message);
-            }
-        };
-	window.deleteRecord = async function(id) { 
-            if (confirm("¿Eliminar expediente de la nube?")) 
-                await deleteDoc(doc(db, COLLECTION_NAME, id)); 
-        }
-    
-       window.toggleStats = function() {
-            const statsSection = document.getElementById('statsSection');
-            if (!statsSection) return;
-            statsSection.classList.toggle('hidden');
-        };
-
-        // INICIALIZACIÓN DE LA NUBE
-        initCloudDB();
-    </script>
-</body>
-</html>
+            let correoGuardado = localStorage.getItem('ultimo_correo_destinatario') || "importacionesepga@gmail.com,
