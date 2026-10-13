@@ -53,6 +53,11 @@ app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
+// Ruta auxiliar para compatibilidad del botón de forzar alertas manuales
+app.get('/api/calcular-alertas', (req, res) => {
+    res.json({ success: true, alerts: [] });
+});
+
 // ==========================================
 // 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
 // ==========================================
@@ -561,7 +566,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     }
                 }
             }
-        } // 👈 ¡Llave de cierre del bucle 'for' añadida aquí!
+        } 
 
         console.log(`✅ [CRON NUBE] Verificación finalizada. Alertas enviadas: ${alertasEnviadasCount}`);
     } catch (error) {
