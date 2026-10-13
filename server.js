@@ -73,6 +73,10 @@ app.all('/api/calcular-alertas', async (req, res) => {
             const clientName = rec.cliente || 'S/C';
             const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
             const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+            const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+            const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+            const iconoVia = esBarco ? "🚢" : "✈️";
+            const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
 
             // 1. ALERTA: PLAZO DE DECLARACIÓN (Art. 47 LOA)
             const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
@@ -104,7 +108,22 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 }
             }
 
-            // 2. ALERTA: VENCIMIENTO DE ALMACÉN Y DEMORAS
+            // 2. ALERTA: ETA (POR LLEGAR)
+            const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
+            const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
+            const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+
+            if (dArriboObj && !hasLlegadaRegistrada) {
+                const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                    const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                    let tarjeta = `${contadorAlerta}️⃣ ${iconoVia} **${destinoTxt.toUpperCase()}**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ **${textoDias}** (${fechaArriboObjetivo})`;
+                    mensajesArray.push(tarjeta);
+                    contadorAlerta++;
+                }
+            }
+
+            // 3. ALERTA: VENCIMIENTO DE ALMACÉN
             if (rec.culminacion_dias_libres) {
                 const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
                 if (culmDate) {
@@ -122,17 +141,27 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 }
             }
 
-            // 3. ALERTA: DAI PRÓXIMA A VENCER (La lógica original que ya tenías)
+            // 4. ALERTA: DAI PRÓXIMA A VENCER
             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-            const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
 
             if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                
                 if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
-                    let tarjeta = `${contadorAlerta}️⃣ ⚠️ **DAI PRÓXIMA A VENCER**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: **${fechaEta}**`;
+                    let tarjeta = `${contadorAlerta}️⃣ ⚠️ **DAI PRÓXIMA A VENCER**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: **${fechaEta}** - Riesgo Multa Art 177 Num 9 de la L.O.A`;
+                    mensajesArray.push(tarjeta);
+                    contadorAlerta++;
+                }
+            }
+
+            // 5. ALERTA: DAI POR REGISTRAR (ETA Próximo y Fecha DAI en blanco)
+            const faltaDaiRegistrar = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
+            if (dArriboObj && !hasLlegadaRegistrada && faltaDaiRegistrar) {
+                const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
+                    const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
+                    let tarjeta = `${contadorAlerta}️⃣ ⚠️ **DAI POR REGISTRAR (ETA PRÓXIMO)**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoEtaDai} (${fechaArriboObjetivo})\n⚠️ *La fecha de registro DAI se encuentra en blanco.*`;
                     mensajesArray.push(tarjeta);
                     contadorAlerta++;
                 }
@@ -143,7 +172,7 @@ app.all('/api/calcular-alertas', async (req, res) => {
             return res.json({ success: true, count: 0, message: "No hay alertas críticas pendientes." });
         }
 
-        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL CONSOLIDADO* 🚨\n\n" + mensajesArray.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE CONSOLIDADO* 🚨\n\n" + mensajesArray.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
         await enviarAlertaTelegramServidor(mensajeConsolidado);
 
         res.json({ success: true, count: mensajesArray.length, message: `¡Alertas consolidadas y enviadas con éxito! (${mensajesArray.length} enviadas)` });
