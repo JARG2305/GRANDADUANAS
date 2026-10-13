@@ -53,49 +53,16 @@ app.get('/health', (req, res) => {
     res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
-// Ruta dual (GET y POST) para compatibilidad total del botón de forzar alertas
-// Ruta dual para procesar tanto las alertas enviadas manualmente desde la web como las peticiones GET
+// Ruta dual (GET y POST) para procesar y consolidar las alertas enviadas manualmente
 app.all('/api/calcular-alertas', async (req, res) => {
     try {
-        const { alertas } = req.body || {};
-        
-        // Si el cliente web envía el listado de alertas activas desde la pantalla
-        if (alertas && Array.isArray(alertas) && alertas.length > 0) {
-            let mensajesFormateados = [];
-
-            alertas.forEach((alertText) => {
-                let textoLimpio = alertText.replace(/<[^>]*>/g, '').trim();
-                
-                // Limpieza y extracción inteligente para ordenar: TÍTULO, EXP, CLIENTE, BL...
-                let lineas = textoLimpio.split('\n').map(l => l.trim()).filter(Boolean);
-                let tituloAlerta = lineas[0] || "⚠️ ALERTA OPERATIVA";
-                let expInfo = lineas.find(l => l.toLowerCase().includes('exp')) || "Exp: S/N";
-                let clienteInfo = lineas.find(l => l.toLowerCase().includes('cliente')) || "Cliente: S/C";
-                let blInfo = lineas.find(l => l.toLowerCase().includes('b/l') || l.toLowerCase().includes('awb')) || `B/L o AWB: S/N`;
-                
-                // Resto de detalles de la alerta (días, fechas, etc.)
-                let restoDetalles = lineas.filter(l => !l.includes(expInfo) && !l.includes(clienteInfo) && !l.includes(blInfo) && !l.includes(tituloAlerta)).join('\n');
-
-                let tarjetaOrdenada = `**${tituloAlerta.toUpperCase()}**\n${expInfo}\n${clienteInfo}\n${blInfo}`;
-                if (restoDetalles) {
-                    tarjetaOrdenada += `\n${restoDetalles}`;
-                }
-                mensajesFormateados.push(tarjetaOrdenada);
-            });
-
-            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n" + mensajesFormateados.join("\n\n──────────────────────\n\n");
-
-            await enviarAlertaTelegramServidor(mensajeConsolidado);
-            return res.json({ success: true, count: alertas.length, message: `¡Alertas forzadas y enviadas con éxito! (${alertas.length} enviadas)` });
-        }
-
-        // Si se invoca sin cuerpo POST, escaneamos Firestore automáticamente con el mismo orden estricto
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
             return res.json({ success: true, count: 0, message: "No hay registros en Firestore." });
         }
 
         let mensajesArray = [];
+        let contadorAlerta = 1;
         const today = new Date();
         today.setHours(0,0,0,0);
 
@@ -103,17 +70,31 @@ app.all('/api/calcular-alertas', async (req, res) => {
             if (rec.despacho) continue;
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
-            const blInfo = rec.awb_bl || 'S/N';
+            const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
 
             if (!hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                let textoDaiEstado = diffVencDays > 0 ? `⏳ Vence en ${diffVencDays} día(s) (${rec.vencimiento_dai})` : (diffVencDays === 0 ? `⚠️ ¡VENCE HOY! (${rec.vencimiento_dai})` : `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS! (Venció el ${rec.vencimiento_dai})`);
                 
-                let tarjeta = `**⚠️ ALERTA DE VENCIMIENTO DAI**\nExp: **${expName}**\nCliente: **${clientName}**\nB/L o AWB: **${blInfo}**\n${textoDaiEstado}\n🚢 ETA: *${fechaEta}*`;
+                let tituloAlerta = "";
+                let textoDaiEstado = "";
+
+                if (diffVencDays > 0) {
+                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
+                    textoDaiEstado = `Faltan ${diffVencDays} día(s) (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
+                } else if (diffVencDays === 0) {
+                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
+                    textoDaiEstado = `¡VENCE HOY! (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
+                } else {
+                    tituloAlerta = "🚨 **DAI VENCIDA**";
+                    textoDaiEstado = `Vencida hace ${Math.abs(diffVencDays)} día(s) (Venció el ${rec.vencimiento_dai}) - Multa Art. 177 Num. 9 de la L.O.A.`;
+                }
+                
+                let tarjeta = `${contadorAlerta}️⃣ ${tituloAlerta}\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoDaiEstado}\n🚢 ETA: **${fechaEta}**`;
                 mensajesArray.push(tarjeta);
+                contadorAlerta++;
             }
         }
 
@@ -121,10 +102,10 @@ app.all('/api/calcular-alertas', async (req, res) => {
             return res.json({ success: true, count: 0, message: "No hay alertas críticas pendientes." });
         }
 
-        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL FORZADO* 🚨\n\n" + mensajesArray.join("\n\n──────────────────────\n\n");
+        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE MANUAL CONSOLIDADO* 🚨\n\n" + mensajesArray.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
         await enviarAlertaTelegramServidor(mensajeConsolidado);
 
-        res.json({ success: true, count: mensajesArray.length, message: `¡Alertas forzadas y enviadas con éxito! (${mensajesArray.length} enviadas)` });
+        res.json({ success: true, count: mensajesArray.length, message: `¡Alertas consolidadas y enviadas con éxito! (${mensajesArray.length} enviadas)` });
     } catch (error) {
         console.error("❌ Error en /api/calcular-alertas:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -218,7 +199,6 @@ async function enviarAlertaTelegramServidor(mensajeTexto) {
     }
 }
 
-// Función avanzada para control de duplicados en la nube por slots de hora
 async function enviarAlertaTelegramUnicaServidor(recId, tipoAlerta, mensajeTexto) {
     const ahora = new Date();
     const horaActual = ahora.getHours();
@@ -241,7 +221,7 @@ async function enviarAlertaTelegramUnicaServidor(recId, tipoAlerta, mensajeTexto
         const checkRes = await fetch(checkUrl);
         
         if (checkRes.ok) {
-            return; // Ya se envió en esta franja horaria, se omite para evitar duplicados
+            return; // Ya se envió en esta franja horaria
         }
 
         await enviarAlertaTelegramServidor(mensajeTexto);
@@ -543,8 +523,6 @@ cron.schedule('0 10,18 * * *', async () => {
 });
 
 // Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
-// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
-// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
     const horaActual = new Date(ahoraVzla).getHours();
@@ -557,39 +535,16 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
         const today = new Date();
         today.setHours(0,0,0,0);
 
-        let expSet = new Set();
-        let blSet = new Set();
-        let contSet = new Set();
         let alertasEnviadasCount = 0;
+        let mensajesArray = [];
+        let contadorAlerta = 1;
 
         for (const rec of records) {
-            const expVal = (rec.num_expediente || "").trim().toLowerCase();
-            const blVal = (rec.awb_bl || "").trim().toLowerCase();
-            const contRaw = (rec.numero_contenedor || "").trim();
-            let contenedoresList = contRaw ? contRaw.split(',').map(c => c.trim().toLowerCase()).filter(Boolean) : [];
-
-            const recIdUnico = rec.id || rec.num_expediente || 'gen';
-
-            if (expVal) {
-                if (expSet.has(expVal)) {
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_exp', `❗ **DUPLICADO:**\n📋 *Expediente:* **${rec.num_expediente}**\n👤 *Cliente:* **${rec.cliente || 'S/C'}**\n📄 *B/L o AWB:* **${rec.awb_bl || 'S/N'}**\n──────────────────────\n─ El N.º de Expediente está repetido en el sistema.`);
-                    alertasEnviadasCount++;
-                }
-                expSet.add(expVal);
-            }
-            if (blVal && blVal !== 's/n') {
-                if (blSet.has(blVal)) {
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'duplicado_bl', `❗ **DUPLICADO:**\n📋 *Expediente:* **${rec.num_expediente || 'S/N'}**\n👤 *Cliente:* **${rec.cliente || 'S/C'}**\n📄 *B/L o AWB:* **${rec.awb_bl}**\n──────────────────────\n─ El B/L o AWB ya está usado en otro expediente.`);
-                    alertasEnviadasCount++;
-                }
-                blSet.add(blVal);
-            }
-
             if (rec.despacho) continue;
 
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
-            const blInfo = rec.awb_bl || 'S/N';
+            const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N';
             const esMaritimo = identificarEsMaritimoServidor(rec);
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
@@ -601,7 +556,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
             const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
 
-            // 1. Control de Plazo de Declaración / Extemporaneidad (Art. 47 y Art. 177 Num. 7 de la L.O.A.)
+            // 1. Control de Plazo de Declaración / Extemporaneidad
             if (dLlegada && !hasTransmision) {
                 let dDeadline = new Date(dLlegada.getTime());
                 let diasHabilesAgregados = 0;
@@ -618,27 +573,34 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
                 if (diffPlazoDays < 0) {
                     const diasExt = Math.abs(diffPlazoDays);
-                    const textExt = `🚨 **EXTEMPORANEIDAD - ART. 47 / 177 N.º 7 L.O.A.**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Transmisión vencida el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.!*`;
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'extemp_art177', textExt);
+                    const textExt = `${contadorAlerta}️⃣ 🚨 **EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ Transmisión vencida el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.!*`;
+                    mensajesArray.push(textExt);
+                    contadorAlerta++;
                     alertasEnviadasCount++;
                 }
             }
 
-            // 2. Control de DAI Vencida o Pendiente (Se mantiene enviándose hasta que se actualice la DAI)
+            // 2. Control de DAI Vencida o Próxima
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             if (!hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                let tituloAlerta = "";
                 let textoDaiEstado = "";
+
                 if (diffVencDays > 0) {
-                    textoDaiEstado = `⏳ Vence en ${diffVencDays} día(s) (${rec.vencimiento_dai})`;
+                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
+                    textoDaiEstado = `Faltan ${diffVencDays} día(s) (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
                 } else if (diffVencDays === 0) {
-                    textoDaiEstado = `⚠️ ¡VENCE HOY! (${rec.vencimiento_dai})`;
+                    tituloAlerta = "⚠️ **DAI PRÓXIMA A VENCER**";
+                    textoDaiEstado = `¡VENCE HOY! (${rec.vencimiento_dai}) - Riesgo de Multa Art. 177 Num. 9 de la L.O.A.`;
                 } else {
-                    textoDaiEstado = `🚨 ¡VENCIDA HACE ${Math.abs(diffVencDays)} DÍAS! (Venció el ${rec.vencimiento_dai})`;
+                    tituloAlerta = "🚨 **DAI VENCIDA**";
+                    textoDaiEstado = `Vencida hace ${Math.abs(diffVencDays)} día(s) (Venció el ${rec.vencimiento_dai}) - Multa Art. 177 Num. 9 de la L.O.A.`;
                 }
 
-                const textDai = `**⚠️ ALERTA DE VENCIMIENTO DAI**\n\n📋 *Expe:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n${textoDaiEstado}\n🚢 *ETA:* *${fechaEta}*.`;
-                await enviarAlertaTelegramUnicaServidor(recIdUnico, 'dai_vencimiento_permanente', textDai);
+                let textDai = `${contadorAlerta}️⃣ ${tituloAlerta}\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ ${textoDaiEstado}\n🚢 ETA: **${fechaEta}**`;
+                mensajesArray.push(textDai);
+                contadorAlerta++;
                 alertasEnviadasCount++;
             }
 
@@ -651,18 +613,25 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 if (diffLlegadaDays >= minDiasAnticipacion && diffLlegadaDays <= maxDiasAnticipacion) {
                     const modoTexto = esMaritimo ? "MARÍTIMO" : "AÉREO";
                     const tipoFecha = rec.fecha_llegada ? "Llegada" : "ETA La Guaira";
-                    const textEta = `**⚠️ CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n\n📋 *Exp:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'cuenta_regresiva_eta', textEta);
+                    const textEta = `${contadorAlerta}️⃣ ⚠️ **CUENTA REGRESIVA ${tipoFecha.toUpperCase()} (${modoTexto})**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ Faltan *${diffLlegadaDays} día(s)* para el ${tipoFecha} (${fechaArriboObjetivo}).`;
+                    mensajesArray.push(textEta);
+                    contadorAlerta++;
                     alertasEnviadasCount++;
                 }
 
                 if (diffLlegadaDays <= maxDiasAnticipacion && !hasRegistroDai) {
-                    const textFaltaDai = `**⚠️ FALTA REGISTRAR DAI (PENDIENTE)**\n\n📋 *Expediente:* **${expName}**\n👤 *Cliente:* **${clientName}**\n📄 *B/L o AWB:* **${blInfo}**\n──────────────────────\n⏳ Arribo cercano o cumplido sin registro DAI en sistema.\n🚢 *ETA:* *${fechaEta}*.`;
-                    await enviarAlertaTelegramUnicaServidor(recIdUnico, 'falta_reg_dai', textFaltaDai);
+                    const textFaltaDai = `${contadorAlerta}️⃣ ⚠️ **FALTA REGISTRAR DAI (PENDIENTE)**\n📋 Exp: **${expName}**\n👤 Cliente: **${clientName}**\n📄 B/L o AWB: **${blInfo}**\n⏳ Arribo cercano o cumplido sin registro DAI en sistema.\n🚢 ETA: **${fechaEta}**`;
+                    mensajesArray.push(textFaltaDai);
+                    contadorAlerta++;
                     alertasEnviadasCount++;
                 }
             }
         } 
+
+        if (mensajesArray.length > 0) {
+            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE AUTOMÁTICO CRON* 🚨\n\n" + mensajesArray.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+            await enviarAlertaTelegramServidor(mensajeConsolidado);
+        }
 
         console.log(`✅ [CRON NUBE] Verificación finalizada. Alertas enviadas: ${alertasEnviadasCount}`);
     } catch (error) {
