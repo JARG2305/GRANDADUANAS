@@ -80,19 +80,29 @@ async function iniciarBaileysWhatsApp() {
         sock.ev.on('creds.update', saveCreds);
 
         // ESCUCHA INTELIGENTE PURA POR COINCIDENCIA DE EVENTO + EXPEDIENTE / B/L
+        // ESCUCHA INTELIGENTE EXCLUSIVA PARA UN GRUPO ESPECÍFICO
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 const msg = m.messages[0];
                 if (!msg.message || msg.key.fromMe) return;
 
-                const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const remitente = msg.key.remoteJid;
+                const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const textoLower = textoMensaje.toLowerCase();
 
-                // 🔍 LÍNEA DE DEPURACIÓN PARA VER EL CHAT O GRUPO EN LOS LOGS
+                // 🔍 Identificar el ID del chat en los logs para copiarlo
                 console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
 
-                // 1. Identificar el campo operativo según la palabra clave o evento en el mensaje
+                // =========================================================================
+                // 🛑 FILTRO DE SEGURIDAD: Define aquí el ID exacto de tu grupo autorizado
+                // =========================================================================
+                const GRUPO_AUTORIZADO_JID = "TU_ID_DE_GRUPO_AQUI@g.us"; // Ej: "120363031234567890@g.us"
+                
+                // Si quieres que SOLO funcione en ese grupo, descomenta la siguiente línea:
+                // if (remitente !== GRUPO_AUTORIZADO_JID) return;
+                // =========================================================================
+
+                // 1. Identificar el campo operativo según la palabra clave o evento
                 let campoAModificar = "";
                 if (textoLower.includes('eta')) {
                     campoAModificar = "eta_la_guaira";
@@ -106,25 +116,20 @@ async function iniciarBaileysWhatsApp() {
                     campoAModificar = "recibida_acta_recepcion";
                 }
 
-                // Si el mensaje no contiene ningún evento conocido, lo ignoramos para que no interfiera con chats normales
                 if (!campoAModificar) return;
 
-                // 2. Extraer fecha (ej: 08/11/2026, 08-11-2026) o usar la de hoy por defecto en Venezuela
+                // 2. Extraer fecha o usar la de hoy por defecto en Venezuela
                 const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
                 let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
 
-                // 3. Consultar Firestore para obtener todos los expedientes y buscar la coincidencia de texto
+                // 3. Consultar Firestore para buscar el expediente
                 const projectId = process.env.FIREBASE_PROJECT_ID;
                 const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
                 const response = await fetch(urlQuery);
                 const result = await response.json();
 
-                if (!result.documents || result.documents.length === 0) {
-                    await sock.sendMessage(remitente, { text: "❌ No se encontraron expedientes en la base de datos." });
-                    return;
-                }
+                if (!result.documents || result.documents.length === 0) return;
 
-                // Convertir todos los documentos de Firestore a un formato plano fácil de buscar
                 let listaExpedientes = result.documents.map(doc => {
                     let fields = doc.fields || {};
                     return {
@@ -135,9 +140,7 @@ async function iniciarBaileysWhatsApp() {
                     };
                 });
 
-                // 4. Buscar cuál es el expediente o B/L mencionado dentro del texto del mensaje
                 let expedienteEncontrado = null;
-                
                 for (let item of listaExpedientes) {
                     if ((item.num_expediente && item.num_expediente.length > 1 && textoLower.includes(item.num_expediente)) ||
                         (item.bl && item.bl.length > 2 && textoLower.includes(item.bl))) {
@@ -146,15 +149,12 @@ async function iniciarBaileysWhatsApp() {
                     }
                 }
 
-                if (!expedienteEncontrado) {
-                    await sock.sendMessage(remitente, { text: "⚠️ No pude identificar ningún número de expediente o B/L válido en tu mensaje para actualizar el evento." });
-                    return;
-                }
+                if (!expedienteEncontrado) return;
 
                 let numExpReal = expedienteEncontrado.fields.num_expediente?.stringValue || 'S/N';
                 let blReal = expedienteEncontrado.fields.awb_bl?.stringValue || expedienteEncontrado.fields.bl?.stringValue || 'S/N';
 
-                // 5. Actualizar en Firestore mediante petición PATCH preservando el resto de los campos
+                // 4. Actualizar en Firestore vía PATCH
                 const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
                 
                 const patchBody = {
@@ -178,7 +178,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
             } catch (err) {
-                console.error("❌ Error procesando mensaje inteligente por coincidencia en Baileys:", err);
+                console.error("❌ Error procesando mensaje en Baileys:", err);
             }
         });
 
