@@ -79,7 +79,7 @@ async function iniciarBaileysWhatsApp() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA INTELIGENTE CON SEPARACIÓN ENTRE ETA Y FECHA DE LLEGADA
+        // ESCUCHA INTELIGENTE PURA POR COINCIDENCIA DE EVENTO + EXPEDIENTE / B/L
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 const msg = m.messages[0];
@@ -87,109 +87,96 @@ async function iniciarBaileysWhatsApp() {
 
                 const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const remitente = msg.key.remoteJid;
+                const textoLower = textoMensaje.toLowerCase();
 
-                if (textoMensaje.toLowerCase().startsWith('acta') || textoMensaje.toLowerCase().startsWith('eta') || textoMensaje.toLowerCase().startsWith('llegada') || textoMensaje.toLowerCase().startsWith('transmision') || textoMensaje.toLowerCase().includes('exp') || textoMensaje.toLowerCase().includes('bl')) {
-                    
-                    // 1. Extraer fecha si viene en el mensaje (ej: DD/MM/AAAA) o usar la de hoy por defecto
-                    const matchFecha = textoMensaje.match(/\b(\d{2}[-/]\d{2}[-/]\d{4}|\d{4}[-/]\d{2}[-/]\d{2})\b/);
-                    let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
+                // 1. Identificar el campo operativo según la palabra clave o evento en el mensaje
+                let campoAModificar = "";
+                if (textoLower.includes('eta')) {
+                    campoAModificar = "eta_la_guaira";
+                } else if (textoLower.includes('llegada')) {
+                    campoAModificar = "fecha_llegada";
+                } else if (textoLower.includes('transmision') || textoLower.includes('transmitido')) {
+                    campoAModificar = "fecha_transmision";
+                } else if (textoLower.includes('dai')) {
+                    campoAModificar = "fecha_registro_dai";
+                } else if (textoLower.includes('acta')) {
+                    campoAModificar = "recibida_acta_recepcion";
+                }
 
-                    // 2. Determinar con precisión si es ETA o Fecha de Llegada (u otros campos)
-                    let campoAModificar = "recibida_acta_recepcion"; // por defecto si dice acta
-                    const textoLower = textoMensaje.toLowerCase();
-                    
-                    if (textoLower.startsWith('eta') || textoLower.includes(' eta ')) {
-                        campoAModificar = "eta_la_guaira";
-                    } else if (textoLower.startsWith('llegada') || textoLower.includes(' llegada ')) {
-                        campoAModificar = "fecha_llegada";
-                    } else if (textoLower.includes("transmision") || textoLower.includes("transmitido")) {
-                        campoAModificar = "fecha_transmision";
-                    } else if (textoLower.includes("dai")) {
-                        campoAModificar = "fecha_registro_dai";
-                    }
+                // Si el mensaje no contiene ningún evento conocido, lo ignoramos para que no interfiera con chats normales
+                if (!campoAModificar) return;
 
-                    // 3. Extraer el identificador (expediente, B/L o AWB)
-                    let identificadorBuscado = "";
-                    const palabras = textoMensaje.split(/\s+/);
-                    for (let i = 0; i < palabras.length; i++) {
-                        let p = palabras[i].toLowerCase();
-                        if ((p === 'exp' || p === 'expediente' || p === 'bl' || p === 'awb') && palabras[i + 1]) {
-                            identificadorBuscado = palabras[i + 1].replace(/[,.]/g, '').trim();
-                            break;
-                        }
-                    }
+                // 2. Extraer fecha (ej: 08/11/2026, 08-11-2026) o usar la de hoy por defecto en Venezuela
+                const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
+                let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
 
-                    if (!identificadorBuscado) {
-                        identificadorBuscado = palabras[1] ? palabras[1].replace(/[,.]/g, '').trim() : "";
-                    }
+                // 3. Consultar Firestore para obtener todos los expedientes y buscar la coincidencia de texto
+                const projectId = process.env.FIREBASE_PROJECT_ID;
+                const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
+                const response = await fetch(urlQuery);
+                const result = await response.json();
 
-                    if (!identificadorBuscado) {
-                        await sock.sendMessage(remitente, { text: "⚠️ No pude identificar el número de expediente o B/L. Ejemplo: *eta exp 1001 20/10/2026* o *llegada exp 1001*" });
-                        return;
-                    }
+                if (!result.documents || result.documents.length === 0) {
+                    await sock.sendMessage(remitente, { text: "❌ No se encontraron expedientes en la base de datos." });
+                    return;
+                }
 
-                    // Consultar Firestore
-                    const projectId = process.env.FIREBASE_PROJECT_ID;
-                    const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
-                    const response = await fetch(urlQuery);
-                    const result = await response.json();
-
-                    if (!result.documents) {
-                        await sock.sendMessage(remitente, { text: "❌ No se encontraron expedientes en Firestore." });
-                        return;
-                    }
-
-                    let documentoEncontrado = null;
-                    let docId = null;
-                    let numExpReal = "";
-                    let blReal = "";
-
-                    for (const doc of result.documents) {
-                        const fields = doc.fields || {};
-                        const expVal = (fields.num_expediente?.stringValue || "").toLowerCase();
-                        const blVal = (fields.awb_bl?.stringValue || fields.bl?.stringValue || fields.numero_bl?.stringValue || "").toLowerCase();
-                        
-                        const idBusquedaLower = identificadorBuscado.toLowerCase();
-
-                        if (expVal.includes(idBusquedaLower) || blVal.includes(idBusquedaLower)) {
-                            documentoEncontrado = fields;
-                            docId = doc.name.split('/').pop();
-                            numExpReal = fields.num_expediente?.stringValue || 'S/N';
-                            blReal = fields.awb_bl?.stringValue || fields.bl || 'S/N';
-                            break;
-                        }
-                    }
-
-                    if (!docId) {
-                        await sock.sendMessage(remitente, { text: `❌ No se encontró ningún expediente asociado a *${identificadorBuscado}* en el sistema.` });
-                        return;
-                    }
-
-                    // Actualizar en Firestore vía PATCH
-                    const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${docId}?updateMask.fieldPaths=${campoAModificar}`;
-                    
-                    const patchBody = {
-                        fields: {
-                            ...documentoEncontrado,
-                            [campoAModificar]: { stringValue: fechaDetectada }
-                        }
+                // Convertir todos los documentos de Firestore a un formato plano fácil de buscar
+                let listaExpedientes = result.documents.map(doc => {
+                    let fields = doc.fields || {};
+                    return {
+                        id: doc.name.split('/').pop(),
+                        fields: fields,
+                        num_expediente: (fields.num_expediente?.stringValue || "").toLowerCase(),
+                        bl: (fields.awb_bl?.stringValue || fields.bl?.stringValue || fields.numero_bl?.stringValue || "").toLowerCase()
                     };
+                });
 
-                    const patchRes = await fetch(updateUrl, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(patchBody)
-                    });
-
-                    if (patchRes.ok) {
-                        await sock.sendMessage(remitente, { text: `✅ *¡ACTUALIZACIÓN EXITOSA DESDE WHATSAPP!* 🚀\n\n📂 Exp: *${numExpReal}*\n📦 B/L / AWB: *${blReal}*\n⚙️ Campo Modificado: *${campoAModificar}*\n📅 Fecha Registrada: *${fechaDetectada}*` });
-                    } else {
-                        const errData = await patchRes.json();
-                        await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
+                // 4. Buscar cuál es el expediente o B/L mencionado dentro del texto del mensaje
+                let expedienteEncontrado = null;
+                
+                for (let item of listaExpedientes) {
+                    // Validamos si el número de expediente o el B/L están contenidos dentro del mensaje del usuario
+                    if ((item.num_expediente && item.num_expediente.length > 1 && textoLower.includes(item.num_expediente)) ||
+                        (item.bl && item.bl.length > 2 && textoLower.includes(item.bl))) {
+                        expedienteEncontrado = item;
+                        break;
                     }
                 }
+
+                if (!expedienteEncontrado) {
+                    await sock.sendMessage(remitente, { text: "⚠️ No pude identificar ningún número de expediente o B/L válido en tu mensaje para actualizar el evento." });
+                    return;
+                }
+
+                let numExpReal = expedienteEncontrado.fields.num_expediente?.stringValue || 'S/N';
+                let blReal = expedienteEncontrado.fields.awb_bl?.stringValue || expedienteEncontrado.fields.bl?.stringValue || 'S/N';
+
+                // 5. Actualizar en Firestore mediante petición PATCH preservando el resto de los campos
+                const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
+                
+                const patchBody = {
+                    fields: {
+                        ...expedienteEncontrado.fields,
+                        [campoAModificar]: { stringValue: fechaDetectada }
+                    }
+                };
+
+                const patchRes = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patchBody)
+                });
+
+                if (patchRes.ok) {
+                    await sock.sendMessage(remitente, { text: `✅ *¡ACTUALIZACIÓN AUTOMÁTICA EXITOSA!* 🚀\n\n📂 Exp: *${numExpReal}*\n📦 B/L / AWB: *${blReal}*\n⚙️ Evento/Campo: *${campoAModificar}*\n📅 Fecha Registrada: *${fechaDetectada}*` });
+                } else {
+                    const errData = await patchRes.json();
+                    await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
+                }
+
             } catch (err) {
-                console.error("❌ Error procesando mensaje inteligente en Baileys:", err);
+                console.error("❌ Error procesando mensaje inteligente por coincidencia en Baileys:", err);
             }
         });
 
