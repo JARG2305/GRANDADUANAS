@@ -204,6 +204,9 @@
                             <button onclick="enviarExcelPorCorreo()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-indigo-700">
                                 📧 Enviar por Correo
                             </button>
+                            <button onclick="openWhatsAppModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-emerald-700">
+                                🤖 Escanear QR WhatsApp
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -759,6 +762,24 @@
         </div>
     </div>
 
+    <!-- MODAL DE WHATSAPP / QR CODE EN LA NUBE -->
+    <div id="whatsappModal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full flex flex-col my-auto p-6 text-center space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-lg text-slate-900">🤖 Conexión WhatsApp (Nube)</h3>
+                <button type="button" onclick="closeWhatsAppModal()" class="text-slate-400 hover:text-slate-700 text-2xl font-bold px-2">&times;</button>
+            </div>
+            <div id="wa-status-container" class="space-y-3">
+                <p id="wa-status-text" class="text-sm font-semibold text-slate-600">Consultando estado del bot...</p>
+                <div id="wa-qr-box" class="flex flex-col items-center justify-center space-y-2" style="display: none;">
+                    <p class="text-xs text-slate-500">Escanee este código QR con su aplicación de WhatsApp:</p>
+                    <img id="wa-qr-img" src="" alt="Código QR WhatsApp" class="max-w-[240px] h-auto border-4 border-slate-100 rounded-xl shadow-md" />
+                </div>
+            </div>
+            <button onclick="closeWhatsAppModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">Cerrar</button>
+        </div>
+    </div>
+
     <!-- Script de Firebase y Lógica del Sistema Corregida -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -831,6 +852,47 @@
             const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(`📋 *REPORTE GENERAL DE TODAS LAS ALERTAS*\n\n${texto}`)}`;
             window.open(url, '_blank');
         };
+
+        window.openWhatsAppModal = function() {
+            document.getElementById("whatsappModal").classList.remove("hidden");
+            verificarEstadoWhatsApp();
+        };
+
+        window.closeWhatsAppModal = function() {
+            document.getElementById("whatsappModal").classList.add("hidden");
+        };
+
+        async function verificarEstadoWhatsApp() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/whatsapp/estado`);
+                const data = await res.json();
+                
+                const statusText = document.getElementById('wa-status-text');
+                const qrBox = document.getElementById('wa-qr-box');
+                const qrImg = document.getElementById('wa-qr-img');
+
+                if (data.ready) {
+                    statusText.innerHTML = "🟢 <strong class='text-emerald-600'>Bot de WhatsApp Conectado y Operativo en la Nube</strong>";
+                    qrBox.style.display = 'none';
+                } else if (data.estado === "ESPERANDO_ESCANEO" && data.qrCodeDataUrl) {
+                    statusText.innerHTML = "🟡 <strong class='text-amber-600'>Escanee el código QR con su WhatsApp</strong>";
+                    qrImg.src = data.qrCodeDataUrl;
+                    qrBox.style.display = 'flex';
+                } else {
+                    statusText.innerHTML = "🔴 <strong class='text-rose-600'>Desconectado / Inicializando servicio en la nube...</strong>";
+                    qrBox.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Error consultando estado de WhatsApp:", err);
+            }
+        }
+
+        setInterval(() => {
+            const modal = document.getElementById("whatsappModal");
+            if (modal && !modal.classList.contains("hidden")) {
+                verificarEstadoWhatsApp();
+            }
+        }, 5000);
 
         const fieldsList = [
             "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
@@ -1824,28 +1886,6 @@
             }
             filterData();
         };
-    
-        window.enviarAlertaWhatsApp = function() {
-            if (!allRecords || allRecords.length === 0) {
-                alert("⚠️ No hay expedientes cargados para enviar por WhatsApp.");
-                return;
-            }
-
-            const topExps = allRecords.slice(0, 5);
-            let mensaje = "🚨 *LOGISTATUS PRO - ALERTAS OPERATIVAS* 🚨\n\n";
-            
-            topExps.forEach((rec, index) => {
-                mensaje += `*${index + 1}. Exp:* ${rec.n_expediente || 'N/D'}\n`;
-                mensaje += `   *Cliente:* ${rec.cliente || 'N/D'}\n`;
-                mensaje += `   *ETA:* ${rec.eta || 'N/D'}\n\n`;
-            });
-
-            mensaje += "Enviado desde el sistema Logistatus Pro.";
-            const textoCodificado = encodeURIComponent(mensaje);
-            const urlWhatsApp = `https://api.whatsapp.com/send?phone=&text=${textoCodificado}`;
-            
-            window.open(urlWhatsApp, '_blank');
-        };
 
         function getFilteredAndSortedRecords() {
             const query = document.getElementById("searchInput").value.toLowerCase().trim();
@@ -2041,13 +2081,10 @@
             }
 
             try {
-                // Preparamos los textos limpios de las alertas activas para enviarlos por POST
-                const listaAlertasTexto = window._todasLasAlertasActivas.map(a => (a.textWeb || "").replace(/<[^>]*>/g, '').trim());
-
                 const response = await fetch(`${BACKEND_URL}/api/calcular-alertas`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ alertas: listaAlertasTexto })
+                    body: JSON.stringify({})
                 });
                 
                 const data = await response.json();
