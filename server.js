@@ -4,21 +4,25 @@ const app = express();
 const path = require('path');
 const XLSX = require('xlsx-js-style');
 const cron = require('node-cron');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
 
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES Y WHATSAPP
+// 0. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
+// Credenciales y configuraciones desde variables de entorno
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
 
+// ==========================================
+// 0.1 CONFIGURACIÓN DE CORS Y MIDDLEWARES
+// ==========================================
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -29,56 +33,736 @@ app.use((req, res, next) => {
     next();
 });
 
-// Inicialización única de WhatsApp
+// ==========================================
+// 0.2 INICIALIZACIÓN DE WHATSAPP CON BAILEYS (NUBE)
+// ==========================================
+let sock = null;
 let whatsappClientReady = false;
 let ultimoQrGenerado = "";
 let estadoConexionWhatsapp = "DESCONECTADO";
 
-const whatsappClient = new Client({
-    authStrategy: new LocalAuth({ clientId: "logistatus-pro-session", dataPath: ".wwebjs_auth" }),
-    puppeteer: {
-        headless: true,
-        executablePath: process.env.CHROME_PATH || undefined,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
-    }
-});
-
-whatsappClient.on('qr', async (qr) => {
-    console.log('📱 [WHATSAPP] Nuevo código QR generado.');
-    estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
+async function iniciarBaileysWhatsApp() {
     try {
-        ultimoQrGenerado = await qrcode.toDataURL(qr);
+        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth_info_baileys'));
+        
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false
+        });
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log('📱 [WHATSAPP BAILEYS] Nuevo código QR generado.');
+                estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
+                try {
+                    ultimoQrGenerado = await qrcode.toDataURL(qr);
+                } catch (err) {
+                    console.error("❌ Error al convertir QR de Baileys a DataURL:", err);
+                }
+            }
+
+            if (connection === 'open') {
+                console.log('✅ [WHATSAPP BAILEYS] ¡Conectado y listo en la nube!');
+                whatsappClientReady = true;
+                estadoConexionWhatsapp = "CONECTADO";
+                ultimoQrGenerado = "";
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log(`⚠️ [WHATSAPP BAILEYS] Conexión cerrada. Reconectando: ${shouldReconnect}`);
+                whatsappClientReady = false;
+                estadoConexionWhatsapp = "DESCONECTADO";
+                if (shouldReconnect) {
+                    iniciarBaileysWhatsApp();
+                }
+            }
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
     } catch (err) {
-        console.error("❌ Error al generar QR:", err);
+        console.error("❌ Error al iniciar Baileys en la nube:", err);
+    }
+}
+
+// Iniciar el cliente de WhatsApp al arrancar el servidor
+iniciarBaileysWhatsApp();
+
+// ==========================================
+// 1. RUTAS ESENCIALES Y DE CONFIGURACIÓN
+// ==========================================
+app.get('/api/config', (req, res) => {
+    res.json({
+        firebaseApiKey: FIREBASE_API_KEY,
+        firebaseProjectId: FIREBASE_PROJECT_ID,
+        telegramBotToken: TELEGRAM_BOT_TOKEN || '',
+        telegramChatId: TELEGRAM_CHAT_ID || ''
+    });
+});
+
+// Ruta raíz que entrega la interfaz principal index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Ruta de verificación para UptimeRobot
+app.get('/health', (req, res) => {
+    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
+});
+
+// ==========================================
+// 1.1 ENDPOINTS DE WHATSAPP PARA LA WEB
+// ==========================================
+app.get('/api/whatsapp/estado', (req, res) => {
+    res.json({
+        success: true,
+        estado: estadoConexionWhatsapp,
+        ready: whatsappClientReady,
+        qrCodeDataUrl: ultimoQrGenerado
+    });
+});
+
+app.post('/api/whatsapp/enviar', async (req, res) => {
+    const { telefono, mensaje } = req.body;
+    if (!whatsappClientReady || !sock) {
+        return res.status(400).json({ success: false, message: "El bot de WhatsApp aún no está conectado. Escanee el código QR en el sistema." });
+    }
+    if (!telefono || !mensaje) {
+        return res.status(400).json({ success: false, message: "Faltan el número de teléfono o el mensaje." });
+    }
+
+    try {
+        let numeroLimpios = telefono.replace(/\D/g, '');
+        const jid = `${numeroLimpios}@s.whatsapp.net`;
+
+        await sock.sendMessage(jid, { text: mensaje });
+        res.json({ success: true, message: "Mensaje de WhatsApp enviado con éxito." });
+    } catch (error) {
+        console.error("❌ Error al enviar WhatsApp con Baileys:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
-whatsappClient.on('ready', () => {
-    console.log('✅ [WHATSAPP] Conectado y listo en la nube.');
-    whatsappClientReady = true;
-    estadoConexionWhatsapp = "CONECTADO";
-    ultimoQrGenerado = "";
+app.all('/api/calcular-alertas', async (req, res) => {
+    try {
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) {
+            return res.json({ success: true, count: 0, message: "No hay registros en Firestore." });
+        }
+
+        let alertasEta = [];
+        let alertasDaiPendientes = [];
+        let alertasVencimientos = [];
+        
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        for (const rec of records) {
+            if (rec.despacho) continue;
+
+            const expName = rec.num_expediente || 'S/N';
+            const clientName = rec.cliente || 'S/C';
+            const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+            const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+            const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+            const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+            const iconoVia = esBarco ? "🚢" : "✈️";
+            const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
+
+            const fechaLlegadaStr = rec.fecha_llegada;
+            const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+
+            // 1. CLASIFICACIÓN: ALERTAS DE ETA (POR LLEGAR)
+            const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
+            const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
+
+            if (dArriboObj && !hasLlegadaRegistrada) {
+                const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                    const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                    let tarjeta = `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaArriboObjetivo})`;
+                    alertasEta.push(tarjeta);
+                }
+            }
+
+            // 2. CLASIFICACIÓN: DAI POR HACER (ETA Próximo y Fecha DAI en blanco)
+            if (dArriboObj && !hasLlegadaRegistrada && !hasRegistroDai) {
+                const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
+                    const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
+                    let tarjeta = `⚠️ *DAI POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaArriboObjetivo})\n⚠️ *La fecha de registro DAI se encuentra en blanco.*`;
+                    alertasDaiPendientes.push(tarjeta);
+                }
+            }
+
+            // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47 / Extemporaneidad Persistente)
+            const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
+            
+            if (dLlegada && !hasTransmision) {
+                let dDeadline = new Date(dLlegada.getTime());
+                let diasHabilesAgregados = 0;
+                let intentosMaximos = 0;
+                while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
+                    dDeadline.setDate(dDeadline.getDate() + 1);
+                    const diaSemana = dDeadline.getDay();
+                    if (diaSemana !== 0 && diaSemana !== 6) {
+                        diasHabilesAgregados++;
+                    }
+                    intentosMaximos++;
+                }
+                const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+                const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
+
+                if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
+                    const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Quedan ${diffPlazoDays} días para transmitir`;
+                    let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffPlazoDays < 0) {
+                    const diasExt = Math.abs(diffPlazoDays);
+                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ Plazo vencido el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.! (Persiste hasta transmitir)*`;
+                    alertasVencimientos.push(tarjeta);
+                }
+            }
+
+            // Vencimiento de Almacén
+            if (rec.culminacion_dias_libres) {
+                const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
+                if (culmDate) {
+                    const diffDaysAlm = Math.round((culmDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffDaysAlm >= 0 && diffDaysAlm <= 2) {
+                        const textoAlm = diffDaysAlm === 0 ? "VENCE HOY" : `Faltan ${diffDaysAlm}d`;
+                        let tarjeta = `⚠️ *ALMACÉN PRÓXIMO A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoAlm} (${rec.culminacion_dias_libres})`;
+                        alertasVencimientos.push(tarjeta);
+                    } else if (diffDaysAlm < 0) {
+                        let tarjeta = `🚨 *ALMACÉN VENCIDO*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció hace ${Math.abs(diffDaysAlm)} día(s) el ${rec.culminacion_dias_libres}`;
+                        alertasVencimientos.push(tarjeta);
+                    }
+                }
+            }
+
+            // DAI Próxima a Vencer o Vencida (Persistente hasta registrar fecha)
+            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+            if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+                const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                
+                if (diffVencDays < 0) {
+                    const diasVencida = Math.abs(diffVencDays);
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffVencDays >= 0 && diffVencDays <= 4) {
+                    const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
+                    let tarjeta = `⚠️ *DAI PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: *${fechaEta}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`;
+                    alertasVencimientos.push(tarjeta);
+                }
+            }
+        }
+
+        let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
+
+        if (listaFinalOrdenada.length === 0) {
+            return res.json({ success: true, count: 0, message: "No hay alertas críticas pendientes." });
+        }
+
+        let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
+
+        let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE CONSOLIDADO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+        await enviarAlertaTelegramServidor(mensajeConsolidado);
+
+        res.json({ success: true, count: listaFinalOrdenada.length, message: `¡Alertas consolidadas y enviadas con éxito! (${listaFinalOrdenada.length} enviadas)` });
+    } catch (error) {
+        console.error("❌ Error en /api/calcular-alertas:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
-whatsappClient.on('auth_failure', (msg) => {
-    console.error('❌ [WHATSAPP] Error de autenticación:', msg);
-    estadoConexionWhatsapp = "ERROR_AUTENTICACION";
+// ==========================================
+// 2. FUNCIONES DE SERVICIO (CORREO, TELEGRAM Y FIRESTORE)
+// ==========================================
+async function enviarCorreoSistema(opcionesMail) {
+    try {
+        const apiKey = process.env.RESEND_API_KEY; 
+        const remitente = process.env.RESEND_REMITE || "onboarding@resend.dev";
+
+        if (!apiKey || apiKey.includes("TU_API_KEY")) {
+            throw new Error("Falta configurar la RESEND_API_KEY en las variables de entorno de Render para este cliente.");
+        }
+
+        let destinatarios = opcionesMail.to;
+        if (!Array.isArray(destinatarios)) {
+            destinatarios = [destinatarios];
+        }
+        destinatarios = destinatarios.map(e => typeof e === 'string' ? e.trim() : '').filter(e => e.length > 0);
+
+        let attachmentsFormatted = [];
+        if (opcionesMail.attachments && Array.isArray(opcionesMail.attachments)) {
+            attachmentsFormatted = opcionesMail.attachments.map(att => {
+                let base64Content = '';
+                if (Buffer.isBuffer(att.content)) {
+                    base64Content = att.content.toString('base64');
+                } else if (typeof att.content === 'string') {
+                    base64Content = att.content.includes('base64,') ? att.content.split('base64,')[1] : att.content;
+                }
+                return { filename: att.filename, content: base64Content };
+            });
+        }
+
+        const payload = {
+            from: `LOGISTATUS PRO <${remitente}>`,
+            to: destinatarios,
+            subject: opcionesMail.subject || 'Notificación LOGISTATUS PRO',
+            html: opcionesMail.html || opcionesMail.text || 'Sin contenido'
+        };
+
+        if (attachmentsFormatted.length > 0) {
+            payload.attachments = attachmentsFormatted;
+        }
+
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(`Error de la API: ${JSON.stringify(data)}`);
+        }
+
+        console.log("✅ Correo enviado exitosamente vía HTTP:", data.id);
+        return { success: true };
+    } catch (error) {
+        console.error("❌ Error al enviar el correo por HTTP:", error);
+        throw error;
+    }
+}
+
+async function enviarAlertaTelegramServidor(mensajeTexto) {
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: mensajeTexto,
+                parse_mode: 'Markdown'
+            })
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            console.error("❌ Error de Telegram en el servidor:", data.description);
+        } else {
+            console.log("✅ Alerta enviada a Telegram desde la nube.");
+        }
+    } catch (err) {
+        console.error("❌ Error de red al conectar con Telegram desde el servidor:", err);
+    }
+}
+
+async function obtenerExpedientesFirestore() {
+    try {
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (!result.documents) return [];
+
+        return result.documents.map(doc => {
+            let fields = doc.fields || {};
+            let parsedRecord = {};
+            for (let key in fields) {
+                let valObj = fields[key];
+                parsedRecord[key] = valObj.stringValue || valObj.doubleValue || valObj.integerValue || valObj.booleanValue || "";
+            }
+            return parsedRecord;
+        });
+    } catch (err) {
+        console.error("❌ Error al consultar Firestore desde el servidor:", err);
+        return [];
+    }
+}
+
+function parseFechaLocalServidor(str) {
+    if (!str) return null;
+    str = String(str).trim();
+    if (str.includes('/')) {
+        const p = str.split('/');
+        if (p.length === 3 && p[2].length === 4) {
+            return new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`);
+        }
+    } else if (str.includes('-')) {
+        const p = str.split('-');
+        if (p.length === 3 && p[0].length === 4) {
+            return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);
+        }
+    }
+    return null;
+}
+
+// ==========================================
+// 3. RUTAS DE LA API
+// ==========================================
+app.post('/api/enviar-excel-correo', async (req, res) => {
+    const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
+    
+    if (!excelBase64) {
+        return res.status(400).json({ success: false, message: 'Falta el archivo Excel en Base64.' });
+    }
+
+    const base64Data = excelBase64.includes('base64,') ? excelBase64.split('base64,')[1] : excelBase64;
+
+    const mailOptions = {
+        to: destinatario,
+        subject: asunto || '📊 Reporte de Expedientes - LOGISTATUS PRO',
+        text: mensaje || 'Adjunto encontrarás el reporte de expedientes actualizado.',
+        attachments: [
+            {
+                filename: nombreArchivo || 'Reporte_Logistatus.xlsx',
+                content: Buffer.from(base64Data, 'base64'),
+                contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            }
+        ]
+    };
+
+    try {
+        await enviarCorreoSistema(mailOptions);
+        res.json({ success: true, message: 'Correo con Excel adjunto enviado con éxito.' });
+    } catch (error) {
+        console.error('Error al enviar el correo:', error);
+        res.status(500).json({ success: false, message: error.message || 'Error al enviar el correo.' });
+    }
 });
 
-whatsappClient.on('disconnected', (reason) => {
-    console.log('⚠️ [WHATSAPP] Desconectado:', reason);
-    whatsappClientReady = false;
-    estadoConexionWhatsapp = "DESCONECTADO";
-    whatsappClient.initialize();
+app.post('/api/notificar', async (req, res) => {
+    try {
+        const { mensaje } = req.body;
+        if (!mensaje) {
+            return res.status(400).json({ success: false, message: 'Falta el mensaje de alerta.' });
+        }
+        await enviarAlertaTelegramServidor(mensaje);
+        res.json({ success: true, message: "Alerta enviada a Telegram con éxito." });
+    } catch (error) {
+        console.error("❌ Error en /api/notificar:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
-whatsappClient.initialize();
+// ==========================================
+// 4. TAREAS PROGRAMADAS EN SEGUNDO PLANO (CRON)
+// ==========================================
+
+// Envío automático programado de correos con Excel estilizado (10:00 AM y 6:00 PM Hora Venezuela)
+cron.schedule('0 10,18 * * *', async () => {
+    console.log("⏰ [CRON] Ejecutando generación y envío automático...");
+    try {
+        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
+        if (!correoCliente) {
+            console.log("⚠️ [CRON] No hay un CORREO_DESTINATARIO_AUTOMATICO configurado para este servicio.");
+            return;
+        }
+        const destinatariosAutomaticos = [correoCliente];
+        
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) {
+            console.log("⚠️ [CRON] No hay registros en Firestore para generar el reporte automático.");
+            return;
+        }
+
+        const excelHeaders = [
+            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+        ];
+
+        const fieldsList = [
+            "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
+            "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
+            "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
+            "eta_la_guaira", "fecha_registro_dai", "vencimiento_dai", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
+            "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
+            "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
+            "almacen", "recibida_acta_recepcion_almacen", "dias_libres_almacen", "inicio_dias_libres", "culminacion_dias_libres",
+            "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
+            "observaciones"
+        ];
+
+        const blackBorder = {
+            top: { style: "thin", color: { rgb: "FFFFFF" } },
+            bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+            left: { style: "thin", color: { rgb: "FFFFFF" } },
+            right: { style: "thin", color: { rgb: "FFFFFF" } }
+        };
+
+        const anchosEspecificosXLSX = [
+            10, 11, 31, 21, 15, 15, 21, 21, 18, 12, 18, 13, 14, 14, 14, 15, 14, 
+            14.5, 14.5, 14.5, 16, 16, 12, 14.5, 14.5, 14.5, 16, 12, 12, 12, 
+            14, 14, 14, 17, 15, 15, 17, 14, 14, 14, 15, 17, 14.5, 14.5, 14.5, 14.5, 20
+        ];
+
+        const buildRowsServidor = (listaRecs) => {
+            return listaRecs.map(rec => {
+                return fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
+            });
+        };
+
+        const ordenarPorETA = (lista) => {
+            return lista.sort((a, b) => {
+                let fA = parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31');
+                let fB = parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31');
+                return fA - fB;
+            });
+        };
+
+        const porLlegar = ordenarPorETA(records.filter(r => !r.despacho && !r.validacion && !r.reconocimiento));
+        const tramites = ordenarPorETA(records.filter(r => !r.despacho && (r.validacion || r.reconocimiento || r.fecha_transmision)));
+        const despachados = ordenarPorETA(records.filter(r => r.despacho));
+
+        let masterRows = [];
+        if (porLlegar.length > 0) {
+            masterRows.push(["▶ 1. EXPEDIENTES POR LLEGAR"]);
+            masterRows.push(excelHeaders);
+            masterRows.push(...buildRowsServidor(porLlegar));
+            masterRows.push([]);
+        }
+        if (tramites.length > 0) {
+            masterRows.push(["▶ 2. TRÁMITES ADUANALES Y EN PROCESO"]);
+            masterRows.push(excelHeaders);
+            masterRows.push(...buildRowsServidor(tramites));
+            masterRows.push([]);
+        }
+        if (despachados.length > 0) {
+            masterRows.push(["▶ 3. EXPEDIENTES DESPACHADOS"]);
+            masterRows.push(excelHeaders);
+            masterRows.push(...buildRowsServidor(despachados));
+        }
+
+        const wb = XLSX.utils.book_new();
+        const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
+        
+        const range = XLSX.utils.decode_range(wsMaster['!ref']);
+        wsMaster['!cols'] = anchosEspecificosXLSX.map(w => ({ wch: w }));
+        wsMaster['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: range.e.c } }) };
+
+        wsMaster['!rows'] = [];
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+            if (cellA && cellA.v && String(cellA.v).includes("▶")) {
+                wsMaster['!rows'].push({ hpt: 30 });
+            } else if (cellA && cellA.v && excelHeaders.includes(cellA.v)) {
+                wsMaster['!rows'].push({ hpt: 43 });
+            } else {
+                wsMaster['!rows'].push({ hpt: 26.50 });
+            }
+        }
+
+        let currentSection = 1;
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            const cellA = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+            if (cellA && cellA.v && String(cellA.v).includes("▶")) {
+                if (String(cellA.v).includes("TRÁMITES")) currentSection = 2;
+                if (String(cellA.v).includes("DESPACHADOS")) currentSection = 3;
+                cellA.s = { font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } }, alignment: { vertical: "center", horizontal: "left" } };
+                continue;
+            }
+
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!wsMaster[cellAddress]) continue;
+
+                let cellStyle = {
+                    border: blackBorder,
+                    alignment: { vertical: "center", horizontal: "center", wrapText: true },
+                    font: { name: "Segoe UI", sz: 10 }
+                };
+
+                const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
+                if (headerCheck && excelHeaders.includes(headerCheck.v)) {
+                    cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
+                    cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
+                } else {
+                    cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
+                    
+                    const textoCabeceraColumna = wsMaster[XLSX.utils.encode_cell({ r: 1, c: C })]?.v || wsMaster[XLSX.utils.encode_cell({ r: 2, c: C })]?.v || "";
+                    
+                    if (textoCabeceraColumna.includes("ETA") || textoCabeceraColumna.includes("DÍAS LIBRES")) {
+                        cellStyle.fill = { fgColor: { rgb: "FEF08A" } };
+                    } else if (textoCabeceraColumna.includes("LLEGADA") || textoCabeceraColumna.includes("FECHA DE LLEGADA")) {
+                        cellStyle.fill = { fgColor: { rgb: "2563EB" } };
+                        cellStyle.font.color = { rgb: "FFFFFF" };
+                    } else {
+                        if (currentSection === 3) {
+                            cellStyle.fill = { fgColor: { rgb: "FEE2E2" } };
+                        } else if (currentSection === 2) {
+                            cellStyle.fill = { fgColor: { rgb: "D9E1F2" } };
+                        } else {
+                            cellStyle.fill = { fgColor: { rgb: "F8FAFC" } };
+                        }
+                    }
+                }
+                wsMaster[cellAddress].s = cellStyle;
+            }
+        }
+
+        XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Maestro Consolidado");
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+        const excelBase64String = Buffer.from(excelBuffer).toString('base64');
+
+        const mailOptionsAuto = {
+            to: destinatariosAutomaticos,
+            subject: "📊 Reporte Maestro Automático de Expedientes - LOGISTATUS PRO",
+            text: "Adjunto encontrarás el reporte consolidado de operaciones generado automáticamente con formato oficial.",
+            html: "<p>Este es el envío automático programado del reporte consolidado de operaciones de <strong>Logistatus Pro</strong> con su formato oficial idéntico al del sistema.</p>",
+            attachments: [
+                {
+                    filename: 'Reporte_Logistatus_Automatico.xlsx',
+                    content: excelBase64String,
+                    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                }
+            ]
+        };
+
+        await enviarCorreoSistema(mailOptionsAuto);
+        console.log("✅ [CRON] Correo automático programado con Excel estilizado enviado con éxito a las 10 AM / 6 PM.");
+    } catch (error) {
+        console.error("❌ [CRON] Error al generar o enviar el correo automático programado:", error);
+    }
+}, {
+    timezone: "America/Caracas"
+});
+
+// Evaluación autónoma de alertas operativas en hora de Venezuela (9 AM, 12 PM, 3 PM, 6 PM, 7 PM, 8 PM)
+cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
+    const ahoraVzla = new Date().toLocaleString("en-US", { timeZone: "America/Caracas" });
+    const horaActual = new Date(ahoraVzla).getHours();
+    console.log(`⏰ [CRON NUBE] Evaluando alertas operativas en hora Venezuela (${horaActual}:00 hrs)...`);
+    
+    try {
+        const records = await obtenerExpedientesFirestore();
+        if (!records || records.length === 0) return;
+
+        let alertasEta = [];
+        let alertasDaiPendientes = [];
+        let alertasVencimientos = [];
+        
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        for (const rec of records) {
+            if (rec.despacho) continue;
+
+            const expName = rec.num_expediente || 'S/N';
+            const clientName = rec.cliente || 'S/C';
+            const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+            const fechaEta = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+            const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+            const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+            const iconoVia = esBarco ? "🚢" : "✈️";
+            const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
+
+            const fechaLlegadaStr = rec.fecha_llegada;
+            const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
+
+            // 1. CLASIFICACIÓN: ALERTAS DE ETA (POR LLEGAR)
+            const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
+            const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
+
+            if (dArriboObj && !hasLlegadaRegistrada) {
+                const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                    const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                    let tarjeta = `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaArriboObjetivo})`;
+                    alertasEta.push(tarjeta);
+                }
+            }
+
+            // 2. CLASIFICACIÓN: DAI POR HACER (ETA Próximo y Fecha DAI en blanco)
+            const faltaDaiRegistrar = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
+            if (dArriboObj && !hasLlegadaRegistrada && faltaDaiRegistrar) {
+                const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
+                    const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
+                    let tarjeta = `⚠️ *DAI POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaArriboObjetivo})\n⚠️ *La fecha de registro DAI se encuentra en blanco.*`;
+                    alertasDaiPendientes.push(tarjeta);
+                }
+            }
+
+            // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer / vencida)
+            const fechaLlegadaOEta = rec.fecha_llegada || rec.eta_la_guaira;
+            const dLlegada = parseFechaLocalServidor(fechaLlegadaOEta);
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+            
+            if (dLlegada && !hasTransmision) {
+                let dDeadline = new Date(dLlegada.getTime());
+                let diasHabilesAgregados = 0;
+                let intentosMaximos = 0;
+                while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
+                    dDeadline.setDate(dDeadline.getDate() + 1);
+                    const diaSemana = dDeadline.getDay();
+                    if (diaSemana !== 0 && diaSemana !== 6) {
+                        diasHabilesAgregados++;
+                    }
+                    intentosMaximos++;
+                }
+                const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+                const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
+
+                if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
+                    const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Quedan ${diffPlazoDays} días para transmitir`;
+                    let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffPlazoDays < 0) {
+                    const diasExt = Math.abs(diffPlazoDays);
+                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ Plazo vencido el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.! (Persiste hasta transmitir)*`;
+                    alertasVencimientos.push(tarjeta);
+                }
+            }
+
+            // DAI Próxima a Vencer o Vencida (PERSISTENTE hasta que se cargue la fecha DAI)
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+
+            if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+                const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                
+                if (diffVencDays < 0) {
+                    const diasVencida = Math.abs(diffVencDays);
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffVencDays >= 0 && diffVencDays <= 4) {
+                    const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
+                    let tarjeta = `⚠️ *DAI PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: *${fechaEta}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`;
+                    alertasVencimientos.push(tarjeta);
+                }
+            }
+        }
+
+        let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
+
+        if (listaFinalOrdenada.length > 0) {
+            let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
+            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE AUTOMÁTICO CRON* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+            await enviarAlertaTelegramServidor(mensajeConsolidado);
+        }
+
+        console.log(`✅ [CRON NUBE] Verificación automática finalizada. Total enviadas: ${listaFinalOrdenada.length}`);
+    } catch (error) {
+        console.error("❌ [CRON NUBE] Error al procesar alertas automáticas:", error);
+    }
+}, {
+    timezone: "America/Caracas"
+});
+
+// ==========================================
+// 5. INICIO DEL SERVIDOR
+// ==========================================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`);
+});
