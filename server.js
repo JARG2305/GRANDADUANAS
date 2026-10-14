@@ -7,6 +7,28 @@ const cron = require('node-cron');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 
+let whatsappClientReady = false;
+let ultimoQrGenerado = "";
+let estadoConexionWhatsapp = "DESCONECTADO";
+
+const whatsappClient = new Client({
+    authStrategy: new LocalAuth({ clientId: "logistatus-pro-session", dataPath: ".wwebjs_auth" }),
+    puppeteer: {
+        headless: true,
+        executablePath: process.env.CHROME_PATH || undefined,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ]
+    }
+});
+
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
