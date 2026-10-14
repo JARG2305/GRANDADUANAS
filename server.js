@@ -126,12 +126,11 @@ async function iniciarBaileysWhatsApp() {
                 let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
 
                 // 3. Consultar Firestore para buscar el expediente
-                const projectId = process.env.FIREBASE_PROJECT_ID;
+                const projectId = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
                 const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
                 const response = await fetch(urlQuery);
                 const result = await response.json();
 
-                // 🔍 Depuración: Ver qué trae Firebase exactamente en la consola
                 console.log("📦 Respuesta cruda de Firestore:", JSON.stringify(result).substring(0, 300));
 
                 if (!result.documents || result.documents.length === 0) {
