@@ -141,20 +141,23 @@ async function iniciarBaileysWhatsApp() {
                     return {
                         id: doc.name.split('/').pop(),
                         fields: fields,
-                        num_expediente: (fields.num_expediente?.stringValue || "").toLowerCase(),
-                        bl: (fields.awb_bl?.stringValue || fields.bl?.stringValue || fields.numero_bl?.stringValue || "").toLowerCase()
+                        num_expediente: (fields.num_expediente?.stringValue || "").toLowerCase().trim(),
+                        bl: (fields.awb_bl?.stringValue || fields.bl?.stringValue || fields.numero_bl?.stringValue || "").toLowerCase().trim()
                     };
                 });
 
                 let expedienteEncontrado = null;
                 for (let item of listaExpedientes) {
-                    if ((item.num_expediente && item.num_expediente.length > 1 && textoLower.includes(item.num_expediente)) ||
-                        (item.bl && item.bl.length > 2 && textoLower.includes(item.bl))) {
+                    let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
+                    let limpioExp = item.num_expediente.replace(/[^a-z0-9]/g, '');
+                    let limpioBl = item.bl.replace(/[^a-z0-9]/g, '');
+
+                    if ((limpioExp.length > 1 && limpioTexto.includes(limpioExp)) ||
+                        (limpioBl.length > 2 && limpioTexto.includes(limpioBl))) {
                         expedienteEncontrado = item;
                         break;
                     }
                 }
-
                 if (!expedienteEncontrado) {
                     console.log(`⚠️ Ningún expediente de la base de datos coincidió con el texto del mensaje.`);
                     return;
