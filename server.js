@@ -82,6 +82,8 @@ app.all('/api/calcular-alertas', async (req, res) => {
 
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
+            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
 
             // 1. CLASIFICACIÓN: ALERTAS DE ETA (POR LLEGAR)
             const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
@@ -97,8 +99,7 @@ app.all('/api/calcular-alertas', async (req, res) => {
             }
 
             // 2. CLASIFICACIÓN: DAI POR HACER (ETA Próximo y Fecha DAI en blanco)
-            const faltaDaiRegistrar = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
-            if (dArriboObj && !hasLlegadaRegistrada && faltaDaiRegistrar) {
+            if (dArriboObj && !hasLlegadaRegistrada && !hasRegistroDai) {
                 const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                 if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
                     const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
@@ -107,10 +108,8 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 }
             }
 
-            // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer)
-            // Plazo de Declaración (Art. 47 LOA)
+            // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47 / Extemporaneidad Persistente)
             const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
-            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
             
             if (dLlegada && !hasTransmision) {
                 let dDeadline = new Date(dLlegada.getTime());
@@ -125,13 +124,15 @@ app.all('/api/calcular-alertas', async (req, res) => {
                     intentosMaximos++;
                 }
                 const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+                const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
 
                 if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
                     const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Quedan ${diffPlazoDays} días para transmitir`;
                     let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffPlazoDays < 0) {
-                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 de la L.O.A.*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⚠️ Sin transmitir a tiempo. *¡Aplica Multa Art. 177 Num. 7 de la L.O.A.!*`;
+                    const diasExt = Math.abs(diffPlazoDays);
+                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ Plazo vencido el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.! (Persiste hasta transmitir)*`;
                     alertasVencimientos.push(tarjeta);
                 }
             }
@@ -152,13 +153,16 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 }
             }
 
-            // DAI Próxima a Vencer
-            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+            // DAI Próxima a Vencer o Vencida (Persistente hasta registrar fecha)
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-
             if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                if (diffVencDays >= 0 && diffVencDays <= 4) {
+                
+                if (diffVencDays < 0) {
+                    const diasVencida = Math.abs(diffVencDays);
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
                     let tarjeta = `⚠️ *DAI PRÓXIMA A VENCER*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: *${fechaEta}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`;
                     alertasVencimientos.push(tarjeta);
@@ -652,6 +656,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             }
 
             // 3. VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer)
+            // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer / vencida)
             const fechaLlegadaOEta = rec.fecha_llegada || rec.eta_la_guaira;
             const dLlegada = parseFechaLocalServidor(fechaLlegadaOEta);
             const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
@@ -669,47 +674,37 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     intentosMaximos++;
                 }
                 const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
+                const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
 
                 if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
                     const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY!" : `Quedan ${diffPlazoDays} días para transmitir`;
                     let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffPlazoDays < 0) {
-                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 de la L.O.A.*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⚠️ Sin transmitir a tiempo. *¡Aplica Multa Art. 177 Num. 7 de la L.O.A.!*`;
+                    // Extemporaneidad PERSISTENTE hasta que se cargue la fecha de transmisión
+                    const diasExt = Math.abs(diffPlazoDays);
+                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ Plazo vencido el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.! (Persiste hasta transmitir)*`;
                     alertasVencimientos.push(tarjeta);
                 }
             }
 
-            // Vencimiento de Almacén
-            if (rec.culminacion_dias_libres) {
-                const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
-                if (culmDate) {
-                    const diffDaysAlm = Math.round((culmDate - today) / (1000 * 60 * 60 * 24));
-                    if (diffDaysAlm >= 0 && diffDaysAlm <= 2) {
-                        const textoAlm = diffDaysAlm === 0 ? "VENCE HOY" : `Faltan ${diffDaysAlm}d`;
-                        let tarjeta = `⚠️ *ALMACÉN PRÓXIMO A VENCER*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoAlm} (${rec.culminacion_dias_libres})`;
-                        alertasVencimientos.push(tarjeta);
-                    } else if (diffDaysAlm < 0) {
-                        let tarjeta = `🚨 *ALMACÉN VENCIDO*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⚠️ Venció hace ${Math.abs(diffDaysAlm)} día(s) el ${rec.culminacion_dias_libres}`;
-                        alertasVencimientos.push(tarjeta);
-                    }
-                }
-            }
-
-            // DAI Próxima a Vencer
+            // DAI Próxima a Vencer o Vencida (PERSISTENTE hasta que se cargue la fecha DAI)
             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
 
             if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                if (diffVencDays >= 0 && diffVencDays <= 4) {
+                
+                if (diffVencDays < 0) {
+                    const diasVencida = Math.abs(diffVencDays);
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    alertasVencimientos.push(tarjeta);
+                } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
                     let tarjeta = `⚠️ *DAI PRÓXIMA A VENCER*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${rec.vencimiento_dai})\n🚢 ETA: *${fechaEta}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`;
                     alertasVencimientos.push(tarjeta);
                 }
             }
-        }
-
         let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
 
         if (listaFinalOrdenada.length > 0) {
