@@ -79,10 +79,9 @@ async function iniciarBaileysWhatsApp() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA INTELIGENTE EXCLUSIVA Y SEGURA
+        // ESCUCHA INTELIGENTE EXCLUSIVA Y SEGURA PARA TU GRUPO
         sock.ev.on('messages.upsert', async (m) => {
             try {
-                // Asegurar que procese los mensajes nuevos del tipo notify
                 if (m.type !== 'notify') return;
 
                 const msg = m.messages[0];
@@ -92,17 +91,18 @@ async function iniciarBaileysWhatsApp() {
                 const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const textoLower = textoMensaje.toLowerCase();
 
-                // 🔍 Identificar el ID del chat / grupo en los logs de Render
                 console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
 
                 // =========================================================================
-                // 🛑 FILTRO DE SEGURIDAD (GRUPO AUTORIZADO)
-                // Coloca aquí el ID de tu grupo cuando lo veas en los logs (ej: "12036303...@g.us")
+                // 🛑 FILTRO DE SEGURIDAD: GRUPO AUTORIZADO CONFIGURADO
                 // =========================================================================
                 const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us"; 
                 
-                // Descomenta la siguiente línea cuando ya tengas el ID de tu grupo autorizado:
-                // if (remitente !== GRUPO_AUTORIZADO_JID) return;
+                // Filtro activo: Solo procesará mensajes que provengan de tu grupo de pautas
+                if (remitente !== GRUPO_AUTORIZADO_JID) {
+                    console.log(`⛔ Mensaje ignorado por seguridad (No proviene del grupo autorizado).`);
+                    return;
+                }
                 // =========================================================================
 
                 // 1. Identificar el campo operativo según la palabra clave o evento
@@ -121,7 +121,7 @@ async function iniciarBaileysWhatsApp() {
 
                 if (!campoAModificar) return;
 
-                // 2. Extraer fecha (ej: 08/11/2026, 08-11-2026) o usar la de hoy por defecto en Venezuela
+                // 2. Extraer fecha o usar la de hoy por defecto en Venezuela
                 const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
                 let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
 
@@ -131,7 +131,10 @@ async function iniciarBaileysWhatsApp() {
                 const response = await fetch(urlQuery);
                 const result = await response.json();
 
-                if (!result.documents || result.documents.length === 0) return;
+                if (!result.documents || result.documents.length === 0) {
+                    console.log("⚠️ No se encontraron documentos en Firestore.");
+                    return;
+                }
 
                 let listaExpedientes = result.documents.map(doc => {
                     let fields = doc.fields || {};
@@ -152,12 +155,15 @@ async function iniciarBaileysWhatsApp() {
                     }
                 }
 
-                if (!expedienteEncontrado) return;
+                if (!expedienteEncontrado) {
+                    console.log(`⚠️ Ningún expediente de la base de datos coincidió con el texto del mensaje.`);
+                    return;
+                }
 
                 let numExpReal = expedienteEncontrado.fields.num_expediente?.stringValue || 'S/N';
                 let blReal = expedienteEncontrado.fields.awb_bl?.stringValue || expedienteEncontrado.fields.bl?.stringValue || 'S/N';
 
-                // 4. Actualizar en Firestore vía PATCH preservando el resto de campos
+                // 4. Actualizar en Firestore vía PATCH
                 const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
                 
                 const patchBody = {
@@ -174,9 +180,11 @@ async function iniciarBaileysWhatsApp() {
                 });
 
                 if (patchRes.ok) {
+                    console.log(`✅ Actualización exitosa en Firebase para el expediente: ${numExpReal}`);
                     await sock.sendMessage(remitente, { text: `✅ *¡ACTUALIZACIÓN AUTOMÁTICA EXITOSA!* 🚀\n\n📂 Exp: *${numExpReal}*\n📦 B/L / AWB: *${blReal}*\n⚙️ Evento/Campo: *${campoAModificar}*\n📅 Fecha Registrada: *${fechaDetectada}*` });
                 } else {
                     const errData = await patchRes.json();
+                    console.error(`❌ Error al actualizar en Firestore:`, errData);
                     await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
                 }
 
@@ -347,7 +355,7 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
-                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) senza registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
