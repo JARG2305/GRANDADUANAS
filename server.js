@@ -631,7 +631,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             const fechaLlegadaStr = rec.fecha_llegada;
             const hasLlegadaRegistrada = Boolean(fechaLlegadaStr && fechaLlegadaStr.trim() !== "");
 
-            // 1. ALERTAS DE ETA (POR LLEGAR)
+            // 1. CLASIFICACIÓN: ALERTAS DE ETA (POR LLEGAR)
             const fechaArriboObjetivo = rec.fecha_llegada || rec.eta_la_guaira;
             const dArriboObj = parseFechaLocalServidor(fechaArriboObjetivo);
 
@@ -644,7 +644,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 }
             }
 
-            // 2. DAI POR HACER (ETA Próximo y Fecha DAI en blanco)
+            // 2. CLASIFICACIÓN: DAI POR HACER (ETA Próximo y Fecha DAI en blanco)
             const faltaDaiRegistrar = !rec.fecha_registro_dai || rec.fecha_registro_dai.trim() === "";
             if (dArriboObj && !hasLlegadaRegistrada && faltaDaiRegistrar) {
                 const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
@@ -655,7 +655,6 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 }
             }
 
-            // 3. VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer)
             // 3. CLASIFICACIÓN: VENCIMIENTOS Y PLAZOS (Art. 47, Almacén, DAI próxima a vencer / vencida)
             const fechaLlegadaOEta = rec.fecha_llegada || rec.eta_la_guaira;
             const dLlegada = parseFechaLocalServidor(fechaLlegadaOEta);
@@ -681,7 +680,6 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffPlazoDays < 0) {
-                    // Extemporaneidad PERSISTENTE hasta que se cargue la fecha de transmisión
                     const diasExt = Math.abs(diffPlazoDays);
                     let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47 / 177 Num. 7 de la L.O.A.*\n📋 Exp: *${expName}*\n👤 Cliente: *${clientName}*\n📄 B/L o AWB: *${blInfo}*\n⏳ Plazo vencido el ${fechaPlazoStr} (Vencida hace ${diasExt} día(s)).\n🚨 *¡Aplica Multa Art. 177 N.º 7 de la L.O.A.! (Persiste hasta transmitir)*`;
                     alertasVencimientos.push(tarjeta);
@@ -705,6 +703,8 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                     alertasVencimientos.push(tarjeta);
                 }
             }
+        } // <--- ¡AQUÍ ESTABA LA LLAVE FALTANTE QUE CIERRA EL FOR![cite: 6]
+
         let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
 
         if (listaFinalOrdenada.length > 0) {
