@@ -99,7 +99,7 @@ async function iniciarBaileysWhatsApp() {
                 // 🛑 FILTRO DE SEGURIDAD (GRUPO AUTORIZADO)
                 // Coloca aquí el ID de tu grupo cuando lo veas en los logs (ej: "12036303...@g.us")
                 // =========================================================================
-                const GRUPO_AUTORIZADO_JID = "TU_ID_DE_GRUPO_AQUI@g.us"; 
+                const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us"; 
                 
                 // Descomenta la siguiente línea cuando ya tengas el ID de tu grupo autorizado:
                 // if (remitente !== GRUPO_AUTORIZADO_JID) return;
