@@ -79,10 +79,12 @@ async function iniciarBaileysWhatsApp() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA INTELIGENTE PURA POR COINCIDENCIA DE EVENTO + EXPEDIENTE / B/L
-        // ESCUCHA INTELIGENTE EXCLUSIVA PARA UN GRUPO ESPECÍFICO
+        // ESCUCHA INTELIGENTE EXCLUSIVA Y SEGURA
         sock.ev.on('messages.upsert', async (m) => {
             try {
+                // Asegurar que procese los mensajes nuevos del tipo notify
+                if (m.type !== 'notify') return;
+
                 const msg = m.messages[0];
                 if (!msg.message || msg.key.fromMe) return;
 
@@ -90,15 +92,16 @@ async function iniciarBaileysWhatsApp() {
                 const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const textoLower = textoMensaje.toLowerCase();
 
-                // 🔍 Identificar el ID del chat en los logs para copiarlo
+                // 🔍 Identificar el ID del chat / grupo en los logs de Render
                 console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
 
                 // =========================================================================
-                // 🛑 FILTRO DE SEGURIDAD: Define aquí el ID exacto de tu grupo autorizado
+                // 🛑 FILTRO DE SEGURIDAD (GRUPO AUTORIZADO)
+                // Coloca aquí el ID de tu grupo cuando lo veas en los logs (ej: "12036303...@g.us")
                 // =========================================================================
-                const GRUPO_AUTORIZADO_JID = "TU_ID_DE_GRUPO_AQUI@g.us"; // Ej: "120363031234567890@g.us"
+                const GRUPO_AUTORIZADO_JID = "TU_ID_DE_GRUPO_AQUI@g.us"; 
                 
-                // Si quieres que SOLO funcione en ese grupo, descomenta la siguiente línea:
+                // Descomenta la siguiente línea cuando ya tengas el ID de tu grupo autorizado:
                 // if (remitente !== GRUPO_AUTORIZADO_JID) return;
                 // =========================================================================
 
@@ -118,7 +121,7 @@ async function iniciarBaileysWhatsApp() {
 
                 if (!campoAModificar) return;
 
-                // 2. Extraer fecha o usar la de hoy por defecto en Venezuela
+                // 2. Extraer fecha (ej: 08/11/2026, 08-11-2026) o usar la de hoy por defecto en Venezuela
                 const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
                 let fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
 
@@ -154,7 +157,7 @@ async function iniciarBaileysWhatsApp() {
                 let numExpReal = expedienteEncontrado.fields.num_expediente?.stringValue || 'S/N';
                 let blReal = expedienteEncontrado.fields.awb_bl?.stringValue || expedienteEncontrado.fields.bl?.stringValue || 'S/N';
 
-                // 4. Actualizar en Firestore vía PATCH
+                // 4. Actualizar en Firestore vía PATCH preservando el resto de campos
                 const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
                 
                 const patchBody = {
@@ -186,6 +189,7 @@ async function iniciarBaileysWhatsApp() {
         console.error("❌ Error al iniciar Baileys en la nube:", err);
     }
 }
+
 // Iniciar el cliente de WhatsApp al arrancar el servidor
 iniciarBaileysWhatsApp();
 
@@ -343,7 +347,7 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
-                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
+                    let tarjeta = `🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${rec.vencimiento_dai} (${diasVencida} día(s) atrás) senza registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`;
                     alertasVencimientos.push(tarjeta);
                 } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
