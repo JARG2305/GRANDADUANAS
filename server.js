@@ -131,6 +131,9 @@ async function iniciarBaileysWhatsApp() {
                 const response = await fetch(urlQuery);
                 const result = await response.json();
 
+                // 🔍 Depuración: Ver qué trae Firebase exactamente en la consola
+                console.log("📦 Respuesta cruda de Firestore:", JSON.stringify(result).substring(0, 300));
+
                 if (!result.documents || result.documents.length === 0) {
                     console.log("⚠️ No se encontraron documentos en Firestore.");
                     return;
