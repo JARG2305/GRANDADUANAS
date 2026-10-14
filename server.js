@@ -89,6 +89,9 @@ async function iniciarBaileysWhatsApp() {
                 const remitente = msg.key.remoteJid;
                 const textoLower = textoMensaje.toLowerCase();
 
+                // 🔍 LÍNEA DE DEPURACIÓN PARA VER EL CHAT O GRUPO EN LOS LOGS
+                console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
+
                 // 1. Identificar el campo operativo según la palabra clave o evento en el mensaje
                 let campoAModificar = "";
                 if (textoLower.includes('eta')) {
@@ -136,7 +139,6 @@ async function iniciarBaileysWhatsApp() {
                 let expedienteEncontrado = null;
                 
                 for (let item of listaExpedientes) {
-                    // Validamos si el número de expediente o el B/L están contenidos dentro del mensaje del usuario
                     if ((item.num_expediente && item.num_expediente.length > 1 && textoLower.includes(item.num_expediente)) ||
                         (item.bl && item.bl.length > 2 && textoLower.includes(item.bl))) {
                         expedienteEncontrado = item;
@@ -184,22 +186,6 @@ async function iniciarBaileysWhatsApp() {
         console.error("❌ Error al iniciar Baileys en la nube:", err);
     }
 }
-sock.ev.on('messages.upsert', async (m) => {
-    try {
-        const msg = m.messages[0];
-        if (!msg.message || msg.key.fromMe) return;
-
-        const remitente = msg.key.remoteJid; // <-- Aquí viene el ID del chat (privado o grupo)
-        const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
-
-        // 🔍 LÍNEA DE DEPURACIÓN PARA VER EL CÓDIGO DEL GRUPO EN LOS LOGS
-        console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
-
-        // ... el resto de tu código de comandos ...
-    } catch (err) {
-        console.error("❌ Error:", err);
-    }
-});
 // Iniciar el cliente de WhatsApp al arrancar el servidor
 iniciarBaileysWhatsApp();
 
