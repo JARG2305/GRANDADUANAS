@@ -118,7 +118,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO DE EXPEDIENTES POR ESTADO (EXACTO A PESTAÑAS)
+                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS (SIN CÁLCULOS EXTRA)
                 // =========================================================================
                 if (
                     textoLower.includes('resumen') || 
@@ -133,7 +133,7 @@ async function iniciarBaileysWhatsApp() {
                     textoLower.includes('expedientes en proceso') ||
                     textoLower.includes('exp en proceso')
                 ) {
-                    console.log(`📊 [WHATSAPP] Solicitud de resumen por estados detectada.`);
+                    console.log(`📊 [WHATSAPP] Solicitud de resumen exacto por pestañas detectada.`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
@@ -148,19 +148,18 @@ async function iniciarBaileysWhatsApp() {
                     let porDespachar = [];
 
                     for (const rec of records) {
-                        if (rec.despacho) continue;
+                        if (rec.despacho) continue; // Ignora despachados
 
-                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
                         const hasDaiDua = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                         const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        const dArribo = parseFechaLocalServidor(fechaEtaRaw);
-
-                        if (dArribo && !hasLlegada) {
-                            porEta.push({ rec, fechaObj: dArribo, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
+                        // Lógica directa basada exactamente en el estado actual de las pestañas
+                        if (!hasLlegada) {
+                            let fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
+                            porEta.push({ rec, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
                         } else if (!hasDaiDua) {
                             porRegistrarDua.push(rec);
                         } else if (!hasReconocimiento) {
@@ -172,11 +171,8 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    porEta.sort((a, b) => a.fechaObj - b.fechaObj);
-                    let infoEtaMasProximo = porEta.length > 0 ? ` (El más próximo: ${porEta[0].fechaStr})` : "";
-
                     let mensajeResumen = `📊 *RESUMEN DE EXPEDIENTES - LOGISTATUS PRO* 📊\n\n` +
-                        `🚢 *Por ETA:* ${porEta.length}${infoEtaMasProximo}\n` +
+                        `🚢 *Por ETA:* ${porEta.length}\n` +
                         `📝 *Por Registrar DUA:* ${porRegistrarDua.length}\n` +
                         `🔍 *Por Reconocer:* ${porReconocer.length}\n` +
                         `📋 *Por Validar:* ${porValidar.length}\n` +
