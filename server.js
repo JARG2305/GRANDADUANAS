@@ -80,10 +80,20 @@ async function iniciarBaileysWhatsApp() {
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
+                // 🚨 ALERTA AUTOMÁTICA AL GRUPO DE WHATSAPP CUANDO SE DESCONECTA
+                try {
+                    if (sock) {
+                        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
+                        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { 
+                            text: `⚠️ *ALERTA DE SISTEMA - LOGISTATUS PRO*\n\nEl bot de WhatsApp se ha **desconectado** (Código: ${statusCode || 'Desconocido'}). Intentando reconectar automáticamente...` 
+                        });
+                    }
+                } catch (errWhatsapp) {
+                    console.error("❌ No se pudo enviar alerta de desconexión al grupo de WhatsApp:", errWhatsapp);
+                }
+
                 if (isLoggedOut) {
                     console.log(`❌ [WHATSAPP] Sesión cerrada permanentemente o token revocado. Limpiando credenciales...`);
-                    // Opcional: Si quieres que borre la sesión automáticamente para un QR limpio, descomenta esta línea:
-                    // require('fs').rmSync(path.join(__dirname, 'auth_info_baileys'), { recursive: true, force: true });
                 }
 
                 if (shouldReconnect) {
@@ -248,10 +258,14 @@ async function iniciarBaileysWhatsApp() {
                     nombreCampoLegible = "Acta de Recepción";
                 }
 
-                // =========================================================================
+               // =========================================================================
                 // 📊 COMANDO RÁPIDO: SOLICITAR ALERTAS ACTIVAS DESDE EL GRUPO
                 // =========================================================================
-                if (textoLower.includes('alertas') || textoLower.includes('reporte') || textoLower.includes('estatus')) {
+                const mencionaPrincipal = textoLower.includes('estatus') || textoLower.includes('alertas') || textoLower.includes('reporte');
+                const palabrasApoyo = ['exp', 'expediente', 'activo', 'activos', 'proceso', 'resumen', 'conteo', 'totales', 'carga', 'aduana', 'llegar', 'registrar', 'reconocer', 'validar', 'despachar'];
+                const tieneApoyo = palabrasApoyo.some(palabra => textoLower.includes(palabra));
+
+                if (mencionaPrincipal && tieneApoyo) {
                     console.log(`📊 [WHATSAPP] Solicitud de alertas manual detectada en el grupo.`);
                     
                     const records = await obtenerExpedientesFirestore();
@@ -361,7 +375,7 @@ async function iniciarBaileysWhatsApp() {
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = "🚨 *ALERTAS ACTIVAS- LOGISTATUS PRO - * 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+                    let mensajeConsolidado = "🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
                     
                     await sock.sendMessage(remitente, { text: mensajeConsolidado });
                     return;
