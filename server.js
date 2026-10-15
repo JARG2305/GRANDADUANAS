@@ -79,6 +79,13 @@ async function iniciarBaileysWhatsApp() {
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
+                // 🚨 ALERTA AUTOMÁTICA POR TELEGRAM ANTES DE INTENTAR RECONECTAR
+                try {
+                    await enviarAlertaTelegramServidor(`⚠️ *ALERTA DE SISTEMA*\n\nEl bot de WhatsApp de Grand Aduanas se ha **desconectado** (Código: ${statusCode || 'Desconocido'}). Intentando reconectar automáticamente...`);
+                } catch (errTelegram) {
+                    console.error("❌ No se pudo enviar alerta de desconexión a Telegram:", errTelegram);
+                }
+
                 if (shouldReconnect) {
                     setTimeout(() => {
                         iniciarBaileysWhatsApp();
@@ -120,7 +127,11 @@ async function iniciarBaileysWhatsApp() {
                     textoLower.includes('activos') || 
                     textoLower.includes('en proceso') ||
                     textoLower.includes('resumen de expedientes') ||
-                    textoLower.includes('resumen de exp')
+                    textoLower.includes('resumen de exp') ||
+                    textoLower.includes('expedientes activos') ||
+                    textoLower.includes('exp activos') ||
+                    textoLower.includes('expedientes en proceso') ||
+                    textoLower.includes('exp en proceso')
                 ) {
                     console.log(`📊 [WHATSAPP] Solicitud de resumen por estados detectada.`);
                     
@@ -131,34 +142,30 @@ async function iniciarBaileysWhatsApp() {
                     }
 
                     let porEta = [];
-                    let porRegistrar = [];
+                    let porRegistrarDua = [];
                     let porReconocer = [];
                     let porValidar = [];
                     let porDespachar = [];
 
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-
                     for (const rec of records) {
-                        if (rec.despacho) continue; // Ignora los despachados
+                        if (rec.despacho) continue;
 
                         const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
-                        const hasDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+                        const hasDaiDua = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                         const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        // Lógica de pestañas / embudo exacto
                         const dArribo = parseFechaLocalServidor(fechaEtaRaw);
-                        
+
                         if (dArribo && !hasLlegada) {
                             porEta.push({ rec, fechaObj: dArribo, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
-                        } else if (!hasDai) {
-                            porRegistrar.push(rec);
-                        } else if (hasTransmision && !hasReconocimiento) {
+                        } else if (!hasDaiDua) {
+                            porRegistrarDua.push(rec);
+                        } else if (!hasReconocimiento) {
                             porReconocer.push(rec);
-                        } else if (hasReconocimiento && !hasValidacion) {
+                        } else if (!hasValidacion) {
                             porValidar.push(rec);
                         } else {
                             porDespachar.push(rec);
@@ -170,7 +177,7 @@ async function iniciarBaileysWhatsApp() {
 
                     let mensajeResumen = `📊 *RESUMEN DE EXPEDIENTES - LOGISTATUS PRO* 📊\n\n` +
                         `🚢 *Por ETA:* ${porEta.length}${infoEtaMasProximo}\n` +
-                        `📝 *Por Registrar (DAI):* ${porRegistrar.length}\n` +
+                        `📝 *Por Registrar DUA:* ${porRegistrarDua.length}\n` +
                         `🔍 *Por Reconocer:* ${porReconocer.length}\n` +
                         `📋 *Por Validar:* ${porValidar.length}\n` +
                         `🚀 *Por Despachar:* ${porDespachar.length}`;
@@ -258,7 +265,7 @@ async function iniciarBaileysWhatsApp() {
                             const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                             if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
                                 const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
-                                alertasDaiPendientes.push(`⚠️ *DAI POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DAI se encuentra en blanco.*`);
+                                alertasDaiPendientes.push(`⚠️ *DUA POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DUA se encuentra en blanco.*`);
                             }
                         }
 
@@ -307,10 +314,10 @@ async function iniciarBaileysWhatsApp() {
                             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                             if (diffVencDays < 0) {
                                 const diasVencida = Math.abs(diffVencDays);
-                                alertasVencimientos.push(`🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`);
+                                alertasVencimientos.push(`🚨 *DUA VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DUA.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`);
                             } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                                 const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
-                                alertasVencimientos.push(`⚠️ *DAI PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
+                                alertasVencimientos.push(`⚠️ *DUA PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
                             }
                         }
                     }
@@ -631,7 +638,7 @@ cron.schedule('0 10,18 * * *', async () => {
         if (!records || records.length === 0) return;
 
         const excelHeaders = [
-            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
         ];
 
         const fieldsList = [
@@ -781,7 +788,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                 if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
                     const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
-                    alertasDaiPendientes.push(`⚠️ *DAI POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DAI se encuentra en blanco.*`);
+                    alertasDaiPendientes.push(`⚠️ *DUA POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DUA se encuentra en blanco.*`);
                 }
             }
 
@@ -828,10 +835,10 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
-                    alertasVencimientos.push(`🚨 *DAI VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DAI.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.!*`);
+                    alertasVencimientos.push(`🚨 *DUA VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DUA.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.!*`);
                 } else if (diffVencDays >= 0 && diffVencDays <= 4) {
                     const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
-                    alertasVencimientos.push(`⚠️ *DAI PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
+                    alertasVencimientos.push(`⚠️ *DUA PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
                 }
             }
         }
