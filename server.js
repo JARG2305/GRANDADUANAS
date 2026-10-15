@@ -171,7 +171,7 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    // Función auxiliar para formatear la lista de expedientes de forma vertical y ordenada
+                    // Función auxiliar para formatear la lista de expedientes de forma vertical, ordenada e incluyendo observaciones
                     const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
                         if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n`;
                         let res = `*${titulo} (${lista.length})*\n`;
@@ -180,6 +180,7 @@ async function iniciarBaileysWhatsApp() {
                             const cli = rec.cliente || 'S/C';
                             const prov = rec.proveedor || 'N/A';
                             const bl = rec.awb_bl || rec.bl || 'S/N';
+                            const obs = rec.observaciones ? rec.observaciones.trim() : '';
                             
                             // Lógica solicitada: Si es "Por Registrar", muestra Fecha de Llegada; de lo contrario, muestra ETA
                             let etiquetaFecha = "ETA";
@@ -194,12 +195,19 @@ async function iniciarBaileysWhatsApp() {
                                    `   • Cliente: *${cli}*\n` +
                                    `   • Prov: *${prov}*\n` +
                                    `   • B/L: *${bl}*\n` +
-                                   `   • ${etiquetaFecha}: *${valorFecha}*\n\n`;
+                                   `   • ${etiquetaFecha}: *${valorFecha}*`;
+
+                            // Si tiene observaciones (como números de factura), las añade en una línea limpia abajo
+                            if (obs !== '' && obs !== 'Ninguna') {
+                                res += `\n   • Obs: _${obs}_`;
+                            }
+
+                            res += `\n\n`;
                         });
                         return res;
                     };
 
-                    let mensajeDetallado = `📊 *ESTATUS DETALLADO POR PESTAÑAS - LOGISTATUS PRO* 📊\n\n` +
+                    let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO - LOGISTATUS PRO* 📊\n\n` +
                         formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false) +
                         formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
                         formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
@@ -353,7 +361,7 @@ async function iniciarBaileysWhatsApp() {
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE SOLICITADO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+                    let mensajeConsolidado = "🚨 *ALERTAS ACTIVAS- LOGISTATUS PRO - * 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
                     
                     await sock.sendMessage(remitente, { text: mensajeConsolidado });
                     return;
