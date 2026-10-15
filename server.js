@@ -50,29 +50,48 @@ async function iniciarBaileysWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                console.log('📱 [WHATSAPP BAILEYS] Nuevo código QR generado.');
+                console.log('📱 [WHATSAPP] Nuevo código QR generado.');
                 estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
                 try {
                     ultimoQrGenerado = await qrcode.toDataURL(qr);
                 } catch (err) {
-                    console.error("❌ Error al convertir QR de Baileys a DataURL:", err);
+                    console.error("❌ Error al convertir QR:", err);
                 }
             }
 
             if (connection === 'open') {
-                console.log('✅ [WHATSAPP BAILEYS] ¡Conectado y listo en la nube!');
+                console.log('✅ [WHATSAPP] ¡Conectado y listo!');
                 whatsappClientReady = true;
                 estadoConexionWhatsapp = "CONECTADO";
                 ultimoQrGenerado = "";
+
+                // (Opcional) Enviar aviso de que el bot volvió a encender con éxito
+                try {
+                    const GRUPO_AUTORIZADO_JID = "TU_GRUPO_JID@g.us";
+                    await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: "🟢 *El bot de aduanas se ha conectado y está operativo.*" });
+                } catch (e) { console.error("No se pudo enviar aviso de conexión", e); }
             }
 
             if (connection === 'close') {
-                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log(`⚠️ [WHATSAPP BAILEYS] Conexión cerrada. Reconectando: ${shouldReconnect}`);
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                
+                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. Reconectando: ${shouldReconnect}`);
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
+
+                // 🚨 ALERTA AUTOMÁTICA ANTES DE CAERSE POR COMPLETO
+                // Si la sesión se cerró por cierre de sesión explícito (LoggedOut), avisa que se requiere QR nuevo.
+                if (statusCode === DisconnectReason.loggedOut) {
+                    console.log("❌ Sesión cerrada permanentemente. Se requiere escanear nuevo QR.");
+                    // Opcional: Podrías disparar una alerta por Telegram si tienes configurado el token
+                }
+
                 if (shouldReconnect) {
-                    iniciarBaileysWhatsApp();
+                    // Intenta reconectar automáticamente
+                    setTimeout(() => {
+                        iniciarBaileysWhatsApp();
+                    }, 5000); // Espera 5 segundos antes del reintento
                 }
             }
         });
