@@ -642,15 +642,24 @@ function formatearFechaDDMMYYYY(str) {
     return `${dia}-${mes}-${anio}`;
 }
 
-async function enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte) {
+async function enviarAlertaMulticanal(listaAlertas, tituloReporte) {
     try {
-        if (!whatsappClientReady || !sock) return;
-        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
-        let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
-        let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });
+        // Aquí puedes consultar o pasar las preferencias guardadas desde la base de datos o almacenamiento local
+        // Por defecto, evaluamos ambos canales si están operativos en el servidor:
+        
+        // 1. Envío por Telegram (si está configurado y activo)
+        if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+            let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
+            let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+            await enviarAlertaTelegramServidor(mensajeConsolidado);
+        }
+
+        // 2. Envío por WhatsApp al grupo autorizado (si Baileys está listo)
+        if (whatsappClientReady && sock) {
+            await enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte);
+        }
     } catch (err) {
-        console.error("❌ Error al enviar reporte al grupo de WhatsApp:", err);
+        console.error("❌ Error en el envío multicanal de alertas:", err);
     }
 }
 
@@ -976,8 +985,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
         if (listaFinalOrdenada.length > 0) {
             let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE AUTOMÁTICO CRON* 🚨\n\n" + listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`).join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
             
-            await enviarAlertaTelegramServidor(mensajeConsolidado);
-            await enviarReporteWhatsAppGrupo(listaFinalOrdenada, "REPORTE AUTOMÁTICO CRON");
+            await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE AUTOMÁTICO CRON");
         }
     } catch (error) {
         console.error("❌ Error en cron de alertas:", error);
