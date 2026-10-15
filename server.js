@@ -227,18 +227,23 @@ async function iniciarBaileysWhatsApp() {
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
                 }
-                // =========================================================================
-
+               // Detección del campo a modificar mediante palabras clave
                 let campoAModificar = "";
                 let nombreCampoLegible = "";
-                
-                if (textoLower.includes('eta')) {
+                let esCampoBooleano = false;
+
+                const palabrasContexto = ['exp', 'expediente', 'actualizar', 'fijar', 'poner', 'borrar', 'eliminar', 'fecha', 'eta', 'dai', 'acta', 'factura', 'prevaloracion', 'documento', 'transporte'];
+                const numCoincidentesContexto = palabrasContexto.filter(p => textoLower.includes(p)).length;
+
+                if (numCoincidentesContexto < 1) return;
+
+                if (textoLower.includes('eta') || textoLower.includes('la guaira') || textoLower.includes('maiquetia')) {
                     campoAModificar = "eta_la_guaira";
-                    nombreCampoLegible = "ETA La Guaira";
+                    nombreCampoLegible = "ETA La Guaira / Maiquetía";
                 } else if (textoLower.includes('llegada')) {
                     campoAModificar = "fecha_llegada";
                     nombreCampoLegible = "Fecha de Llegada";
-                } else if (textoLower.includes('dai')) {
+                } else if (textoLower.includes('dai') || textoLower.includes('registro dai')) {
                     campoAModificar = "fecha_registro_dai";
                     nombreCampoLegible = "Registro DAI";
                 } else if (textoLower.includes('transmision') || textoLower.includes('transmitido')) {
@@ -253,9 +258,87 @@ async function iniciarBaileysWhatsApp() {
                 } else if (textoLower.includes('despacho')) {
                     campoAModificar = "despacho";
                     nombreCampoLegible = "Despacho";
-                } else if (textoLower.includes('acta')) {
+                } else if (textoLower.includes('acta recepcion') || textoLower.includes('acta de recepcion')) {
                     campoAModificar = "recibida_acta_recepcion";
                     nombreCampoLegible = "Acta de Recepción";
+                } else if (textoLower.includes('prevaloracion') || textoLower.includes('prevaloración')) {
+                    campoAModificar = "prevaloracion_enviada";
+                    nombreCampoLegible = "Prevaloración Enviada";
+                    esCampoBooleano = true;
+                } else if (textoLower.includes('factura recibida') || textoLower.includes('factura')) {
+                    campoAModificar = "factura_recibida";
+                    nombreCampoLegible = "Factura Recibida";
+                    esCampoBooleano = true;
+                } else if (textoLower.includes('documento valorado') || textoLower.includes('valorado en sistema')) {
+                    campoAModificar = "documento_valorado_en_sistema";
+                    nombreCampoLegible = "Documento Valorado en Sistema";
+                    esCampoBooleano = true;
+                } else if (textoLower.includes('recibido documento de transporte') || textoLower.includes('doc transporte') || textoLower.includes('transporte')) {
+                    campoAModificar = "recibido_documento_transporte";
+                    nombreCampoLegible = "Recibido Documento de Transporte";
+                    esCampoBooleano = true;
+                }
+
+                if (!campoAModificar) return;
+
+                const pideBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('vaciar') || textoLower.includes('quitar');
+                
+                let valorFinalAEscribir = "";
+
+                if (esCampoBooleano) {
+                    const pideAfirmacion = textoLower.includes('si') || textoLower.includes('sí') || textoLower.includes('ok') || textoLower.includes('listo') || textoLower.includes('true');
+                    valorFinalAEscribir = (pideBorrar || !pideAfirmacion) ? "NO" : "SÍ";
+                } else {
+                    if (pideBorrar) {
+                        valorFinalAEscribir = ""; 
+                    } else {
+                        const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
+                        valorFinalAEscribir = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
+                    }
+                }
+
+                // ... (búsqueda de expediente en Firestore se mantiene igual) ...
+
+                let datosActuales = expedienteEncontrado.raw;
+                let numExpReal = datosActuales.num_expediente || 'S/N';
+                let clientReal = datosActuales.cliente || 'S/C';
+                let blReal = datosActuales.awb_bl || datosActuales.bl || 'S/N';
+
+                // Validación específica si intenta borrar un campo que ya está vacío
+                if (pideBorrar || valorFinalAEscribir === "") {
+                    let valorActualEnBase = datosActuales[campoAModificar];
+                    if (!valorActualEnBase || valorActualEnBase.trim() === "") {
+                        await sock.sendMessage(remitente, { text: `ℹ️ *CAMPO YA VACÍO*\n\n📂 Exp: *${numExpReal}*\n⚙️ El campo *${nombreCampoLegible}* ya se encuentra vacío actualmente.` });
+                        return;
+                    }
+                }
+
+                const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
+                
+                const patchBody = {
+                    fields: {
+                        ...expedienteEncontrado.fields,
+                        [campoAModificar]: { stringValue: valorFinalAEscribir }
+                    }
+                };
+
+                const patchRes = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patchBody)
+                });
+
+                if (patchRes.ok) {
+                    let mensajeRespuesta = "";
+                    if (esCampoBooleano) {
+                        mensajeRespuesta = `✅ *¡ESTATUS ACTUALIZADO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📌 Valor Asignado: *${valorFinalAEscribir}*`;
+                    } else if (pideBorrar || valorFinalAEscribir === "") {
+                        mensajeRespuesta = `🗑️ *¡CAMPO VACÍO / ELIMINADO!* ⚠️\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📌 _El campo ha quedado completamente vacío exitosamente._`;
+                    } else {
+                        let fechaDdmmyyyyLog = formatearFechaDDMMYYYY(valorFinalAEscribir);
+                        mensajeRespuesta = `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Registrada: *${fechaDdmmyyyyLog}*`;
+                    }
+                    await sock.sendMessage(remitente, { text: mensajeRespuesta });
                 }
 
                // =========================================================================

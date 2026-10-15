@@ -207,6 +207,24 @@
                             <button onclick="openWhatsAppModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-emerald-700">
                                 🤖 Escanear QR WhatsApp
                             </button>
+			<button onclick="openWhatsAppModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-emerald-700">
+    🤖 Escanear QR WhatsApp
+</button>
+
+<!-- Botones de Control de Encendido / Apagado por Separado -->
+<div class="px-4 py-3 border-t border-slate-200 mt-2">
+    <div class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Control de Servicios</div>
+    
+    <div class="flex items-center justify-between py-1.5">
+        <span class="text-sm font-medium text-slate-700">WhatsApp (Baileys)</span>
+        <button id="btn-toggle-wsp" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBot('whatsapp')">Encendido</button>
+    </div>
+
+    <div class="flex items-center justify-between py-1.5">
+        <span class="text-sm font-medium text-slate-700">Alertas / Telegram</span>
+        <button id="btn-toggle-tg" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBot('telegram')">Encendido</button>
+    </div>
+</div>
                         </div>
                     </div>
                 </div>
@@ -2475,6 +2493,34 @@
             if (!statsSection) return;
             statsSection.classList.toggle('hidden');
         };
+
+        // --- CONTROL DE BOTS INDEPENDIENTES ---
+        const estadosBots = { whatsapp: true, telegram: true };
+
+        window.toggleBot = function(tipo) {
+            estadosBots[tipo] = !estadosBots[tipo];
+            const btn = document.getElementById(tipo === 'whatsapp' ? 'btn-toggle-wsp' : 'btn-toggle-tg');
+            const txt = document.getElementById(tipo === 'whatsapp' ? 'estado-wsp-txt' : 'estado-tg-txt');
+
+            if (estadosBots[tipo]) {
+                btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white";
+                btn.innerText = "Encendido";
+                if (txt) {
+                    txt.innerText = "Estado: Operativo";
+                    txt.className = "text-success fw-bold";
+                }
+            } else {
+                btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-rose-600 text-white";
+                btn.innerText = "Apagado";
+                if (txt) {
+                    txt.innerText = "Estado: Detenido";
+                    txt.className = "text-danger fw-bold";
+                }
+            }
+            console.log(`Bot ${tipo} cambiado a: ${estadosBots[tipo] ? 'ENCENDIDO' : 'APAGADO'}`);
+        };
+
+        initCloudDB();
 
         initCloudDB();
     </script>
