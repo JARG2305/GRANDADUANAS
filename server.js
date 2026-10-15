@@ -16,8 +16,8 @@ app.use(express.static(path.join(__dirname)));
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";[cite: 1]
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";[cite: 1]
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || "";
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,7 +39,7 @@ let estadoConexionWhatsapp = "DESCONECTADO";
 
 async function iniciarBaileysWhatsApp() {
     try {
-        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth_info_baileys'));[cite: 1]
+        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth_info_baileys'));
         
         sock = makeWASocket({
             auth: state,
@@ -50,32 +50,32 @@ async function iniciarBaileysWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                console.log('📱 [WHATSAPP] Nuevo código QR generado.');[cite: 1]
+                console.log('📱 [WHATSAPP] Nuevo código QR generado.');
                 estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
                 try {
                     ultimoQrGenerado = await qrcode.toDataURL(qr);
                 } catch (err) {
-                    console.error("❌ Error al convertir QR:", err);[cite: 1]
+                    console.error("❌ Error al convertir QR:", err);
                 }
             }
 
             if (connection === 'open') {
-                console.log('✅ [WHATSAPP] ¡Conectado y listo!');[cite: 1]
+                console.log('✅ [WHATSAPP] ¡Conectado y listo!');
                 whatsappClientReady = true;
                 estadoConexionWhatsapp = "CONECTADO";
                 ultimoQrGenerado = "";
 
                 try {
-                    const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";[cite: 1]
-                    await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: "🟢 *El bot de aduanas se ha conectado y está operativo.*" });[cite: 1]
-                } catch (e) { console.error("No se pudo enviar aviso de conexión", e); }[cite: 1]
+                    const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
+                    await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: "🟢 *El bot de aduanas se ha conectado y está operativo.*" });
+                } catch (e) { console.error("No se pudo enviar aviso de conexión", e); }
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
                 
-                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. Reconectando: ${shouldReconnect}`);[cite: 1]
+                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. Reconectando: ${shouldReconnect}`);
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
@@ -92,21 +92,21 @@ async function iniciarBaileysWhatsApp() {
         // ESCUCHA INTELIGENTE EXCLUSIVA Y SEGURA PARA TU GRUPO
         sock.ev.on('messages.upsert', async (m) => {
             try {
-                if (m.type !== 'notify') return;[cite: 1]
+                if (m.type !== 'notify') return;
 
                 const msg = m.messages[0];
-                if (!msg.message || msg.key.fromMe) return;[cite: 1]
+                if (!msg.message || msg.key.fromMe) return;
 
                 const remitente = msg.key.remoteJid;
                 const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const textoLower = textoMensaje.toLowerCase();
 
-                console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);[cite: 1]
+                console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
 
-                const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";[cite: 1] 
+                const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us"; 
                 
                 if (remitente !== GRUPO_AUTORIZADO_JID) {
-                    console.log(`⛔ Mensaje ignorado por seguridad (No proviene del grupo autorizado).`);[cite: 1]
+                    console.log(`⛔ Mensaje ignorado por seguridad (No proviene del grupo autorizado).`);
                     return;
                 }
 
@@ -210,11 +210,11 @@ async function iniciarBaileysWhatsApp() {
                 // 📊 COMANDO RÁPIDO: SOLICITAR ALERTAS ACTIVAS DESDE EL GRUPO
                 // =========================================================================
                 if (textoLower.includes('alertas') || textoLower.includes('reporte') || textoLower.includes('estatus')) {
-                    console.log(`📊 [WHATSAPP] Solicitud de alertas manual detectada en el grupo.`);[cite: 1]
+                    console.log(`📊 [WHATSAPP] Solicitud de alertas manual detectada en el grupo.`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });[cite: 1]
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
                         return;
                     }
 
@@ -314,14 +314,14 @@ async function iniciarBaileysWhatsApp() {
 
                     let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
                     if (listaFinalOrdenada.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ ¡Excelente! No hay alertas críticas pendientes en este momento." });[cite: 1]
+                        await sock.sendMessage(remitente, { text: "✅ ¡Excelente! No hay alertas críticas pendientes en este momento." });
                         return;
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE SOLICITADO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");[cite: 1]
+                    let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE SOLICITADO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
                     
-                    await sock.sendMessage(remitente, { text: mensajeConsolidado });[cite: 1]
+                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
                     return;
                 }
                 // =========================================================================
@@ -333,21 +333,21 @@ async function iniciarBaileysWhatsApp() {
                 
                 if (!pideBorrar) {
                     const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
-                    fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });[cite: 1]
+                    fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
                 }
 
-                const projectId = process.env.FIREBASE_PROJECT_ID || "statusylogistica";[cite: 1]
-                const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;[cite: 1]
+                const projectId = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
+                const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
                 const response = await fetch(urlQuery);
                 const result = await response.json();
 
-                if (!result.documents || result.documents.length === 0) return;[cite: 1]
+                if (!result.documents || result.documents.length === 0) return;
 
                 let listaExpedientes = result.documents.map(doc => {
                     let fields = doc.fields || {};
                     let recParsed = {};
                     for (let key in fields) {
-                        recParsed[key] = fields[key].stringValue || fields[key].doubleValue || fields[key].integerValue || fields[key].booleanValue || "";[cite: 1]
+                        recParsed[key] = fields[key].stringValue || fields[key].doubleValue || fields[key].integerValue || fields[key].booleanValue || "";
                     }
                     return {
                         id: doc.name.split('/').pop(),
@@ -372,7 +372,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 if (!expedienteEncontrado) {
-                    await sock.sendMessage(remitente, { text: `⚠️ No se encontró el expediente indicado en el mensaje.` });[cite: 1]
+                    await sock.sendMessage(remitente, { text: `⚠️ No se encontró el expediente indicado en el mensaje.` });
                     return;
                 }
 
@@ -383,24 +383,24 @@ async function iniciarBaileysWhatsApp() {
 
                 if (!pideBorrar) {
                     if (campoAModificar === 'fecha_transmision' && (!datosActuales.fecha_llegada && !datosActuales.eta_la_guaira)) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Transmisión* porque la **Fecha de Llegada / ETA** previa se encuentra en blanco.` });[cite: 1]
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Transmisión* porque la **Fecha de Llegada / ETA** previa se encuentra en blanco.` });
                         return;
                     }
                     if (campoAModificar === 'reconocimiento' && !datosActuales.fecha_transmision) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Reconocimiento* porque la **Fecha de Transmisión** inmediatamente anterior no está cargada.` });[cite: 1]
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Reconocimiento* porque la **Fecha de Transmisión** inmediatamente anterior no está cargada.` });
                         return;
                     }
                     if (campoAModificar === 'validacion' && !datosActuales.reconocimiento) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Validación* porque el **Reconocimiento** previo no está registrado.` });[cite: 1]
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Validación* porque el **Reconocimiento** previo no está registrado.` });
                         return;
                     }
                     if (campoAModificar === 'despacho' && !datosActuales.validacion) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Despacho* porque la **Validación** inmediatamente anterior no está cargada.` });[cite: 1]
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Despacho* porque la **Validación** inmediatamente anterior no está cargada.` });
                         return;
                     }
                 }
 
-                const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;[cite: 1]
+                const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
                 
                 const patchBody = {
                     fields: {
@@ -419,75 +419,75 @@ async function iniciarBaileysWhatsApp() {
                     let mensajeRespuesta = "";
                     let fechaDdmmyyyyLog = formatearFechaDDMMYYYY(fechaDetectada);
                     if (pideBorrar || !fechaDetectada) {
-                        mensajeRespuesta = `🗑️ *¡FECHA ELIMINADA EXITOSAMENTE!* ⚠️\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📌 _Fecha eliminada según su petición._`;[cite: 1]
+                        mensajeRespuesta = `🗑️ *¡FECHA ELIMINADA EXITOSAMENTE!* ⚠️\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📌 _Fecha eliminada según su petición._`;
                     } else {
-                        mensajeRespuesta = `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Registrada: *${fechaDdmmyyyyLog}*\n📌 _Fecha actualizada según su petición._`;[cite: 1]
+                        mensajeRespuesta = `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Registrada: *${fechaDdmmyyyyLog}*\n📌 _Fecha actualizada según su petición._`;
                     }
-                    await sock.sendMessage(remitente, { text: mensajeRespuesta });[cite: 1]
+                    await sock.sendMessage(remitente, { text: mensajeRespuesta });
                 } else {
                     const errData = await patchRes.json();
-                    await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });[cite: 1]
+                    await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
                 }
 
             } catch (err) {
-                console.error("❌ Error procesando mensaje en Baileys:", err);[cite: 1]
+                console.error("❌ Error procesando mensaje en Baileys:", err);
             }
         });
 
     } catch (err) {
-        console.error("❌ Error al iniciar Baileys en la nube:", err);[cite: 1]
+        console.error("❌ Error al iniciar Baileys en la nube:", err);
     }
 }
 
-iniciarBaileysWhatsApp();[cite: 1]
+iniciarBaileysWhatsApp();
 
 // ==========================================
 // 1. RUTAS ESENCIALES Y DE CONFIGURACIÓN
 // ==========================================
 app.get('/api/config', (req, res) => {
     res.json({
-        firebaseApiKey: FIREBASE_API_KEY,[cite: 1]
-        firebaseProjectId: FIREBASE_PROJECT_ID,[cite: 1]
-        telegramBotToken: TELEGRAM_BOT_TOKEN || '',[cite: 1]
-        telegramChatId: TELEGRAM_CHAT_ID || ''[cite: 1]
+        firebaseApiKey: FIREBASE_API_KEY,
+        firebaseProjectId: FIREBASE_PROJECT_ID,
+        telegramBotToken: TELEGRAM_BOT_TOKEN || '',
+        telegramChatId: TELEGRAM_CHAT_ID || ''
     });
 });
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));[cite: 1]
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/health', (req, res) => {
-    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');[cite: 1]
+    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
 });
 
 app.get('/api/whatsapp/estado', (req, res) => {
     res.json({
         success: true,
-        estado: estadoConexionWhatsapp,[cite: 1]
-        ready: whatsappClientReady,[cite: 1]
-        qrCodeDataUrl: ultimoQrGenerado[cite: 1]
+        estado: estadoConexionWhatsapp,
+        ready: whatsappClientReady,
+        qrCodeDataUrl: ultimoQrGenerado
     });
 });
 
 app.post('/api/whatsapp/enviar', async (req, res) => {
     const { telefono, mensaje } = req.body;
     if (!whatsappClientReady || !sock) {
-        return res.status(400).json({ success: false, message: "El bot de WhatsApp aún no está conectado." });[cite: 1]
+        return res.status(400).json({ success: false, message: "El bot de WhatsApp aún no está conectado." });
     }
     if (!telefono || !mensaje) {
-        return res.status(400).json({ success: false, message: "Faltan el número de teléfono o el mensaje." });[cite: 1]
+        return res.status(400).json({ success: false, message: "Faltan el número de teléfono o el mensaje." });
     }
 
     try {
         let numeroLimpios = telefono.replace(/\D/g, '');
         const jid = `${numeroLimpios}@s.whatsapp.net`;
 
-        await sock.sendMessage(jid, { text: mensaje });[cite: 1]
-        res.json({ success: true, message: "Mensaje de WhatsApp enviado con éxito." });[cite: 1]
+        await sock.sendMessage(jid, { text: mensaje });
+        res.json({ success: true, message: "Mensaje de WhatsApp enviado con éxito." });
     } catch (error) {
-        console.error("❌ Error al enviar WhatsApp con Baileys:", error);[cite: 1]
-        res.status(500).json({ success: false, message: error.message });[cite: 1]
+        console.error("❌ Error al enviar WhatsApp con Baileys:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -506,22 +506,22 @@ function formatearFechaDDMMYYYY(str) {
 async function enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte) {
     try {
         if (!whatsappClientReady || !sock) return;
-        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";[cite: 1]
+        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
         let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
         let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });[cite: 1]
+        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });
     } catch (err) {
-        console.error("❌ Error al enviar reporte al grupo de WhatsApp:", err);[cite: 1]
+        console.error("❌ Error al enviar reporte al grupo de WhatsApp:", err);
     }
 }
 
 async function enviarCorreoSistema(opcionesMail) {
     try {
         const apiKey = process.env.RESEND_API_KEY; 
-        const remitente = process.env.RESEND_REMITE || "onboarding@resend.dev";[cite: 1]
+        const remitente = process.env.RESEND_REMITE || "onboarding@resend.dev";
 
         if (!apiKey || apiKey.includes("TU_API_KEY")) {
-            throw new Error("Falta configurar la RESEND_API_KEY.");[cite: 1]
+            throw new Error("Falta configurar la RESEND_API_KEY.");
         }
 
         let destinatarios = opcionesMail.to;
@@ -542,10 +542,10 @@ async function enviarCorreoSistema(opcionesMail) {
         }
 
         const payload = {
-            from: `LOGISTATUS PRO <${remitente}>`,[cite: 1]
+            from: `LOGISTATUS PRO <${remitente}>`,
             to: destinatarios,
-            subject: opcionesMail.subject || 'Notificación LOGISTATUS PRO',[cite: 1]
-            html: opcionesMail.html || opcionesMail.text || 'Sin contenido'[cite: 1]
+            subject: opcionesMail.subject || 'Notificación LOGISTATUS PRO',
+            html: opcionesMail.html || opcionesMail.text || 'Sin contenido'
         };
 
         if (attachmentsFormatted.length > 0) payload.attachments = attachmentsFormatted;
@@ -557,42 +557,42 @@ async function enviarCorreoSistema(opcionesMail) {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(`Error API: ${JSON.stringify(data)}`);[cite: 1]
+        if (!response.ok) throw new Error(`Error API: ${JSON.stringify(data)}`);
         return { success: true };
     } catch (error) {
-        console.error("❌ Error al enviar el correo:", error);[cite: 1]
+        console.error("❌ Error al enviar el correo:", error);
         throw error;
     }
 }
 
 async function enviarAlertaTelegramServidor(mensajeTexto) {
     try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;[cite: 1]
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
         await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: mensajeTexto, parse_mode: 'Markdown' })[cite: 1]
+            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: mensajeTexto, parse_mode: 'Markdown' })
         });
     } catch (err) {
-        console.error("❌ Error Telegram:", err);[cite: 1]
+        console.error("❌ Error Telegram:", err);
     }
 }
 
 async function obtenerExpedientesFirestore() {
     try {
-        const projectId = process.env.FIREBASE_PROJECT_ID;[cite: 1]
-        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;[cite: 1]
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
         const response = await fetch(url);
         const result = await response.json();
         
-        if (!result.documents) return [];[cite: 1]
+        if (!result.documents) return [];
 
         return result.documents.map(doc => {
             let fields = doc.fields || {};
             let parsedRecord = {};
             for (let key in fields) {
                 let valObj = fields[key];
-                parsedRecord[key] = valObj.stringValue || valObj.doubleValue || valObj.integerValue || valObj.booleanValue || "";[cite: 1]
+                parsedRecord[key] = valObj.stringValue || valObj.doubleValue || valObj.integerValue || valObj.booleanValue || "";
             }
             return parsedRecord;
         });
@@ -606,10 +606,10 @@ function parseFechaLocalServidor(str) {
     str = String(str).trim();
     if (str.includes('/')) {
         const p = str.split('/');
-        if (p.length === 3 && p[2].length === 4) return new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`);[cite: 1]
+        if (p.length === 3 && p[2].length === 4) return new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`);
     } else if (str.includes('-')) {
         const p = str.split('-');
-        if (p.length === 3 && p[0].length === 4) return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);[cite: 1]
+        if (p.length === 3 && p[0].length === 4) return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);
     }
     return null;
 }
@@ -618,11 +618,11 @@ function parseFechaLocalServidor(str) {
 // 3. TAREAS PROGRAMADAS (CRON)
 // ==========================================
 cron.schedule('0 10,18 * * *', async () => {
-    console.log("⏰ [CRON] Ejecutando generación y envío automático...");[cite: 1]
+    console.log("⏰ [CRON] Ejecutando generación y envío automático...");
     try {
-        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;[cite: 1]
+        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
         if (!correoCliente) return;
-        const destinatariosAutomaticos = [correoCliente];[cite: 1]
+        const destinatariosAutomaticos = [correoCliente];
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) return;
@@ -644,10 +644,10 @@ cron.schedule('0 10,18 * * *', async () => {
         ];
 
         const blackBorder = {
-            top: { style: "thin", color: { rgb: "FFFFFF" } },[cite: 1]
-            bottom: { style: "thin", color: { rgb: "FFFFFF" } },[cite: 1]
-            left: { style: "thin", color: { rgb: "FFFFFF" } },[cite: 1]
-            right: { style: "thin", color: { rgb: "FFFFFF" } }[cite: 1]
+            top: { style: "thin", color: { rgb: "FFFFFF" } },
+            bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+            left: { style: "thin", color: { rgb: "FFFFFF" } },
+            right: { style: "thin", color: { rgb: "FFFFFF" } }
         };
 
         const anchosEspecificosXLSX = [
@@ -702,7 +702,7 @@ cron.schedule('0 10,18 * * *', async () => {
             if (cellA && cellA.v && String(cellA.v).includes("▶")) {
                 if (String(cellA.v).includes("TRÁMITES")) currentSection = 2;
                 if (String(cellA.v).includes("DESPACHADOS")) currentSection = 3;
-                cellA.s = { font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } } };[cite: 1]
+                cellA.s = { font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "1E3A8A" } } };
                 continue;
             }
 
@@ -710,14 +710,14 @@ cron.schedule('0 10,18 * * *', async () => {
                 const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
                 if (!wsMaster[cellAddress]) continue;
 
-                let cellStyle = { border: blackBorder, alignment: { vertical: "center", horizontal: "center", wrapText: true }, font: { name: "Segoe UI", sz: 10 } };[cite: 1]
+                let cellStyle = { border: blackBorder, alignment: { vertical: "center", horizontal: "center", wrapText: true }, font: { name: "Segoe UI", sz: 10 } };
                 const headerCheck = wsMaster[XLSX.utils.encode_cell({ r: R, c: 0 })];
                 if (headerCheck && excelHeaders.includes(headerCheck.v)) {
-                    cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };[cite: 1]
-                    cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };[cite: 1]
+                    cellStyle.fill = { fgColor: { rgb: "1E3A8A" } };
+                    cellStyle.font = { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
                 } else {
-                    cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };[cite: 1]
-                    cellStyle.fill = { fgColor: { rgb: currentSection === 3 ? "FEE2E2" : currentSection === 2 ? "D9E1F2" : "F8FAFC" } };[cite: 1]
+                    cellStyle.font = { name: "Segoe UI", sz: 10, color: { rgb: "000000" }, bold: true };
+                    cellStyle.fill = { fgColor: { rgb: currentSection === 3 ? "FEE2E2" : currentSection === 2 ? "D9E1F2" : "F8FAFC" } };
                 }
                 wsMaster[cellAddress].s = cellStyle;
             }
@@ -728,13 +728,13 @@ cron.schedule('0 10,18 * * *', async () => {
         const excelBase64String = Buffer.from(excelBuffer).toString('base64');
 
         await enviarCorreoSistema({
-            to: [correoCliente],[cite: 1]
-            subject: "📊 Reporte Maestro Automático - LOGISTATUS PRO",[cite: 1]
-            text: "Adjunto el reporte automático consolidado.",[cite: 1]
+            to: [correoCliente],
+            subject: "📊 Reporte Maestro Automático - LOGISTATUS PRO",
+            text: "Adjunto el reporte automático consolidado.",
             attachments: [{ filename: 'Reporte_Automatico.xlsx', content: excelBase64String, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }]
         });
     } catch (error) {
-        console.error("❌ [CRON] Error al enviar reporte automático:", error);[cite: 1]
+        console.error("❌ [CRON] Error al enviar reporte automático:", error);
     }
 }, { timezone: "America/Caracas" });
 
