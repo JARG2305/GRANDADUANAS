@@ -599,17 +599,17 @@ function formatearFechaDDMMYYYY(str) {
     return `${dia}-${mes}-${anio}`;
 }
 
-async function enviarAlertaMulticanal(listaAlertas, tituloReporte) {
+async function enviarAlertaMulticanal(listaAlertas, tituloReporte, canalesPermitidos = { whatsapp: true, telegram: true }) {
     try {
-        // 1. Envío por Telegram (si está configurado y activo)
-        if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+        // 1. Envío por Telegram (si está activo en la preferencia y configurado)
+        if (canalesPermitidos.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
             let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
             let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
             await enviarAlertaTelegramServidor(mensajeConsolidado);
         }
 
-        // 2. Envío por WhatsApp al grupo autorizado (si Baileys está listo)
-        if (whatsappClientReady && sock) {
+        // 2. Envío por WhatsApp (si está activo en la preferencia y Baileys está listo)
+        if (canalesPermitidos.whatsapp && whatsappClientReady && sock) {
             await enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte);
         }
     } catch (err) {
