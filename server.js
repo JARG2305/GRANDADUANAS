@@ -480,11 +480,8 @@ app.all('/api/calcular-alertas', async (req, res) => {
                 }
             }
 
-            // ==========================================
             // 3. PLAZO DE DECLARACIÓN / EXTEMPORANEIDAD (ART. 47 LOA - EXCLUSIVO CON FECHA DE LLEGADA)
-            // ==========================================
             const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
-            
             if (dLlegada && !hasTransmision) {
                 let dDeadline = new Date(dLlegada.getTime());
                 let diasHabilesAgregados = 0;
@@ -497,18 +494,15 @@ app.all('/api/calcular-alertas', async (req, res) => {
                     }
                     intentosMaximos++;
                 }
-                
                 const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
                 const fechaPlazoStr = dDeadline.toISOString().split('T')[0];
 
                 if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
                     const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY EL PLAZO!" : `Quedan ${diffPlazoDays} día(s) de plazo`;
-                    let tarjeta = `⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} (Límite: ${fechaPlazoStr}) - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`;
-                    alertasVencimientos.push(tarjeta);
+                    alertasVencimientos.push(`⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} (Límite: ${fechaPlazoStr}) - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`);
                 } else if (diffPlazoDays < 0) {
                     const diasExt = Math.abs(diffPlazoDays);
-                    let tarjeta = `🚨 *EXTEMPORANEIDAD - ART. 47*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ El plazo de 5 días hábiles venció el ${fechaPlazoStr} (Han transcurrido ${diasExt} día(s) en extemporaneidad).\n🚨 *¡Aplica Multa Art. 177 Num 7 de la L.O.A.! (Persiste hasta transmitir)*`;
-                    alertasVencimientos.push(tarjeta);
+                    alertasVencimientos.push(`🚨 *EXTEMPORANEIDAD - ART. 47*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ El plazo de 5 días hábiles venció el ${fechaPlazoStr} (Han transcurrido ${diasExt} día(s) en extemporaneidad).\n🚨 *¡Aplica Multa Art. 177 Num 7 de la L.O.A.! (Persiste hasta transmitir)*`);
                 }
             }
 
