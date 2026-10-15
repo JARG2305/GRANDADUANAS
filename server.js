@@ -297,12 +297,69 @@ async function iniciarBaileysWhatsApp() {
                     }
                 }
 
-                // ... (búsqueda de expediente en Firestore se mantiene igual) ...
+                const projectId = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
+                const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
+                const response = await fetch(urlQuery);
+                const result = await response.json();
+
+                if (!result.documents || result.documents.length === 0) return;
+
+                let listaExpedientes = result.documents.map(doc => {
+                    let fields = doc.fields || {};
+                    let recParsed = {};
+                    for (let key in fields) {
+                        recParsed[key] = fields[key].stringValue || fields[key].doubleValue || fields[key].integerValue || fields[key].booleanValue || "";
+                    }
+                    return {
+                        id: doc.name.split('/').pop(),
+                        fields: fields,
+                        raw: recParsed,
+                        num_expediente: (recParsed.num_expediente || "").toLowerCase().trim(),
+                        bl: (recParsed.awb_bl || recParsed.bl || recParsed.numero_bl || "").toLowerCase().trim()
+                    };
+                });
+
+                let expedienteEncontrado = null;
+                for (let item of listaExpedientes) {
+                    let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
+                    let limpioExp = item.num_expediente.replace(/[^a-z0-9]/g, '');
+                    let limpioBl = item.bl.replace(/[^a-z0-9]/g, '');
+
+                    if ((limpioExp.length > 1 && limpioTexto.includes(limpioExp)) ||
+                        (limpioBl.length > 2 && limpioTexto.includes(limpioBl))) {
+                        expedienteEncontrado = item;
+                        break;
+                    }
+                }
+
+                if (!expedienteEncontrado) {
+                    await sock.sendMessage(remitente, { text: `⚠️ No se encontró el expediente indicado en el mensaje.` });
+                    return;
+                }
 
                 let datosActuales = expedienteEncontrado.raw;
                 let numExpReal = datosActuales.num_expediente || 'S/N';
                 let clientReal = datosActuales.cliente || 'S/C';
                 let blReal = datosActuales.awb_bl || datosActuales.bl || 'S/N';
+
+                if (!pideBorrar && !esCampoBooleano) {
+                    if (campoAModificar === 'fecha_transmision' && (!datosActuales.fecha_llegada && !datosActuales.eta_la_guaira)) {
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Transmisión* porque la **Fecha de Llegada / ETA** previa se encuentra en blanco.` });
+                        return;
+                    }
+                    if (campoAModificar === 'reconocimiento' && !datosActuales.fecha_transmision) {
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Reconocimiento* porque la **Fecha de Transmisión** inmediatamente anterior no está cargada.` });
+                        return;
+                    }
+                    if (campoAModificar === 'validacion' && !datosActuales.reconocimiento) {
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Validación* porque el **Reconocimiento** previo no está registrado.` });
+                        return;
+                    }
+                    if (campoAModificar === 'despacho' && !datosActuales.validacion) {
+                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Despacho* porque la **Validación** inmediatamente anterior no está cargada.` });
+                        return;
+                    }
+                }
 
                 // Validación específica si intenta borrar un campo que ya está vacío
                 if (pideBorrar || valorFinalAEscribir === "") {
@@ -339,6 +396,9 @@ async function iniciarBaileysWhatsApp() {
                         mensajeRespuesta = `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Registrada: *${fechaDdmmyyyyLog}*`;
                     }
                     await sock.sendMessage(remitente, { text: mensajeRespuesta });
+                } else {
+                    const errData = await patchRes.json();
+                    await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
                 }
 
                // =========================================================================
@@ -465,109 +525,6 @@ async function iniciarBaileysWhatsApp() {
                 }
                 // =========================================================================
 
-                if (!campoAModificar) return;
-
-                const pideBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('vaciar');
-                let fechaDetectada = "";
-                
-                if (!pideBorrar) {
-                    const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
-                    fechaDetectada = matchFecha ? matchFecha[0].replace(/-/g, '/') : new Date().toLocaleDateString("es-VE", { timeZone: "America/Caracas" });
-                }
-
-                const projectId = process.env.FIREBASE_PROJECT_ID || "statusylogistica";
-                const urlQuery = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
-                const response = await fetch(urlQuery);
-                const result = await response.json();
-
-                if (!result.documents || result.documents.length === 0) return;
-
-                let listaExpedientes = result.documents.map(doc => {
-                    let fields = doc.fields || {};
-                    let recParsed = {};
-                    for (let key in fields) {
-                        recParsed[key] = fields[key].stringValue || fields[key].doubleValue || fields[key].integerValue || fields[key].booleanValue || "";
-                    }
-                    return {
-                        id: doc.name.split('/').pop(),
-                        fields: fields,
-                        raw: recParsed,
-                        num_expediente: (recParsed.num_expediente || "").toLowerCase().trim(),
-                        bl: (recParsed.awb_bl || recParsed.bl || recParsed.numero_bl || "").toLowerCase().trim()
-                    };
-                });
-
-                let expedienteEncontrado = null;
-                for (let item of listaExpedientes) {
-                    let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
-                    let limpioExp = item.num_expediente.replace(/[^a-z0-9]/g, '');
-                    let limpioBl = item.bl.replace(/[^a-z0-9]/g, '');
-
-                    if ((limpioExp.length > 1 && limpioTexto.includes(limpioExp)) ||
-                        (limpioBl.length > 2 && limpioTexto.includes(limpioBl))) {
-                        expedienteEncontrado = item;
-                        break;
-                    }
-                }
-
-                if (!expedienteEncontrado) {
-                    await sock.sendMessage(remitente, { text: `⚠️ No se encontró el expediente indicado en el mensaje.` });
-                    return;
-                }
-
-                let datosActuales = expedienteEncontrado.raw;
-                let numExpReal = datosActuales.num_expediente || 'S/N';
-                let clientReal = datosActuales.cliente || 'S/C';
-                let blReal = datosActuales.awb_bl || datosActuales.bl || 'S/N';
-
-                if (!pideBorrar) {
-                    if (campoAModificar === 'fecha_transmision' && (!datosActuales.fecha_llegada && !datosActuales.eta_la_guaira)) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Transmisión* porque la **Fecha de Llegada / ETA** previa se encuentra en blanco.` });
-                        return;
-                    }
-                    if (campoAModificar === 'reconocimiento' && !datosActuales.fecha_transmision) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Reconocimiento* porque la **Fecha de Transmisión** inmediatamente anterior no está cargada.` });
-                        return;
-                    }
-                    if (campoAModificar === 'validacion' && !datosActuales.reconocimiento) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar la *Validación* porque el **Reconocimiento** previo no está registrado.` });
-                        return;
-                    }
-                    if (campoAModificar === 'despacho' && !datosActuales.validacion) {
-                        await sock.sendMessage(remitente, { text: `❌ *ACCIÓN DENEGADA*\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n\nNo se puede registrar el *Despacho* porque la **Validación** inmediatamente anterior no está cargada.` });
-                        return;
-                    }
-                }
-
-                const updateUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
-                
-                const patchBody = {
-                    fields: {
-                        ...expedienteEncontrado.fields,
-                        [campoAModificar]: { stringValue: fechaDetectada }
-                    }
-                };
-
-                const patchRes = await fetch(updateUrl, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(patchBody)
-                });
-
-                if (patchRes.ok) {
-                    let mensajeRespuesta = "";
-                    let fechaDdmmyyyyLog = formatearFechaDDMMYYYY(fechaDetectada);
-                    if (pideBorrar || !fechaDetectada) {
-                        mensajeRespuesta = `🗑️ *¡FECHA ELIMINADA EXITOSAMENTE!* ⚠️\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📌 _Fecha eliminada según su petición._`;
-                    } else {
-                        mensajeRespuesta = `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${numExpReal}*\n👤 Cliente: *${clientReal}*\n📦 B/L: *${blReal}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Registrada: *${fechaDdmmyyyyLog}*\n📌 _Fecha actualizada según su petición._`;
-                    }
-                    await sock.sendMessage(remitente, { text: mensajeRespuesta });
-                } else {
-                    const errData = await patchRes.json();
-                    await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
-                }
-
             } catch (err) {
                 console.error("❌ Error procesando mensaje en Baileys:", err);
             }
@@ -644,9 +601,6 @@ function formatearFechaDDMMYYYY(str) {
 
 async function enviarAlertaMulticanal(listaAlertas, tituloReporte) {
     try {
-        // Aquí puedes consultar o pasar las preferencias guardadas desde la base de datos o almacenamiento local
-        // Por defecto, evaluamos ambos canales si están operativos en el servidor:
-        
         // 1. Envío por Telegram (si está configurado y activo)
         if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
             let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
@@ -660,6 +614,18 @@ async function enviarAlertaMulticanal(listaAlertas, tituloReporte) {
         }
     } catch (err) {
         console.error("❌ Error en el envío multicanal de alertas:", err);
+    }
+}
+
+async function enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte) {
+    try {
+        if (!whatsappClientReady || !sock) return;
+        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
+        let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
+        let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });
+    } catch (err) {
+        console.error("❌ Error al enviar reporte al grupo de WhatsApp:", err);
     }
 }
 
@@ -983,8 +949,6 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 
         let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
         if (listaFinalOrdenada.length > 0) {
-            let mensajeConsolidado = "🚨 *LOGISTATUS PRO - REPORTE AUTOMÁTICO CRON* 🚨\n\n" + listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`).join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-            
             await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE AUTOMÁTICO CRON");
         }
     } catch (error) {
