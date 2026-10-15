@@ -171,8 +171,8 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    // Función auxiliar para formatear la lista de expedientes por sección
-                    const formatearBloqueSeccion = (titulo, lista) => {
+                    // Función auxiliar para formatear la lista de expedientes de forma vertical y ordenada
+                    const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
                         if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n`;
                         let res = `*${titulo} (${lista.length})*\n`;
                         lista.forEach((rec, idx) => {
@@ -180,18 +180,31 @@ async function iniciarBaileysWhatsApp() {
                             const cli = rec.cliente || 'S/C';
                             const prov = rec.proveedor || 'N/A';
                             const bl = rec.awb_bl || rec.bl || 'S/N';
-                            const eta = rec.fecha_llegada || rec.eta_la_guaira || 'Pendiente';
-                            res += `${idx + 1}️⃣ Exp: *${exp}* | Cliente: *${cli}* | Prov: *${prov}* | B/L: *${bl}* | ETA: *${eta}*\n`;
+                            
+                            // Lógica solicitada: Si es "Por Registrar", muestra Fecha de Llegada; de lo contrario, muestra ETA
+                            let etiquetaFecha = "ETA";
+                            let valorFecha = rec.eta_la_guaira || rec.fecha_llegada || 'Pendiente';
+                            
+                            if (esPorRegistrar) {
+                                etiquetaFecha = "Fecha de Llegada";
+                                valorFecha = rec.fecha_llegada || 'Pendiente';
+                            }
+
+                            res += `${idx + 1}️⃣ Exp: *${exp}*\n` +
+                                   `   • Cliente: *${cli}*\n` +
+                                   `   • Prov: *${prov}*\n` +
+                                   `   • B/L: *${bl}*\n` +
+                                   `   • ${etiquetaFecha}: *${valorFecha}*\n\n`;
                         });
                         return res;
                     };
 
                     let mensajeDetallado = `📊 *ESTATUS DETALLADO POR PESTAÑAS - LOGISTATUS PRO* 📊\n\n` +
-                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar) + `\n` +
-                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar) + `\n` +
-                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer) + `\n` +
-                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar) + `\n` +
-                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar);
+                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false) +
+                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
+                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
+                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false) +
+                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false);
 
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
