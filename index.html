@@ -208,33 +208,19 @@
                                 🤖 Escanear QR WhatsApp
                             </button>
 			<div class="px-4 py-3 border-t border-slate-200 mt-1 bg-slate-50">
-    <div class="text-[10px] font-extrabold text-slate-400 mb-2 uppercase tracking-wider">Canales Activos (Bot y Alertas)</div>
+    <div class="text-[10px] font-extrabold text-slate-400 mb-2 uppercase tracking-wider">Control de Bots y Alertas</div>
     
     <div class="flex items-center justify-between py-1">
         <span class="text-xs font-semibold text-slate-700">💬 WhatsApp (Baileys)</span>
-        <input type="checkbox" id="canal-whatsapp" class="form-check-input cursor-pointer" checked onchange="guardarPreferenciaCanal('whatsapp', this.checked)">
+        <button id="btn-toggle-wsp" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('whatsapp')">Encendido</button>
     </div>
 
     <div class="flex items-center justify-between py-1 mt-1">
         <span class="text-xs font-semibold text-slate-700">✈️ Telegram</span>
-        <input type="checkbox" id="canal-telegram" class="form-check-input cursor-pointer" checked onchange="guardarPreferenciaCanal('telegram', this.checked)">
+        <button id="btn-toggle-tg" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('telegram')">Encendido</button>
     </div>
 </div>
 
-<!-- Botones de Control de Encendido / Apagado por Separado -->
-<div class="px-4 py-3 border-t border-slate-200 mt-2">
-    <div class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Control de Servicios</div>
-    
-    <div class="flex items-center justify-between py-1.5">
-        <span class="text-sm font-medium text-slate-700">WhatsApp (Baileys)</span>
-        <button id="btn-toggle-wsp" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBot('whatsapp')">Encendido</button>
-    </div>
-
-    <div class="flex items-center justify-between py-1.5">
-        <span class="text-sm font-medium text-slate-700">Alertas / Telegram</span>
-        <button id="btn-toggle-tg" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBot('telegram')">Encendido</button>
-    </div>
-</div>
                         </div>
                     </div>
                 </div>
@@ -2504,48 +2490,36 @@
             statsSection.classList.toggle('hidden');
         };
 
-        // --- CONTROL DE BOTS INDEPENDIENTES ---
-        const estadosBots = { whatsapp: true, telegram: true };
+        // --- CONTROL UNIFICADO DE BOTS Y ALERTAS (1 CLIC) ---
+        const estadosBots = {
+            whatsapp: localStorage.getItem('canal_wsp') !== 'false',
+            telegram: localStorage.getItem('canal_tg') !== 'false'
+        };
 
-        window.toggleBot = function(tipo) {
+        // Sincronizar el estado visual de los botones al cargar la página
+        document.addEventListener("DOMContentLoaded", () => {
+            actualizarEstiloBot('whatsapp', estadosBots.whatsapp);
+            actualizarEstiloBot('telegram', estadosBots.telegram);
+        });
+
+        window.toggleBotUnificado = function(tipo) {
             estadosBots[tipo] = !estadosBots[tipo];
-            const btn = document.getElementById(tipo === 'whatsapp' ? 'btn-toggle-wsp' : 'btn-toggle-tg');
-            const txt = document.getElementById(tipo === 'whatsapp' ? 'estado-wsp-txt' : 'estado-tg-txt');
+            localStorage.setItem(`canal_${tipo === 'whatsapp' ? 'wsp' : 'tg'}`, estadosBots[tipo]);
+            actualizarEstiloBot(tipo, estadosBots[tipo]);
+            console.log(`Canal [${tipo}] cambiado a: ${estadosBots[tipo] ? 'ENCENDIDO' : 'APAGADO'}`);
+        };
 
-            if (estadosBots[tipo]) {
+        function actualizarEstiloBot(tipo, activo) {
+            const btn = document.getElementById(tipo === 'whatsapp' ? 'btn-toggle-wsp' : 'btn-toggle-tg');
+            if (!btn) return;
+            if (activo) {
                 btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white";
                 btn.innerText = "Encendido";
-                if (txt) {
-                    txt.innerText = "Estado: Operativo";
-                    txt.className = "text-success fw-bold";
-                }
             } else {
                 btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-rose-600 text-white";
                 btn.innerText = "Apagado";
-                if (txt) {
-                    txt.innerText = "Estado: Detenido";
-                    txt.className = "text-danger fw-bold";
-                }
             }
-            console.log(`Bot ${tipo} cambiado a: ${estadosBots[tipo] ? 'ENCENDIDO' : 'APAGADO'}`);
-        };
-	const canalesActivos = {
-        whatsapp: localStorage.getItem('canal_wsp') !== 'false',
-        telegram: localStorage.getItem('canal_tg') !== 'false'
-    };
-
-    document.addEventListener("DOMContentLoaded", () => {
-        const chkWsp = document.getElementById('canal-whatsapp');
-        const chkTg = document.getElementById('canal-telegram');
-        if (chkWsp) chkWsp.checked = canalesActivos.whatsapp;
-        if (chkTg) chkTg.checked = canalesActivos.telegram;
-    });
-
-    window.guardarPreferenciaCanal = function(canal, activo) {
-        canalesActivos[canal] = activo;
-        localStorage.setItem(`canal_${canal === 'whatsapp' ? 'wsp' : 'tg'}`, activo);
-        console.log(`Canal de alertas [${canal}] configurado a: ${activo ? 'ACTIVO' : 'INACTIVO'}`);
-    };
+        }
 
        
         initCloudDB();
