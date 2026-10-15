@@ -73,23 +73,25 @@ async function iniciarBaileysWhatsApp() {
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                const shouldReconnect = !isLoggedOut;
                 
-                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. Reconectando: ${shouldReconnect}`);
+                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. ¿Reconectar?: ${shouldReconnect}`);
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
-                // 🚨 ALERTA AUTOMÁTICA POR TELEGRAM ANTES DE INTENTAR RECONECTAR
-                try {
-                    await enviarAlertaTelegramServidor(`⚠️ *ALERTA DE SISTEMA*\n\nEl bot de WhatsApp de Grand Aduanas se ha **desconectado** (Código: ${statusCode || 'Desconocido'}). Intentando reconectar automáticamente...`);
-                } catch (errTelegram) {
-                    console.error("❌ No se pudo enviar alerta de desconexión a Telegram:", errTelegram);
+                if (isLoggedOut) {
+                    console.log(`❌ [WHATSAPP] Sesión cerrada permanentemente o token revocado. Limpiando credenciales...`);
+                    // Opcional: Si quieres que borre la sesión automáticamente para un QR limpio, descomenta esta línea:
+                    // require('fs').rmSync(path.join(__dirname, 'auth_info_baileys'), { recursive: true, force: true });
                 }
 
                 if (shouldReconnect) {
                     setTimeout(() => {
                         iniciarBaileysWhatsApp();
                     }, 5000);
+                } else {
+                    console.log(`🚫 [WHATSAPP] No se intentará reconectar automáticamente. Se requiere escanear el código QR nuevamente desde el panel.`);
                 }
             }
         });
