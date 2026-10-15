@@ -111,9 +111,17 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO DE EXPEDIENTES POR ESTADO
+                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO DE EXPEDIENTES POR ESTADO (EXACTO A PESTAÑAS)
                 // =========================================================================
-                if (textoLower.includes('resumen') || textoLower.includes('conteo') || textoLower.includes('totales')) {
+                if (
+                    textoLower.includes('resumen') || 
+                    textoLower.includes('conteo') || 
+                    textoLower.includes('totales') || 
+                    textoLower.includes('activos') || 
+                    textoLower.includes('en proceso') ||
+                    textoLower.includes('resumen de expedientes') ||
+                    textoLower.includes('resumen de exp')
+                ) {
                     console.log(`📊 [WHATSAPP] Solicitud de resumen por estados detectada.`);
                     
                     const records = await obtenerExpedientesFirestore();
@@ -128,8 +136,11 @@ async function iniciarBaileysWhatsApp() {
                     let porValidar = [];
                     let porDespachar = [];
 
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
                     for (const rec of records) {
-                        if (rec.despacho) continue;
+                        if (rec.despacho) continue; // Ignora los despachados
 
                         const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
@@ -138,26 +149,18 @@ async function iniciarBaileysWhatsApp() {
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
+                        // Lógica de pestañas / embudo exacto
                         const dArribo = parseFechaLocalServidor(fechaEtaRaw);
-                        const today = new Date();
-                        today.setHours(0,0,0,0);
+                        
                         if (dArribo && !hasLlegada) {
                             porEta.push({ rec, fechaObj: dArribo, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
-                        }
-
-                        if (!hasDai) {
+                        } else if (!hasDai) {
                             porRegistrar.push(rec);
-                        }
-
-                        if (hasTransmision && !hasReconocimiento) {
+                        } else if (hasTransmision && !hasReconocimiento) {
                             porReconocer.push(rec);
-                        }
-
-                        if (hasReconocimiento && !hasValidacion) {
+                        } else if (hasReconocimiento && !hasValidacion) {
                             porValidar.push(rec);
-                        }
-
-                        if (hasValidacion) {
+                        } else {
                             porDespachar.push(rec);
                         }
                     }
