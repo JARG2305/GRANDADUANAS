@@ -133,7 +133,7 @@ async function iniciarBaileysWhatsApp() {
                     textoLower.includes('expedientes en proceso') ||
                     textoLower.includes('exp en proceso')
                 ) {
-                    console.log(`📊 [WHATSAPP] Solicitud de resumen exacto por pestañas detectada.`);
+                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas detectada.`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
@@ -141,8 +141,8 @@ async function iniciarBaileysWhatsApp() {
                         return;
                     }
 
-                    let porEta = [];
-                    let porRegistrarDua = [];
+                    let porLlegar = [];
+                    let porRegistrar = [];
                     let porReconocer = [];
                     let porValidar = [];
                     let porDespachar = [];
@@ -151,34 +151,47 @@ async function iniciarBaileysWhatsApp() {
                         if (rec.despacho) continue; // Ignora los despachados
 
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
-                        const hasDaiDua = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                         const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        // Secuencia estricta y limpia por pestaña operativa:
-                        if (!hasLlegada) {
-                            let fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
-                            porEta.push({ rec, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
-                        } else if (hasLlegada && !hasDaiDua) {
-                            porRegistrarDua.push(rec);
-                        } else if (hasDaiDua && !hasReconocimiento) {
-                            porReconocer.push(rec);
-                        } else if (hasReconocimiento && !hasValidacion) {
-                            porValidar.push(rec);
-                        } else {
+                        // Lógica exacta de clasificación por pestañas
+                        if (hasValidacion) {
                             porDespachar.push(rec);
+                        } else if (hasReconocimiento) {
+                            porValidar.push(rec);
+                        } else if (hasTransmision) {
+                            porReconocer.push(rec);
+                        } else if (hasLlegada) {
+                            porRegistrar.push(rec);
+                        } else {
+                            porLlegar.push(rec);
                         }
                     }
 
-                    let mensajeResumen = `📊 *RESUMEN DE EXPEDIENTES - LOGISTATUS PRO* 📊\n\n` +
-                        `🚢 *Por ETA:* ${porEta.length}\n` +
-                        `📝 *Por Registrar DUA:* ${porRegistrarDua.length}\n` +
-                        `🔍 *Por Reconocer:* ${porReconocer.length}\n` +
-                        `📋 *Por Validar:* ${porValidar.length}\n` +
-                        `🚀 *Por Despachar:* ${porDespachar.length}`;
+                    // Función auxiliar para formatear la lista de expedientes por sección
+                    const formatearBloqueSeccion = (titulo, lista) => {
+                        if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n`;
+                        let res = `*${titulo} (${lista.length})*\n`;
+                        lista.forEach((rec, idx) => {
+                            const exp = rec.num_expediente || 'S/N';
+                            const cli = rec.cliente || 'S/C';
+                            const prov = rec.proveedor || 'N/A';
+                            const bl = rec.awb_bl || rec.bl || 'S/N';
+                            const eta = rec.fecha_llegada || rec.eta_la_guaira || 'Pendiente';
+                            res += `${idx + 1}️⃣ Exp: *${exp}* | Cliente: *${cli}* | Prov: *${prov}* | B/L: *${bl}* | ETA: *${eta}*\n`;
+                        });
+                        return res;
+                    };
 
-                    await sock.sendMessage(remitente, { text: mensajeResumen });
+                    let mensajeDetallado = `📊 *ESTATUS DETALLADO POR PESTAÑAS - LOGISTATUS PRO* 📊\n\n` +
+                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar) + `\n` +
+                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar) + `\n` +
+                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer) + `\n` +
+                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar) + `\n` +
+                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar);
+
+                    await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
                 }
                 // =========================================================================
