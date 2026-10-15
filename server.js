@@ -118,7 +118,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS (SIN CÁLCULOS EXTRA)
+                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS (SECUENCIA CORREGIDA)
                 // =========================================================================
                 if (
                     textoLower.includes('resumen') || 
@@ -148,7 +148,7 @@ async function iniciarBaileysWhatsApp() {
                     let porDespachar = [];
 
                     for (const rec of records) {
-                        if (rec.despacho) continue; // Ignora despachados
+                        if (rec.despacho) continue; // Ignora los despachados
 
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
                         const hasDaiDua = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
@@ -156,15 +156,15 @@ async function iniciarBaileysWhatsApp() {
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        // Lógica directa basada exactamente en el estado actual de las pestañas
+                        // Secuencia estricta y limpia por pestaña operativa:
                         if (!hasLlegada) {
                             let fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || '';
                             porEta.push({ rec, fechaStr: formatearFechaDDMMYYYY(fechaEtaRaw) });
-                        } else if (!hasDaiDua) {
+                        } else if (hasLlegada && !hasDaiDua) {
                             porRegistrarDua.push(rec);
-                        } else if (!hasReconocimiento) {
+                        } else if (hasDaiDua && !hasReconocimiento) {
                             porReconocer.push(rec);
-                        } else if (!hasValidacion) {
+                        } else if (hasReconocimiento && !hasValidacion) {
                             porValidar.push(rec);
                         } else {
                             porDespachar.push(rec);
