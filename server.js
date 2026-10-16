@@ -80,7 +80,6 @@ async function iniciarBaileysWhatsApp() {
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
-                // 🚨 ALERTA AUTOMÁTICA AL GRUPO DE WHATSAPP CUANDO SE DESCONECTA
                 try {
                     if (sock) {
                         const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
@@ -130,7 +129,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS (SECUENCIA CORREGIDA)
+                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS
                 // =========================================================================
                 if (
                     textoLower.includes('resumen') || 
@@ -160,14 +159,13 @@ async function iniciarBaileysWhatsApp() {
                     let porDespachar = [];
 
                     for (const rec of records) {
-                        if (rec.despacho) continue; // Ignora los despachados
+                        if (rec.despacho) continue;
 
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
                         const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        // Lógica exacta de clasificación por pestañas
                         if (hasValidacion) {
                             porDespachar.push(rec);
                         } else if (hasReconocimiento) {
@@ -181,7 +179,6 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    // Función auxiliar para formatear la lista de expedientes de forma vertical, ordenada e incluyendo observaciones
                     const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
                         if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n`;
                         let res = `*${titulo} (${lista.length})*\n`;
@@ -192,7 +189,6 @@ async function iniciarBaileysWhatsApp() {
                             const bl = rec.awb_bl || rec.bl || 'S/N';
                             const obs = rec.observaciones ? rec.observaciones.trim() : '';
                             
-                            // Lógica solicitada: Si es "Por Registrar", muestra Fecha de Llegada; de lo contrario, muestra ETA
                             let etiquetaFecha = "ETA";
                             let valorFecha = rec.eta_la_guaira || rec.fecha_llegada || 'Pendiente';
                             
@@ -207,7 +203,6 @@ async function iniciarBaileysWhatsApp() {
                                    `   • B/L: *${bl}*\n` +
                                    `   • ${etiquetaFecha}: *${valorFecha}*`;
 
-                            // Si tiene observaciones (como números de factura), las añade en una línea limpia abajo
                             if (obs !== '' && obs !== 'Ninguna') {
                                 res += `\n   • Obs: _${obs}_`;
                             }
@@ -227,12 +222,15 @@ async function iniciarBaileysWhatsApp() {
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
                 }
-               // Detección del campo a modificar mediante palabras clave
+
+                // =========================================================================
+                // 🔍 DETECCIÓN DE CAMPOS MEDIANTE NUEVO DICCIONARIO DE PALABRAS CLAVE
+                // =========================================================================
                 let campoAModificar = "";
                 let nombreCampoLegible = "";
                 let esCampoBooleano = false;
 
-                const palabrasContexto = ['exp', 'expediente', 'actualizar', 'fijar', 'poner', 'borrar', 'eliminar', 'fecha', 'eta', 'dai', 'acta', 'factura', 'prevaloracion', 'documento', 'transporte'];
+                const palabrasContexto = ['exp', 'expediente', 'actualizar', 'fijar', 'poner', 'borrar', 'eliminar', 'fecha', 'eta', 'dai', 'acta', 'factura', 'prevaloracion', 'documento', 'transporte', 'bl'];
                 const numCoincidentesContexto = palabrasContexto.filter(p => textoLower.includes(p)).length;
 
                 if (numCoincidentesContexto < 1) return;
@@ -240,22 +238,22 @@ async function iniciarBaileysWhatsApp() {
                 if (textoLower.includes('eta') || textoLower.includes('la guaira') || textoLower.includes('maiquetia')) {
                     campoAModificar = "eta_la_guaira";
                     nombreCampoLegible = "ETA La Guaira / Maiquetía";
-                } else if (textoLower.includes('llegada')) {
+                } else if (textoLower.includes('llegada') || textoLower.includes('llego') || textoLower.includes('llegó')) {
                     campoAModificar = "fecha_llegada";
                     nombreCampoLegible = "Fecha de Llegada";
                 } else if (textoLower.includes('dai') || textoLower.includes('registro dai')) {
                     campoAModificar = "fecha_registro_dai";
                     nombreCampoLegible = "Registro DAI";
-                } else if (textoLower.includes('transmision') || textoLower.includes('transmitido')) {
+                } else if (textoLower.includes('transmision') || textoLower.includes('transmitido') || textoLower.includes('transmisión')) {
                     campoAModificar = "fecha_transmision";
                     nombreCampoLegible = "Fecha de Transmisión";
-                } else if (textoLower.includes('reconocimiento')) {
+                } else if (textoLower.includes('reconocimiento') || textoLower.includes('reconocido')) {
                     campoAModificar = "reconocimiento";
                     nombreCampoLegible = "Reconocimiento";
-                } else if (textoLower.includes('validacion')) {
+                } else if (textoLower.includes('validacion') || textoLower.includes('validado') || textoLower.includes('validación')) {
                     campoAModificar = "validacion";
                     nombreCampoLegible = "Validación";
-                } else if (textoLower.includes('despacho')) {
+                } else if (textoLower.includes('despacho') || textoLower.includes('despachado')) {
                     campoAModificar = "despacho";
                     nombreCampoLegible = "Despacho";
                 } else if (textoLower.includes('acta recepcion') || textoLower.includes('acta de recepcion')) {
@@ -265,7 +263,7 @@ async function iniciarBaileysWhatsApp() {
                     campoAModificar = "prevaloracion_enviada";
                     nombreCampoLegible = "Prevaloración Enviada";
                     esCampoBooleano = true;
-                } else if (textoLower.includes('factura recibida') || textoLower.includes('factura')) {
+                } else if (textoLower.includes('factura recibida') || textoLower.includes('factura') || textoLower.includes('facturas recibidas')) {
                     campoAModificar = "factura_recibida";
                     nombreCampoLegible = "Factura Recibida";
                     esCampoBooleano = true;
@@ -273,7 +271,7 @@ async function iniciarBaileysWhatsApp() {
                     campoAModificar = "documento_valorado_en_sistema";
                     nombreCampoLegible = "Documento Valorado en Sistema";
                     esCampoBooleano = true;
-                } else if (textoLower.includes('recibido documento de transporte') || textoLower.includes('doc transporte') || textoLower.includes('transporte')) {
+                } else if (textoLower.includes('recibido documento de transporte') || textoLower.includes('doc transporte') || textoLower.includes('retirado bl') || textoLower.includes('retirado b/l')) {
                     campoAModificar = "recibido_documento_transporte";
                     nombreCampoLegible = "Recibido Documento de Transporte";
                     esCampoBooleano = true;
@@ -361,7 +359,6 @@ async function iniciarBaileysWhatsApp() {
                     }
                 }
 
-                // Validación específica si intenta borrar un campo que ya está vacío
                 if (pideBorrar || valorFinalAEscribir === "") {
                     let valorActualEnBase = datosActuales[campoAModificar];
                     if (!valorActualEnBase || valorActualEnBase.trim() === "") {
@@ -400,130 +397,6 @@ async function iniciarBaileysWhatsApp() {
                     const errData = await patchRes.json();
                     await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore: ${errData.error?.message || 'Desconocido'}` });
                 }
-
-               // =========================================================================
-                // 📊 COMANDO RÁPIDO: SOLICITAR ALERTAS ACTIVAS DESDE EL GRUPO
-                // =========================================================================
-                const mencionaPrincipal = textoLower.includes('estatus') || textoLower.includes('alertas') || textoLower.includes('reporte');
-                const palabrasApoyo = ['exp', 'expediente', 'activo', 'activos', 'proceso', 'resumen', 'conteo', 'totales', 'carga', 'aduana', 'llegar', 'registrar', 'reconocer', 'validar', 'despachar'];
-                const tieneApoyo = palabrasApoyo.some(palabra => textoLower.includes(palabra));
-
-                if (mencionaPrincipal && tieneApoyo) {
-                    console.log(`📊 [WHATSAPP] Solicitud de alertas manual detectada en el grupo.`);
-                    
-                    const records = await obtenerExpedientesFirestore();
-                    if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
-                        return;
-                    }
-
-                    let alertasEta = [];
-                    let alertasDaiPendientes = [];
-                    let alertasVencimientos = [];
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-
-                    for (const rec of records) {
-                        if (rec.despacho) continue;
-
-                        const expName = rec.num_expediente || 'S/N';
-                        const clientName = rec.cliente || 'S/C';
-                        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
-                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
-                        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
-                        
-                        const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
-                        const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
-                        const iconoVia = esBarco ? "🚢" : "✈️";
-                        const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
-
-                        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
-                        const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
-                        const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
-                        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
-
-                        if (dArriboObj && !hasLlegadaRegistrada) {
-                            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
-                            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
-                                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
-                                alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})`);
-                            }
-                        }
-
-                        if (dArriboObj && !hasLlegadaRegistrada && !hasRegistroDai) {
-                            const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
-                            if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
-                                const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
-                                alertasDaiPendientes.push(`⚠️ *DUA POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DUA se encuentra en blanco.*`);
-                            }
-                        }
-
-                        const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
-                        if (dLlegada && !hasTransmision) {
-                            let dDeadline = new Date(dLlegada.getTime());
-                            let diasHabilesAgregados = 0;
-                            let intentosMaximos = 0;
-                            while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
-                                dDeadline.setDate(dDeadline.getDate() + 1);
-                                const diaSemana = dDeadline.getDay();
-                                if (diaSemana !== 0 && diaSemana !== 6) {
-                                    diasHabilesAgregados++;
-                                }
-                                intentosMaximos++;
-                            }
-                            const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
-                            const fechaPlazoStr = formatearFechaDDMMYYYY(dDeadline.toISOString().split('T')[0]);
-
-                            if (diffPlazoDays >= 0 && diffPlazoDays <= 2) {
-                                const textoPlazo = diffPlazoDays === 0 ? "¡VENCE HOY EL PLAZO!" : `Quedan ${diffPlazoDays} día(s) de plazo`;
-                                alertasVencimientos.push(`⚠️ *PLAZO DE DECLARACIÓN PRÓXIMO A VENCER (Art. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoPlazo} (Límite: ${fechaPlazoStr}) - *Riesgo Multa Art. 177 Num. 7 de la L.O.A.*`);
-                            } else if (diffPlazoDays < 0) {
-                                const diasExt = Math.abs(diffPlazoDays);
-                                alertasVencimientos.push(`🚨 *EXTEMPORANEIDAD - ART. 47*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ El plazo de 5 días hábiles venció el ${fechaPlazoStr} (Han transcurrido ${diasExt} día(s) en extemporaneidad).\n🚨 *¡Aplica Multa Art. 177 Num 7 de la L.O.A.! (Persiste hasta transmitir)*`);
-                            }
-                        }
-
-                        if (rec.culminacion_dias_libres) {
-                            const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
-                            const culmFormatted = formatearFechaDDMMYYYY(rec.culminacion_dias_libres);
-                            if (culmDate) {
-                                const diffDaysAlm = Math.round((culmDate - today) / (1000 * 60 * 60 * 24));
-                                if (diffDaysAlm >= 0 && diffDaysAlm <= 2) {
-                                    const textoAlm = diffDaysAlm === 0 ? "VENCE HOY" : `Faltan ${diffDaysAlm}d`;
-                                    alertasVencimientos.push(`⚠️ *ALMACÉN PRÓXIMO A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoAlm} (${culmFormatted})`);
-                                } else if (diffDaysAlm < 0) {
-                                    alertasVencimientos.push(`🚨 *ALMACÉN VENCIDO*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció hace ${Math.abs(diffDaysAlm)} día(s) el ${culmFormatted}`);
-                                }
-                            }
-                        }
-
-                        const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                        const vencDaiFormatted = formatearFechaDDMMYYYY(rec.vencimiento_dai);
-                        if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
-                            const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                            if (diffVencDays < 0) {
-                                const diasVencida = Math.abs(diffVencDays);
-                                alertasVencimientos.push(`🚨 *DUA VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DUA.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.! (Persiste hasta registrar)*`);
-                            } else if (diffVencDays >= 0 && diffVencDays <= 4) {
-                                const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
-                                alertasVencimientos.push(`⚠️ *DUA PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
-                            }
-                        }
-                    }
-
-                    let listaFinalOrdenada = [...alertasEta, ...alertasDaiPendientes, ...alertasVencimientos];
-                    if (listaFinalOrdenada.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ ¡Excelente! No hay alertas críticas pendientes en este momento." });
-                        return;
-                    }
-
-                    let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = "🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n" + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-                    
-                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
-                    return;
-                }
-                // =========================================================================
 
             } catch (err) {
                 console.error("❌ Error procesando mensaje en Baileys:", err);
@@ -601,14 +474,12 @@ function formatearFechaDDMMYYYY(str) {
 
 async function enviarAlertaMulticanal(listaAlertas, tituloReporte, canalesActivos = { whatsapp: true, telegram: true }) {
     try {
-        // 1. Si el canal de Telegram está activo, envía la alerta automática por ahí
         if (canalesActivos.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
             let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
             let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
             await enviarAlertaTelegramServidor(mensajeConsolidado);
         }
 
-        // 2. Si el canal de WhatsApp está activo, envía la alerta automática por el grupo
         if (canalesActivos.whatsapp && whatsappClientReady && sock) {
             await enviarReporteWhatsAppGrupo(listaAlertas, tituloReporte);
         }
@@ -852,6 +723,7 @@ cron.schedule('0 10,18 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
+// CRON DE ALERTAS FRECUENTES CON VALIDACIÓN DINÁMICA DE DUA (MARÍTIMO 2 DÍAS, AÉREO 1 DÍA) Y FALTA DE DAI
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         const records = await obtenerExpedientesFirestore();
@@ -880,6 +752,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
             const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
             const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
+            // 1. Alerta de ETA Próximo
             if (dArriboObj && !hasLlegadaRegistrada) {
                 const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                 if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -888,14 +761,16 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 }
             }
 
+            // 2. Alerta: FALTA DAI / DUA POR REGISTRAR (Si el ETA está a 3 días o menos y no tiene registro DAI)
             if (dArriboObj && !hasLlegadaRegistrada && !hasRegistroDai) {
                 const diffEtaDaiDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
-                if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 5) {
+                if (diffEtaDaiDays >= 0 && diffEtaDaiDays <= 3) {
                     const textoEtaDai = diffEtaDaiDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffEtaDaiDays}d para el ETA`;
-                    alertasDaiPendientes.push(`⚠️ *DUA POR REGISTRAR (ETA PRÓXIMO)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DUA se encuentra en blanco.*`);
+                    alertasDaiPendientes.push(`⚠️ *¡FALTA DAI / DUA POR REGISTRAR!*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoEtaDai} (${fechaEtaFormatted})\n⚠️ *La fecha de registro DUA/DAI se encuentra en blanco a pocos días del arribo.*`);
                 }
             }
 
+            // 3. Plazo legal de Declaración (Art. 47 LOA) tras la llegada
             const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
             if (dLlegada && !hasTransmision) {
                 let dDeadline = new Date(dLlegada.getTime());
@@ -919,6 +794,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 }
             }
 
+            // 4. Vencimiento de Días Libres en Almacén
             if (rec.culminacion_dias_libres) {
                 const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
                 const culmFormatted = formatearFechaDDMMYYYY(rec.culminacion_dias_libres);
@@ -933,16 +809,19 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
                 }
             }
 
+            // 5. Vencimiento de DAI con umbral dinámico (Marítimo: 2 días | Aéreo: 1 día)
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             const vencDaiFormatted = formatearFechaDDMMYYYY(rec.vencimiento_dai);
-            if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+            if (!hasLlegadaRegistrada && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                const umbralAlerta = esBarco ? 2 : 1;
+
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
                     alertasVencimientos.push(`🚨 *DUA VENCIDA (SIN REGISTRAR)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció el ${vencDaiFormatted} (${diasVencida} día(s) atrás) sin registrar DUA.\n🚨 *¡Aplica Multa Art. 177 Num. 9 de la L.O.A.!*`);
-                } else if (diffVencDays >= 0 && diffVencDays <= 4) {
-                    const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY!" : `Faltan ${diffVencDays}d`;
-                    alertasVencimientos.push(`⚠️ *DUA PRÓXIMA A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 ETA: *${fechaEtaFormatted}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
+                } else if (diffVencDays >= 0 && diffVencDays <= umbralAlerta) {
+                    const textoCountdown = diffVencDays === 0 ? "¡VENCE HOY LA DUA!" : `Faltan ${diffVencDays}d para vencer la DUA`;
+                    alertasVencimientos.push(`⚠️ *DAI VIGENTE - PRÓXIMO A VENCER*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ ${textoCountdown} (${vencDaiFormatted})\n🚢 Vía: *${esBarco ? 'Marítima' : 'Aérea'}* - *Riesgo Multa Art 177 Num 9 de la L.O.A*`);
                 }
             }
         }
