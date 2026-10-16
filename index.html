@@ -207,24 +207,27 @@
                             <button onclick="openWhatsAppModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-emerald-700">
                                 🤖 Escanear QR WhatsApp
                             </button>
-			<div class="px-4 py-3 border-t border-slate-200 mt-1 bg-slate-50">
-    <div class="text-[10px] font-extrabold text-slate-400 mb-2 uppercase tracking-wider">Control de Bots y Alertas</div>
-    
-    <div class="flex items-center justify-between py-1">
-        <span class="text-xs font-semibold text-slate-700">💬 WhatsApp (Baileys)</span>
-        <button id="btn-toggle-wsp" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('whatsapp')">Encendido</button>
-    </div>
+                            
+                            <!-- BLOQUE ÚNICO DE CONTROL DE BOTS Y ALERTAS (1 CLIC) -->
+                            <div class="px-4 py-3 border-t border-slate-200 mt-1 bg-slate-50">
+                                <div class="text-[10px] font-extrabold text-slate-400 mb-2 uppercase tracking-wider">Control de Bots y Alertas</div>
+                                
+                                <div class="flex items-center justify-between py-1">
+                                    <span class="text-xs font-semibold text-slate-700">💬 WhatsApp (Baileys)</span>
+                                    <button id="btn-toggle-wsp" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('whatsapp')">Encendido</button>
+                                </div>
 
-    <div class="flex items-center justify-between py-1 mt-1">
-        <span class="text-xs font-semibold text-slate-700">✈️ Telegram</span>
-        <button id="btn-toggle-tg" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('telegram')">Encendido</button>
-    </div>
-</div>
+                                <div class="flex items-center justify-between py-1 mt-1">
+                                    <span class="text-xs font-semibold text-slate-700">✈️ Telegram</span>
+                                    <button id="btn-toggle-tg" class="btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white" onclick="toggleBotUnificado('telegram')">Encendido</button>
+                                </div>
+                            </div>
 
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -921,7 +924,7 @@
         ];
 
         const excelHeaders = [
-            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+            "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
         ];
 
         const camposFechas = [
@@ -930,50 +933,6 @@
             "fecha_transmision", "reconocimiento", "validacion", "despacho", 
             "recibida_acta_recepcion_almacen", "inicio_dias_libres", "culminacion_dias_libres", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera"
         ];
-
-        async function enviarAlertaDesdeWeb(mensajeTexto) {
-            try {
-                const response = await fetch(`${BACKEND_URL}/api/notificar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mensaje: mensajeTexto })
-                });
-                const data = await response.json();
-                
-                if (!response.ok || !data.success) {
-                    throw new Error(data.message || "El servidor rechazó la alerta.");
-                }
-            } catch (err) {
-                console.error("❌ Error:", err);
-                throw err;
-            }
-        }
-
-        const TELEGRAM_BOT_TOKEN = "8631519853:AAEFJVeQtj_jlbCUOnimlVXWTDeOL0qrttU";
-        const TELEGRAM_CHAT_ID = "-1003976808854";     
-
-        async function enviarAlertaTelegram(mensajeTexto) {
-            if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes("TU_")) {
-                console.warn("⚠️ Token de Telegram no configurado.");
-                return;
-            }
-            try {
-                const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: mensajeTexto,
-                        parse_mode: 'Markdown'
-                    })
-                });
-                const data = await response.json();
-                if (!data.ok) console.error("Error al enviar a Telegram:", data.description);
-            } catch (err) {
-                console.error("Fallo de red al conectar con Telegram:", err);
-            }
-        }
 
         window.limpiarAnaliticaFechas = function() {
             document.getElementById("filtroFechaDesde").value = "";
@@ -2095,22 +2054,27 @@
             }
 
             try {
-                const response = await fetch(`${BACKEND_URL}/api/calcular-alertas`, {
+                const canalesSeleccionados = {
+                    whatsapp: typeof estadosBots !== 'undefined' ? estadosBots.whatsapp : true,
+                    telegram: typeof estadosBots !== 'undefined' ? estadosBots.telegram : true
+                };
+
+                const response = await fetch(`${BACKEND_URL}/api/alertas/forzar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ canales: canalesSeleccionados })
                 });
                 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    alert(`✅ ¡Alertas forzadas y enviadas a Telegram con éxito! (${data.count} enviadas)`);
+                    alert("✅ ¡Alertas forzadas y enviadas con éxito a través de los canales activos!");
                 } else {
                     alert("❌ Error al enviar las alertas: " + (data.message || "Error desconocido"));
                 }
             } catch (err) {
                 console.error("Error al forzar alertas:", err);
-                alert("❌ Ocurrió un error al conectar con el servidor: " + err.message);
+                alert("❌ Ocurrió un error de red al conectar con el servidor: " + err.message);
             }
         };
 
