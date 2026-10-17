@@ -129,7 +129,121 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 COMANDO RÁPIDO: RESUMEN Y CONTEO EXACTO DE PESTAÑAS
+// 🤖 1. COMANDO DE SISTEMA: GUÍA DE COMANDOS (Exige al menos 2 palabras clave)
+// =========================================================================
+const palabrasClaveAyuda = ['ayuda', 'menu', 'menú', 'comandos', 'sistema', 'estatus', 'eventos', 'como', 'pedir'];
+const palabrasEnMensaje = textoLower.split(/\s+/);
+const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasClaveAyuda.includes(p)).length;
+
+// Se activa solo si el mensaje incluye al menos 2 palabras de la lista anterior (ej: "comandos sistema", "ayuda estatus")
+if (coincidenciasAyuda >= 2 || textoLower === 'ayuda' || textoLower === 'comandos') {
+    console.log(`🤖 [WHATSAPP] Solicitud de guía de comandos validada (Coincidencias: ${coincidenciasAyuda}).`);
+    
+    let guiaEventos = `🤖 *GUÍA DE COMANDOS Y EVENTOS - LOGISTATUS PRO* 🤖\n\n` +
+        `Aquí tienes la forma exacta de redactar cada mensaje para que el bot entienda y ejecute el cambio:\n\n` +
+        
+        `📊 *1. Ver Resumen y Alertas*\n` +
+        `• *"resumen"* o *"conteo"* ↳ _Lista todos los expedientes activos por pestañas (incluyendo estado de DAI y observaciones)._\n` +
+        `• *"alertas"* o *"urgentes"* ↳ _Te envía únicamente las alertas activas, vencimientos críticos y estado de DAI._\n\n` +
+        
+        `🚢 *2. Fecha de Llegada / ETA*\n` +
+        `• _Ejemplo:_ *"Actualizar ETA Exp 123 el 25/10/2026"*\n\n` +
+        
+        `📄 *3. Registro DAI / DUA*\n` +
+        `• _Ejemplo:_ *"Actualizar DAI Exp 123 el 20/10/2026"*\n\n` +
+        
+        `🔍 *4. Fases Aduaneras (Transmisión, Reconocimiento, Validación, Despacho)*\n` +
+        `• _Ejemplos:_ *"Transmitido Exp 123 el 22/10/2026"* | *"Reconocimiento Exp 123"* | *"Validado Exp 123"* | *"Despacho Exp 123"*\n\n` +
+        
+        `⚙️ *5. Borrar o Limpiar un Campo*\n` +
+        `• _Ejemplo:_ *"Borrar ETA Exp 123"* o *"Eliminar reconocimiento Exp ABC"*\n\n` +
+        
+        `💡 *Tip:* Puedes usar el número de expediente o parte del B/L.`;
+
+    await sock.sendMessage(remitente, { text: guiaEventos });
+    return;
+}
+
+                // =========================================================================
+                // 🚨 2. COMANDO: CONSULTAR ALERTAS ACTIVAS Y ESTADO DE DAI
+                // =========================================================================
+                if (
+                    textoLower === 'alertas' || 
+                    textoLower === 'alertas activas' || 
+                    textoLower === 'urgentes' || 
+                    textoLower === 'reporte activo' ||
+                    textoLower === 'vencimientos'
+                ) {
+                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas detectada.`);
+                    
+                    const records = await obtenerExpedientesFirestore();
+                    if (!records || records.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
+                        return;
+                    }
+
+                    let alertasEta = [], alertasVencimientos = [];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    for (const rec of records) {
+                        if (rec.despacho) continue;
+
+                        const expName = rec.num_expediente || 'S/N';
+                        const clientName = rec.cliente || 'S/C';
+                        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+                        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
+                        
+                        const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+                        const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+                        const iconoVia = esBarco ? "🚢" : "✈️";
+                        const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
+
+                        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+                        const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+                        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
+
+                        // Alertas de ETA con DAI integrada
+                        if (dArriboObj && !hasLlegadaRegistrada) {
+                            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                                
+                                let detalleDaiTexto = "";
+                                if (hasRegistroDai) {
+                                    const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
+                                    const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                                    if (dVencimientoDai) {
+                                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
+                                    } else {
+                                        detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
+                                    }
+                                } else {
+                                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
+                                }
+
+                                alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`);
+                            }
+                        }
+                    }
+
+                    let listaFinalOrdenada = alertasEta;
+                    if (listaFinalOrdenada.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas de ETA ni DAI próximas en este momento." });
+                        return;
+                    }
+
+                    let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
+                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+                    
+                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
+                    return;
+                }
+
+                // =========================================================================
+                // 📈 3. COMANDOS DE RESUMEN Y CONTEO (CON DAI Y OBSERVACIONES)
                 // =========================================================================
                 if (
                     textoLower.includes('resumen') || 
@@ -157,6 +271,8 @@ async function iniciarBaileysWhatsApp() {
                     let porReconocer = [];
                     let porValidar = [];
                     let porDespachar = [];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
 
                     for (const rec of records) {
                         if (rec.despacho) continue;
@@ -179,9 +295,59 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
-                        if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n`;
+                    const formatearBloquePorLlegar = (titulo, lista) => {
+                        if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n\n`;
                         let res = `*${titulo} (${lista.length})*\n`;
+                        
+                        lista.forEach((rec, idx) => {
+                            const exp = rec.num_expediente || 'S/N';
+                            const cli = rec.cliente || 'S/C';
+                            const prov = rec.proveedor || 'N/A';
+                            const bl = rec.awb_bl || rec.bl || 'S/N';
+                            const obs = rec.observaciones ? rec.observaciones.trim() : '';
+                            const valorFecha = rec.eta_la_guaira || rec.fecha_llegada || 'Pendiente';
+                            
+                            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+                            let detalleDaiTexto = "";
+                            
+                            if (hasRegistroDai) {
+                                const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
+                                const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                                
+                                if (dVencimientoDai) {
+                                    const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                                    if (diffVencDays < 0) {
+                                        detalleDaiTexto = `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA*`;
+                                    } else {
+                                        detalleDaiTexto = `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
+                                    }
+                                } else {
+                                    detalleDaiTexto = `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
+                                }
+                            } else {
+                                detalleDaiTexto = `\n   • DAI: *⚠️ FALTA REGISTRAR DAI / DUA*`;
+                            }
+
+                            res += `${idx + 1}️⃣ Exp: *${exp}*\n` +
+                                   `   • Cliente: *${cli}*\n` +
+                                   `   • Prov: *${prov}*\n` +
+                                   `   • B/L: *${bl}*\n` +
+                                   `   • ETA: *${valorFecha}*` +
+                                   detalleDaiTexto;
+
+                            if (obs !== '' && obs !== 'Ninguna') {
+                                res += `\n   • Obs: _${obs}_`;
+                            }
+
+                            res += `\n\n`;
+                        });
+                        return res;
+                    };
+
+                    const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
+                        if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n\n`;
+                        let res = `*${titulo} (${lista.length})*\n`;
+                        
                         lista.forEach((rec, idx) => {
                             const exp = rec.num_expediente || 'S/N';
                             const cli = rec.cliente || 'S/C';
@@ -213,7 +379,7 @@ async function iniciarBaileysWhatsApp() {
                     };
 
                     let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO - LOGISTATUS PRO* 📊\n\n` +
-                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false) +
+                        formatearBloquePorLlegar("🚢✈️ 1. POR LLEGAR", porLlegar) +
                         formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
                         formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
                         formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false) +
