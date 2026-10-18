@@ -76,32 +76,18 @@ async function iniciarBaileysWhatsApp() {
                 const isLoggedOut = statusCode === DisconnectReason.loggedOut;
                 const shouldReconnect = !isLoggedOut;
                 
-                console.log(`⚠️ [WHATSAPP] Conexión cerrada. Código: ${statusCode}. ¿Reconectar?: ${shouldReconnect}`);
                 whatsappClientReady = false;
                 estadoConexionWhatsapp = "DESCONECTADO";
 
-                try {
-                    if (sock) {
-                        const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
-                        await sock.sendMessage(GRUPO_AUTORIZADO_JID, { 
-                            text: `⚠️ *ALERTA DE SISTEMA - LOGISTATUS PRO*\n\nEl bot de WhatsApp se ha **desconectado** (Código: ${statusCode || 'Desconocido'}). Intentando reconectar automáticamente...` 
-                        });
-                    }
-                } catch (errWhatsapp) {
-                    console.error("❌ No se pudo enviar alerta de desconexión al grupo de WhatsApp:", errWhatsapp);
-                }
-
                 if (shouldReconnect) {
-                    setTimeout(() => {
-                        iniciarBaileysWhatsApp();
-                    }, 5000);
+                    setTimeout(iniciarBaileysWhatsApp, 5000);
                 }
             }
         });
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA INTELIGENTE DE MENSAJES CON FILTRO DE 2 PALABRAS CLAVE
+        // ESCUCHA INTELIGENTE DE MENSAJES (COMANDOS Y ACTUALIZACIONES)
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 if (m.type !== 'notify') return;
@@ -113,51 +99,47 @@ async function iniciarBaileysWhatsApp() {
                 const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
                 const textoLower = textoMensaje.toLowerCase();
 
-                console.log(`📩 [MENSAJE RECIBIDO] De: ${remitente} | Texto: ${textoMensaje}`);
-
                 const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us"; 
-                
-                if (remitente !== GRUPO_AUTORIZADO_JID) {
-                    console.log(`⛔ Mensaje ignorado por seguridad (No proviene del grupo autorizado).`);
-                    return;
-                }
+                if (remitente !== GRUPO_AUTORIZADO_JID) return;
 
                 const palabrasEnMensaje = textoLower.split(/\s+/);
 
                 // =========================================================================
-                // 🤖 1. COMANDO: GUÍA DE COMANDOS (comandos sistema, ayuda sistema, menu sistema)
+                // 🤖 1. GUÍA DE COMANDOS COMPLETA (menu sistema / ayuda sistema)
                 // =========================================================================
                 const palabrasAyuda = ['comandos', 'ayuda', 'menu', 'menú', 'sistema'];
                 const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
 
                 if (coincidenciasAyuda >= 2 || textoLower === 'ayuda' || textoLower === 'comandos') {
-                    console.log(`🤖 [WHATSAPP] Solicitud de guía de comandos validada.`);
-                    
-                    let guiaEventos = `🤖 *GUÍA DE COMANDOS Y EVENTOS - LOGISTATUS PRO* 🤖\n\n` +
-                        `Aquí tienes los comandos disponibles:\n\n` +
+                    let guiaEventos = `🤖 *GUÍA DE COMANDOS - LOGISTATUS PRO* 🤖\n\n` +
                         `🚨 *1. Alertas Activas*\n` +
                         `• *"alertas activas"*, *"alertas exp"*, *"alerta expedientes"*, *"alerta sistema"*\n\n` +
-                        `📊 *2. Resumen y Conteo de Expedientes (Ordenados por ETA)*\n` +
+                        `📊 *2. Resumen y Conteo*\n` +
                         `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*, *"exp activos"*\n\n` +
-                        `⚙️ *3. Ayuda y Sistema*\n` +
-                        `• *"comandos sistema"*, *"ayuda sistema"* o *"menu sistema"*\n`;
+                        `✏️ *3. Actualización de Fechas*\n` +
+                        `• *ETA:* "Actualizar ETA Exp 26-030 al 26/10/2026"\n` +
+                        `• *Fecha Llegada:* "Actualizar Llegada Exp 26-030 al 26/10/2026"\n` +
+                        `• *Registro DAI:* "Actualizar DAI Exp 26-030 al 20/10/2026"\n\n` +
+                        `🗑️ *4. Borrar / Eliminar Campos*\n` +
+                        `• *Borrar ETA:* "Borrar ETA Exp 26-030"\n` +
+                        `• *Borrar Llegada:* "Borrar Llegada Exp 26-030"\n` +
+                        `• *Borrar DAI:* "Borrar DAI Exp 26-030"\n\n` +
+                        `⚙️ *Ayuda:* "menu sistema"`;
 
                     await sock.sendMessage(remitente, { text: guiaEventos });
                     return;
                 }
 
                 // =========================================================================
-                // 🚨 2. COMANDO: ALERTAS (ordenadas por ETA)
+                // 🚨 2. CONSULTAR ALERTAS ACTIVAS
                 // =========================================================================
                 const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
                 const coincidenciasAlertas = palabrasEnMensaje.filter(p => palabrasAlertas.includes(p)).length;
 
                 if (coincidenciasAlertas >= 2) {
-                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas validada.`);
-                    
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore." });
                         return;
                     }
 
@@ -203,7 +185,7 @@ async function iniciarBaileysWhatsApp() {
                                 }
 
                                 alertasEta.push({
-                                    texto: `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`,
+                                    texto: `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`,
                                     fechaSort: dArriboObj
                                 });
                             }
@@ -227,59 +209,44 @@ async function iniciarBaileysWhatsApp() {
 
                     let listaFinalOrdenada = [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
                     if (listaFinalOrdenada.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas en este momento." });
+                        await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas." });
                         return;
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA/VENCIMIENTO)* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-                    
-                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
+                    await sock.sendMessage(remitente, { text: `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA)* 🚨\n\n` + mensajesEnumerados.join("\n\n") });
                     return;
                 }
 
                 // =========================================================================
-                // 📈 3. COMANDO: RESUMEN / CONTEO (ordenado por ETA y sin DAI en trámite)
+                // 📈 3. CONSULTAR RESUMEN / CONTEO
                 // =========================================================================
                 const palabrasResumen = ['resumen', 'exp', 'expedientes', 'activos', 'conteo', 'totales', 'proceso'];
                 const coincidenciasResumen = palabrasEnMensaje.filter(p => palabrasResumen.includes(p)).length;
 
                 if (coincidenciasResumen >= 2) {
-                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas validada.`);
-                    
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para resumir." });
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore." });
                         return;
                     }
 
-                    let porLlegar = [];
-                    let porRegistrar = [];
-                    let porReconocer = [];
-                    let porValidar = [];
-                    let porDespachar = [];
+                    let porLlegar = [], porRegistrar = [], porReconocer = [], porValidar = [], porDespachar = [];
                     const today = new Date();
                     today.setHours(0,0,0,0);
 
                     for (const rec of records) {
                         if (rec.despacho) continue;
-
                         const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
                         const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
                         const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
                         const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
 
-                        if (hasValidacion) {
-                            porDespachar.push(rec);
-                        } else if (hasReconocimiento) {
-                            porValidar.push(rec);
-                        } else if (hasTransmision) {
-                            porReconocer.push(rec);
-                        } else if (hasLlegada) {
-                            porRegistrar.push(rec);
-                        } else {
-                            porLlegar.push(rec);
-                        }
+                        if (hasValidacion) porDespachar.push(rec);
+                        else if (hasReconocimiento) porValidar.push(rec);
+                        else if (hasTransmision) porReconocer.push(rec);
+                        else if (hasLlegada) porRegistrar.push(rec);
+                        else porLlegar.push(rec);
                     }
 
                     const ordenarPorETA = (lista) => {
@@ -321,7 +288,6 @@ async function iniciarBaileysWhatsApp() {
                                    `   • B/L: *${bl}*\n` +
                                    `   • ${etiquetaFecha}: *${valorFecha}*`;
 
-                            // MOSTRAR DAI ÚNICAMENTE SI ESTÁ MARCADO (SOLO EN "POR LLEGAR")
                             if (mostrarDai) {
                                 const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                                 if (hasRegistroDai) {
@@ -329,7 +295,7 @@ async function iniciarBaileysWhatsApp() {
                                     const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
                                     if (dVencimientoDai) {
                                         const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                                        res += diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
+                                        res += diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
                                     } else {
                                         res += `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
                                     }
@@ -338,36 +304,107 @@ async function iniciarBaileysWhatsApp() {
                                 }
                             }
 
-                            if (obs !== '' && obs !== 'Ninguna') {
-                                res += `\n   • Obs: _${obs}_`;
-                            }
-
+                            if (obs !== '' && obs !== 'Ninguna') res += `\n   • Obs: _${obs}_`;
                             res += `\n\n`;
                         });
                         return res;
                     };
 
                     let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO (ORDENADOS POR ETA)* 📊\n\n` +
-                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false, true) + // Muestra DAI
-                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true, false) + // Sin DAI
-                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false, false) + // Sin DAI
-                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false, false) + // Sin DAI
-                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false, false); // Sin DAI
+                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false, true) +
+                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true, false) +
+                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false, false) +
+                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false, false) +
+                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false, false);
 
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
                 }
 
+                // =========================================================================
+                // ⚙️ 4. ACTUALIZACIÓN O ELIMINACIÓN RÁPIDA DESDE EL CHAT
+                // =========================================================================
+                let campoAModificar = "";
+                let nombreCampoLegible = "";
+                let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
+
+                if (textoLower.includes('eta')) {
+                    campoAModificar = "eta_la_guaira";
+                    nombreCampoLegible = "ETA";
+                } else if (textoLower.includes('llegada')) {
+                    campoAModificar = "fecha_llegada";
+                    nombreCampoLegible = "Fecha de Llegada";
+                } else if (textoLower.includes('dai')) {
+                    campoAModificar = "fecha_registro_dai";
+                    nombreCampoLegible = "Registro DAI";
+                }
+
+                if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar'))) {
+                    let valorFecha = "";
+                    if (!esBorrar) {
+                        const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
+                        if (!matchFecha) {
+                            await sock.sendMessage(remitente, { text: `❌ Debes indicar una fecha válida (Ej: 26/10/2026).` });
+                            return;
+                        }
+                        valorFecha = matchFecha[0].replace(/-/g, '/');
+                    }
+
+                    const recordsQuery = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes`);
+                    const resultQuery = await recordsQuery.json();
+                    if (!resultQuery.documents) return;
+
+                    let expedienteEncontrado = null;
+                    for (let doc of resultQuery.documents) {
+                        let fields = doc.fields || {};
+                        let numExp = (fields.num_expediente?.stringValue || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
+                        if (numExp.length > 1 && limpioTexto.includes(numExp)) {
+                            expedienteEncontrado = { id: doc.name.split('/').pop(), fields, numExpediente: fields.num_expediente?.stringValue };
+                            break;
+                        }
+                    }
+
+                    if (!expedienteEncontrado) {
+                        await sock.sendMessage(remitente, { text: `⚠️ No se encontró el expediente indicado en el mensaje.` });
+                        return;
+                    }
+
+                    const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
+                    const patchBody = {
+                        fields: {
+                            ...expedienteEncontrado.fields,
+                            [campoAModificar]: { stringValue: valorFecha }
+                        }
+                    };
+
+                    const patchRes = await fetch(updateUrl, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patchBody)
+                    });
+
+                    if (patchRes.ok) {
+                        if (esBorrar) {
+                            await sock.sendMessage(remitente, { text: `🗑️ *¡CAMPO ELIMINADO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n⚙️ Campo: *${nombreCampoLegible}* ha quedado vacío.` });
+                        } else {
+                            await sock.sendMessage(remitente, { text: `✅ *¡ACTUALIZADO CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Nueva Fecha: *${formatearFechaDDMMYYYY(valorFecha)}*` });
+                        }
+                    } else {
+                        await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore.` });
+                    }
+                    return;
+                }
+
             } catch (err) {
-                console.error("❌ Error procesando mensaje en Baileys:", err);
+                console.error("❌ Error en Baileys upsert:", err);
             }
         });
 
     } catch (err) {
-        console.error("❌ Error al iniciar Baileys en la nube:", err);
+        console.error("❌ Error al iniciar Baileys:", err);
     }
 }
-
 iniciarBaileysWhatsApp();
 
 // ==========================================
@@ -390,7 +427,6 @@ async function iniciarTelegramPolling() {
 
                     const chatId = String(update.message.chat.id);
                     const texto = update.message.text.trim().toLowerCase();
-
                     if (TELEGRAM_CHAT_ID && chatId !== String(TELEGRAM_CHAT_ID)) continue;
 
                     if (texto.includes('resumen') || texto.includes('conteo') || texto.includes('alertas')) {
@@ -432,7 +468,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
-            return res.json({ success: false, message: "No hay registros en Firestore para evaluar." });
+            return res.json({ success: false, message: "No hay registros en Firestore." });
         }
 
         let alertasEta = [], alertasVencimientos = [];
@@ -501,7 +537,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
 
         let listaFinalOrdenada = [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
         if (listaFinalOrdenada.length === 0) {
-            return res.json({ success: false, message: "No hay alertas activas en este momento para enviar." });
+            return res.json({ success: false, message: "No hay alertas activas." });
         }
 
         let canalesActivos = {
@@ -510,7 +546,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
         };
 
         await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL (ORDENADO POR ETA)", canalesActivos);
-        res.json({ success: true, message: "Alertas forzadas y enviadas con éxito a las apps encendidas.", canalesUtilizados: canalesActivos });
+        res.json({ success: true, message: "Alertas forzadas y enviadas con éxito.", canalesUtilizados: canalesActivos });
 
     } catch (error) {
         console.error("❌ Error al forzar alertas:", error);
@@ -519,7 +555,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
 });
 
 // ==========================================
-// 2. FUNCIONES DE SERVICIO AUXILIARES
+// 2. FUNCIONES AUXILIARES
 // ==========================================
 function formatearFechaDDMMYYYY(str) {
     const d = parseFechaLocalServidor(str);
