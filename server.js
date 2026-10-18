@@ -122,7 +122,6 @@ async function iniciarBaileysWhatsApp() {
                     return;
                 }
 
-                // Desglose de palabras para verificar coincidencia mínima de 2 palabras clave
                 const palabrasEnMensaje = textoLower.split(/\s+/);
 
                 // =========================================================================
@@ -132,13 +131,13 @@ async function iniciarBaileysWhatsApp() {
                 const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
 
                 if (coincidenciasAyuda >= 2 || textoLower === 'ayuda' || textoLower === 'comandos') {
-                    console.log(`🤖 [WHATSAPP] Solicitud de guía de comandos validada (Coincidencias: ${coincidenciasAyuda}).`);
+                    console.log(`🤖 [WHATSAPP] Solicitud de guía de comandos validada.`);
                     
                     let guiaEventos = `🤖 *GUÍA DE COMANDOS Y EVENTOS - LOGISTATUS PRO* 🤖\n\n` +
                         `Aquí tienes los comandos disponibles:\n\n` +
                         `🚨 *1. Alertas Activas*\n` +
                         `• *"alertas activas"*, *"alertas exp"*, *"alerta expedientes"*, *"alerta sistema"*\n\n` +
-                        `📊 *2. Resumen y Conteo de Expedientes*\n` +
+                        `📊 *2. Resumen y Conteo de Expedientes (Ordenados por ETA)*\n` +
                         `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*, *"exp activos"* _(Incluye estado de DAI, vigencia y observaciones)_\n\n` +
                         `⚙️ *3. Ayuda y Sistema*\n` +
                         `• *"comandos sistema"*, *"ayuda sistema"* o *"menu sistema"*\n`;
@@ -148,13 +147,13 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 🚨 2. COMANDO: ALERTAS (alertas activas, alertas exp, alerta expedientes, alerta sistema)
+                // 🚨 2. COMANDO: ALERTAS (ordenadas por ETA)
                 // =========================================================================
                 const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
                 const coincidenciasAlertas = palabrasEnMensaje.filter(p => palabrasAlertas.includes(p)).length;
 
                 if (coincidenciasAlertas >= 2) {
-                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas validada (Coincidencias: ${coincidenciasAlertas}).`);
+                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas validada.`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
@@ -203,7 +202,10 @@ async function iniciarBaileysWhatsApp() {
                                     detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
                                 }
 
-                                alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`);
+                                alertasEta.push({
+                                    texto: `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`,
+                                    fechaSort: dArriboObj
+                                });
                             }
                         }
 
@@ -212,32 +214,39 @@ async function iniciarBaileysWhatsApp() {
                             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                             if (diffVencDays < 0) {
                                 const diasVencida = Math.abs(diffVencDays);
-                                alertasVencimientos.push(`🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`);
+                                alertasVencimientos.push({
+                                    texto: `🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                                    fechaSort: dVencimientoDai
+                                });
                             }
                         }
                     }
 
-                    let listaFinalOrdenada = [...alertasEta, ...alertasVencimientos];
+                    // ORDENAR AMBAS LISTAS POR FECHA (ETA / Vencimiento) ASCENDENTE
+                    alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
+                    alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
+
+                    let listaFinalOrdenada = [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
                     if (listaFinalOrdenada.length === 0) {
                         await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas en este momento." });
                         return;
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA/VENCIMIENTO)* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
                     
                     await sock.sendMessage(remitente, { text: mensajeConsolidado });
                     return;
                 }
 
                 // =========================================================================
-                // 📈 3. COMANDO: RESUMEN / CONTEO (resumen exp, resumen expedientes, expedientes activos, exp activos)
+                // 📈 3. COMANDO: RESUMEN / CONTEO (ordenado por ETA)
                 // =========================================================================
                 const palabrasResumen = ['resumen', 'exp', 'expedientes', 'activos', 'conteo', 'totales', 'proceso'];
                 const coincidenciasResumen = palabrasEnMensaje.filter(p => palabrasResumen.includes(p)).length;
 
                 if (coincidenciasResumen >= 2) {
-                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas validada (Coincidencias: ${coincidenciasResumen}).`);
+                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas validada.`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
@@ -273,6 +282,21 @@ async function iniciarBaileysWhatsApp() {
                             porLlegar.push(rec);
                         }
                     }
+
+                    // Función para ordenar colecciones de expedientes estrictamente por ETA
+                    const ordenarPorETA = (lista) => {
+                        return lista.sort((a, b) => {
+                            let fA = parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31');
+                            let fB = parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31');
+                            return fA - fB;
+                        });
+                    };
+
+                    porLlegar = ordenarPorETA(porLlegar);
+                    porRegistrar = ordenarPorETA(porRegistrar);
+                    porReconocer = ordenarPorETA(porReconocer);
+                    porValidar = ordenarPorETA(porValidar);
+                    porDespachar = ordenarPorETA(porDespachar);
 
                     const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
                         if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n\n`;
@@ -324,7 +348,7 @@ async function iniciarBaileysWhatsApp() {
                         return res;
                     };
 
-                    let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO - LOGISTATUS PRO* 📊\n\n` +
+                    let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO (ORDENADOS POR ETA)* 📊\n\n` +
                         formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar) +
                         formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
                         formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
@@ -401,7 +425,7 @@ app.get('/api/whatsapp/estado', (req, res) => {
 });
 
 // =========================================================================
-// RUTA DE FORZAR ALERTAS (RESPETA CANALES ACTIVOS Y CAPTURA SOTO ADUANAS)
+// RUTA DE FORZAR ALERTAS (ORDENADAS POR ETA Y RESPETA CANALES ACTIVOS)
 // =========================================================================
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
@@ -453,7 +477,10 @@ app.post('/api/alertas/forzar', async (req, res) => {
                         detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
                     }
 
-                    alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`);
+                    alertasEta.push({
+                        texto: `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`,
+                        fechaSort: dArriboObj
+                    });
                 }
             }
 
@@ -462,12 +489,18 @@ app.post('/api/alertas/forzar', async (req, res) => {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
-                    alertasVencimientos.push(`🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`);
+                    alertasVencimientos.push({
+                        texto: `🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                        fechaSort: dVencimientoDai
+                    });
                 }
             }
         }
 
-        let listaFinalOrdenada = [...alertasEta, ...alertasVencimientos];
+        alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
+        alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
+
+        let listaFinalOrdenada = [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
         if (listaFinalOrdenada.length === 0) {
             return res.json({ success: false, message: "No hay alertas activas en este momento para enviar." });
         }
@@ -477,7 +510,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
             telegram: Boolean(canales?.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)
         };
 
-        await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL", canalesActivos);
+        await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL (ORDENADO POR ETA)", canalesActivos);
         res.json({ success: true, message: "Alertas forzadas y enviadas con éxito a las apps encendidas.", canalesUtilizados: canalesActivos });
 
     } catch (error) {
