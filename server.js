@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 0.2 INICIALIZACIÓN DE WHATSAPP CON BAILEYS (INTELIGENCIA DE COMANDOS COMPLETA)
+// 0.2 INICIALIZACIÓN DE WHATSAPP CON BAILEYS
 // ==========================================
 let sock = null;
 let whatsappClientReady = false;
@@ -101,7 +101,7 @@ async function iniciarBaileysWhatsApp() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA INTELIGENTE EXCLUSIVA Y SEGURA PARA TU GRUPO
+        // ESCUCHA INTELIGENTE DE MENSAJES CON FILTRO DE 2 PALABRAS CLAVE
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 if (m.type !== 'notify') return;
@@ -122,23 +122,122 @@ async function iniciarBaileysWhatsApp() {
                     return;
                 }
 
+                // Desglose de palabras para verificar coincidencia mínima de 2 palabras clave
+                const palabrasEnMensaje = textoLower.split(/\s+/);
+
                 // =========================================================================
-                // 📈 3. COMANDOS DE RESUMEN Y CONTEO (CON DAI, VIGENCIA Y OBSERVACIONES)
+                // 🤖 1. COMANDO: GUÍA DE COMANDOS (comandos sistema, ayuda sistema, menu sistema)
                 // =========================================================================
-                if (
-                    textoLower.includes('resumen') || 
-                    textoLower.includes('conteo') || 
-                    textoLower.includes('totales') || 
-                    textoLower.includes('activos') || 
-                    textoLower.includes('en proceso') ||
-                    textoLower.includes('resumen de expedientes') ||
-                    textoLower.includes('resumen de exp') ||
-                    textoLower.includes('expedientes activos') ||
-                    textoLower.includes('exp activos') ||
-                    textoLower.includes('expedientes en proceso') ||
-                    textoLower.includes('exp en proceso')
-                ) {
-                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas detectada.`);
+                const palabrasAyuda = ['comandos', 'ayuda', 'menu', 'menú', 'sistema'];
+                const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
+
+                if (coincidenciasAyuda >= 2 || textoLower === 'ayuda' || textoLower === 'comandos') {
+                    console.log(`🤖 [WHATSAPP] Solicitud de guía de comandos validada (Coincidencias: ${coincidenciasAyuda}).`);
+                    
+                    let guiaEventos = `🤖 *GUÍA DE COMANDOS Y EVENTOS - LOGISTATUS PRO* 🤖\n\n` +
+                        `Aquí tienes los comandos disponibles:\n\n` +
+                        `🚨 *1. Alertas Activas*\n` +
+                        `• *"alertas activas"*, *"alertas exp"*, *"alerta expedientes"*, *"alerta sistema"*\n\n` +
+                        `📊 *2. Resumen y Conteo de Expedientes*\n` +
+                        `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*, *"exp activos"* _(Incluye estado de DAI, vigencia y observaciones)_\n\n` +
+                        `⚙️ *3. Ayuda y Sistema*\n` +
+                        `• *"comandos sistema"*, *"ayuda sistema"* o *"menu sistema"*\n`;
+
+                    await sock.sendMessage(remitente, { text: guiaEventos });
+                    return;
+                }
+
+                // =========================================================================
+                // 🚨 2. COMANDO: ALERTAS (alertas activas, alertas exp, alerta expedientes, alerta sistema)
+                // =========================================================================
+                const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
+                const coincidenciasAlertas = palabrasEnMensaje.filter(p => palabrasAlertas.includes(p)).length;
+
+                if (coincidenciasAlertas >= 2) {
+                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas validada (Coincidencias: ${coincidenciasAlertas}).`);
+                    
+                    const records = await obtenerExpedientesFirestore();
+                    if (!records || records.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
+                        return;
+                    }
+
+                    let alertasEta = [], alertasVencimientos = [];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    for (const rec of records) {
+                        if (rec.despacho) continue;
+
+                        const expName = rec.num_expediente || 'S/N';
+                        const clientName = rec.cliente || 'S/C';
+                        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+                        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
+                        
+                        const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+                        const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+                        const iconoVia = esBarco ? "🚢" : "✈️";
+                        const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
+
+                        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+                        const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+                        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
+
+                        if (dArriboObj && !hasLlegadaRegistrada) {
+                            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                                
+                                let detalleDaiTexto = "";
+                                if (hasRegistroDai) {
+                                    const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
+                                    const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                                    if (dVencimientoDai) {
+                                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
+                                    } else {
+                                        detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
+                                    }
+                                } else {
+                                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
+                                }
+
+                                alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`);
+                            }
+                        }
+
+                        const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                        if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+                            const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                            if (diffVencDays < 0) {
+                                const diasVencida = Math.abs(diffVencDays);
+                                alertasVencimientos.push(`🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`);
+                            }
+                        }
+                    }
+
+                    let listaFinalOrdenada = [...alertasEta, ...alertasVencimientos];
+                    if (listaFinalOrdenada.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas en este momento." });
+                        return;
+                    }
+
+                    let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
+                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+                    
+                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
+                    return;
+                }
+
+                // =========================================================================
+                // 📈 3. COMANDO: RESUMEN / CONTEO (resumen exp, resumen expedientes, expedientes activos, exp activos)
+                // =========================================================================
+                const palabrasResumen = ['resumen', 'exp', 'expedientes', 'activos', 'conteo', 'totales', 'proceso'];
+                const coincidenciasResumen = palabrasEnMensaje.filter(p => palabrasResumen.includes(p)).length;
+
+                if (coincidenciasResumen >= 2) {
+                    console.log(`📊 [WHATSAPP] Solicitud de detalle por pestañas validada (Coincidencias: ${coincidenciasResumen}).`);
                     
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
@@ -194,7 +293,6 @@ async function iniciarBaileysWhatsApp() {
                                 valorFecha = rec.fecha_llegada || 'Pendiente';
                             }
 
-                            // Estatus de DAI, vigencia y observaciones
                             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                             let detalleDaiTexto = "";
                             if (hasRegistroDai) {
@@ -230,87 +328,10 @@ async function iniciarBaileysWhatsApp() {
                         formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar) +
                         formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
                         formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
-                        formatearBloque("📋 4. POR VALIDAR", porValidar, false) +
-                        formatearBloque("🚚 5. POR DESPACHAR", porDespachar, false);
+                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false) +
+                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false);
 
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
-                    return;
-                }
-
-                // =========================================================================
-                // 🚨 2. COMANDO: CONSULTAR ALERTAS ACTIVAS
-                // =========================================================================
-                if (
-                    textoLower === 'alertas' || 
-                    textoLower === 'alertas activas' || 
-                    textoLower === 'urgentes' || 
-                    textoLower === 'reporte activo' ||
-                    textoLower === 'vencimientos'
-                ) {
-                    console.log(`🚨 [WHATSAPP] Solicitud de alertas activas detectada.`);
-                    
-                    const records = await obtenerExpedientesFirestore();
-                    if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
-                        return;
-                    }
-
-                    let alertasEta = [], alertasVencimientos = [];
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-
-                    for (const rec of records) {
-                        if (rec.despacho) continue;
-
-                        const expName = rec.num_expediente || 'S/N';
-                        const clientName = rec.cliente || 'S/C';
-                        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
-                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
-                        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
-                        
-                        const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
-                        const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
-                        const iconoVia = esBarco ? "🚢" : "✈️";
-                        const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
-
-                        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
-                        const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
-                        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
-
-                        if (dArriboObj && !hasLlegadaRegistrada) {
-                            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
-                            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
-                                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
-                                
-                                let detalleDaiTexto = "";
-                                if (hasRegistroDai) {
-                                    const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
-                                    const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                                    if (dVencimientoDai) {
-                                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
-                                    } else {
-                                        detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
-                                    }
-                                } else {
-                                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
-                                }
-
-                                alertasEta.push(`${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`);
-                            }
-                        }
-                    }
-
-                    let listaFinalOrdenada = alertasEta;
-                    if (listaFinalOrdenada.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ *¡EXCELENTE!* No hay alertas activas en este momento." });
-                        return;
-                    }
-
-                    let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n` + mensajesEnumerados.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
-                    
-                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
                     return;
                 }
 
@@ -327,7 +348,7 @@ async function iniciarBaileysWhatsApp() {
 iniciarBaileysWhatsApp();
 
 // ==========================================
-// 0.3 INICIALIZACIÓN DE TELEGRAM (POLLING DE COMANDOS)
+// 0.3 INICIALIZACIÓN DE TELEGRAM (POLLING)
 // ==========================================
 async function iniciarTelegramPolling() {
     if (!TELEGRAM_BOT_TOKEN) return;
@@ -373,42 +394,10 @@ app.get('/api/config', (req, res) => {
     });
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/health', (req, res) => {
-    res.status(200).send('LOGISTATUS PRO - Servidor Activo OK');
-});
-
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
+app.get('/health', (req, res) => { res.status(200).send('LOGISTATUS PRO - Servidor Activo OK'); });
 app.get('/api/whatsapp/estado', (req, res) => {
-    res.json({
-        success: true,
-        estado: estadoConexionWhatsapp,
-        ready: whatsappClientReady,
-        qrCodeDataUrl: ultimoQrGenerado
-    });
-});
-
-app.post('/api/whatsapp/enviar', async (req, res) => {
-    const { telefono, mensaje } = req.body;
-    if (!whatsappClientReady || !sock) {
-        return res.status(400).json({ success: false, message: "El bot de WhatsApp aún no está conectado." });
-    }
-    if (!telefono || !mensaje) {
-        return res.status(400).json({ success: false, message: "Faltan el número de teléfono o el mensaje." });
-    }
-
-    try {
-        let numeroLimpios = telefono.replace(/\D/g, '');
-        const jid = `${numeroLimpios}@s.whatsapp.net`;
-
-        await sock.sendMessage(jid, { text: mensaje });
-        res.json({ success: true, message: "Mensaje de WhatsApp enviado con éxito." });
-    } catch (error) {
-        console.error("❌ Error al enviar WhatsApp con Baileys:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
+    res.json({ success: true, estado: estadoConexionWhatsapp, ready: whatsappClientReady, qrCodeDataUrl: ultimoQrGenerado });
 });
 
 // =========================================================================
@@ -443,10 +432,8 @@ app.post('/api/alertas/forzar', async (req, res) => {
 
             const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
-            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
             const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
-            // 1. Alertas de ETA con estatus y fecha de DAI detallada
             if (dArriboObj && !hasLlegadaRegistrada) {
                 const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                 if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -456,7 +443,6 @@ app.post('/api/alertas/forzar', async (req, res) => {
                     if (hasRegistroDai) {
                         const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
                         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                        
                         if (dVencimientoDai) {
                             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                             detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
@@ -471,40 +457,6 @@ app.post('/api/alertas/forzar', async (req, res) => {
                 }
             }
 
-            // 2. Plazo legal de Declaración (Art. 47 LOA)
-            const dLlegada = parseFechaLocalServidor(rec.fecha_llegada);
-            if (dLlegada && !hasTransmision) {
-                let dDeadline = new Date(dLlegada.getTime());
-                let diasHabilesAgregados = 0;
-                let intentosMaximos = 0;
-                while (diasHabilesAgregados < 5 && intentosMaximos < 30) {
-                    dDeadline.setDate(dDeadline.getDate() + 1);
-                    const diaSemana = dDeadline.getDay();
-                    if (diaSemana !== 0 && diaSemana !== 6) diasHabilesAgregados++;
-                    intentosMaximos++;
-                }
-                const diffPlazoDays = Math.round((dDeadline - today) / (1000 * 60 * 60 * 24));
-                const fechaPlazoStr = formatearFechaDDMMYYYY(dDeadline.toISOString().split('T')[0]);
-
-                if (diffPlazoDays < 0) {
-                    const diasExt = Math.abs(diffPlazoDays);
-                    alertasVencimientos.push(`🚨 *EXTEMPORANEIDAD - ART. 47*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⏳ Venció el ${fechaPlazoStr} (${diasExt}d en extemporaneidad).\n🚨 *¡Aplica Multa Art. 177 Num 7!*`);
-                }
-            }
-
-            // 3. Vencimiento de Días Libres en Almacén
-            if (rec.culminacion_dias_libres) {
-                const culmDate = parseFechaLocalServidor(rec.culminacion_dias_libres);
-                const culmFormatted = formatearFechaDDMMYYYY(rec.culminacion_dias_libres);
-                if (culmDate) {
-                    const diffDaysAlm = Math.round((culmDate - today) / (1000 * 60 * 60 * 24));
-                    if (diffDaysAlm < 0) {
-                        alertasVencimientos.push(`🚨 *ALMACÉN VENCIDO*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ Venció hace ${Math.abs(diffDaysAlm)} día(s) el ${culmFormatted}`);
-                    }
-                }
-            }
-
-            // 4. Vencimiento DUA / DAI (Captura Soto Aduanas y Grand Aduanas)
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
@@ -520,18 +472,13 @@ app.post('/api/alertas/forzar', async (req, res) => {
             return res.json({ success: false, message: "No hay alertas activas en este momento para enviar." });
         }
 
-        // VALIDACIÓN ESTRICTA: Solo envía a los canales que estén encendidos en la interfaz
         let canalesActivos = {
             whatsapp: Boolean(canales?.whatsapp && whatsappClientReady && sock),
             telegram: Boolean(canales?.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)
         };
 
         await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL", canalesActivos);
-        res.json({ 
-            success: true, 
-            message: "Alertas forzadas y enviadas con éxito a las apps encendidas.",
-            canalesUtilizados: canalesActivos
-        });
+        res.json({ success: true, message: "Alertas forzadas y enviadas con éxito a las apps encendidas.", canalesUtilizados: canalesActivos });
 
     } catch (error) {
         console.error("❌ Error al forzar alertas:", error);
@@ -545,10 +492,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
 function formatearFechaDDMMYYYY(str) {
     const d = parseFechaLocalServidor(str);
     if (!d || isNaN(d.getTime())) return str || 'S/N';
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const anio = d.getFullYear();
-    return `${dia}-${mes}-${anio}`;
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
 
 async function enviarAlertaMulticanal(listaAlertas, tituloReporte, canalesActivos = { whatsapp: true, telegram: true }) {
@@ -566,7 +510,7 @@ async function enviarAlertaMulticanal(listaAlertas, tituloReporte, canalesActivo
             await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });
         }
     } catch (err) {
-        console.error("❌ Error en el envío multicanal de alertas:", err);
+        console.error("❌ Error en envío multicanal:", err);
     }
 }
 
@@ -578,9 +522,7 @@ async function enviarAlertaTelegramServidor(mensajeTexto) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: mensajeTexto, parse_mode: 'Markdown' })
         });
-    } catch (err) {
-        console.error("❌ Error Telegram:", err);
-    }
+    } catch (err) { console.error("Error Telegram:", err); }
 }
 
 async function obtenerExpedientesFirestore() {
@@ -589,7 +531,6 @@ async function obtenerExpedientesFirestore() {
         const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/expedientes`;
         const response = await fetch(url);
         const result = await response.json();
-        
         if (!result.documents) return [];
 
         return result.documents.map(doc => {
@@ -601,9 +542,7 @@ async function obtenerExpedientesFirestore() {
             }
             return parsedRecord;
         });
-    } catch (err) {
-        return [];
-    }
+    } catch (err) { return []; }
 }
 
 function parseFechaLocalServidor(str) {
@@ -620,24 +559,7 @@ function parseFechaLocalServidor(str) {
 }
 
 // ==========================================
-// 3. TAREAS PROGRAMADAS (CRON)
-// ==========================================
-cron.schedule('0 10,18 * * *', async () => {
-    try {
-        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
-        if (!correoCliente) return;
-        const records = await obtenerExpedientesFirestore();
-        if (!records || records.length === 0) return;
-        // Tarea automática de correo existente intacta...
-    } catch (error) {
-        console.error("❌ [CRON] Error:", error);
-    }
-}, { timezone: "America/Caracas" });
-
-// ==========================================
-// 4. INICIO DEL SERVIDOR
+// 3. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`);
-});
+app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });
