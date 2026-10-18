@@ -138,7 +138,7 @@ async function iniciarBaileysWhatsApp() {
                         `🚨 *1. Alertas Activas*\n` +
                         `• *"alertas activas"*, *"alertas exp"*, *"alerta expedientes"*, *"alerta sistema"*\n\n` +
                         `📊 *2. Resumen y Conteo de Expedientes (Ordenados por ETA)*\n` +
-                        `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*, *"exp activos"* _(Incluye estado de DAI, vigencia y observaciones)_\n\n` +
+                        `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*, *"exp activos"*\n\n` +
                         `⚙️ *3. Ayuda y Sistema*\n` +
                         `• *"comandos sistema"*, *"ayuda sistema"* o *"menu sistema"*\n`;
 
@@ -222,7 +222,6 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    // ORDENAR AMBAS LISTAS POR FECHA (ETA / Vencimiento) ASCENDENTE
                     alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
                     alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
 
@@ -240,7 +239,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // 📈 3. COMANDO: RESUMEN / CONTEO (ordenado por ETA)
+                // 📈 3. COMANDO: RESUMEN / CONTEO (ordenado por ETA y sin DAI en trámite)
                 // =========================================================================
                 const palabrasResumen = ['resumen', 'exp', 'expedientes', 'activos', 'conteo', 'totales', 'proceso'];
                 const coincidenciasResumen = palabrasEnMensaje.filter(p => palabrasResumen.includes(p)).length;
@@ -283,7 +282,6 @@ async function iniciarBaileysWhatsApp() {
                         }
                     }
 
-                    // Función para ordenar colecciones de expedientes estrictamente por ETA
                     const ordenarPorETA = (lista) => {
                         return lista.sort((a, b) => {
                             let fA = parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31');
@@ -298,7 +296,7 @@ async function iniciarBaileysWhatsApp() {
                     porValidar = ordenarPorETA(porValidar);
                     porDespachar = ordenarPorETA(porDespachar);
 
-                    const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false) => {
+                    const formatearBloqueSeccion = (titulo, lista, esPorRegistrar = false, mostrarDai = false) => {
                         if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n\n`;
                         let res = `*${titulo} (${lista.length})*\n`;
                         
@@ -317,27 +315,28 @@ async function iniciarBaileysWhatsApp() {
                                 valorFecha = rec.fecha_llegada || 'Pendiente';
                             }
 
-                            const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
-                            let detalleDaiTexto = "";
-                            if (hasRegistroDai) {
-                                const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
-                                const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                                if (dVencimientoDai) {
-                                    const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                                    detalleDaiTexto = diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
-                                } else {
-                                    detalleDaiTexto = `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
-                                }
-                            } else {
-                                detalleDaiTexto = `\n   • DAI: *⚠️ FALTA REGISTRAR DAI / DUA*`;
-                            }
-
                             res += `${idx + 1}️⃣ Exp: *${exp}*\n` +
                                    `   • Cliente: *${cli}*\n` +
                                    `   • Prov: *${prov}*\n` +
                                    `   • B/L: *${bl}*\n` +
-                                   `   • ${etiquetaFecha}: *${valorFecha}*` +
-                                   detalleDaiTexto;
+                                   `   • ${etiquetaFecha}: *${valorFecha}*`;
+
+                            // MOSTRAR DAI ÚNICAMENTE SI ESTÁ MARCADO (SOLO EN "POR LLEGAR")
+                            if (mostrarDai) {
+                                const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+                                if (hasRegistroDai) {
+                                    const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
+                                    const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                                    if (dVencimientoDai) {
+                                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                                        res += diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
+                                    } else {
+                                        res += `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
+                                    }
+                                } else {
+                                    res += `\n   • DAI: *⚠️ FALTA REGISTRAR DAI / DUA*`;
+                                }
+                            }
 
                             if (obs !== '' && obs !== 'Ninguna') {
                                 res += `\n   • Obs: _${obs}_`;
@@ -349,11 +348,11 @@ async function iniciarBaileysWhatsApp() {
                     };
 
                     let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO (ORDENADOS POR ETA)* 📊\n\n` +
-                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar) +
-                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true) +
-                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false) +
-                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false) +
-                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false);
+                        formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false, true) + // Muestra DAI
+                        formatearBloqueSeccion("📝 2. POR REGISTRAR", porRegistrar, true, false) + // Sin DAI
+                        formatearBloqueSeccion("🔍 3. POR RECONOCER", porReconocer, false, false) + // Sin DAI
+                        formatearBloqueSeccion("📋 4. POR VALIDAR", porValidar, false, false) + // Sin DAI
+                        formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false, false); // Sin DAI
 
                     await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
