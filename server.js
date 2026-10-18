@@ -153,7 +153,9 @@ async function iniciarBaileysWhatsApp() {
                         const expName = rec.num_expediente || 'S/N';
                         const clientName = rec.cliente || 'S/C';
                         const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
-                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+                        
+                        // Captura robusta del ETA (prioriza eta_la_guaira y respalda con fecha_llegada si aplica)
+                        const fechaEtaRaw = rec.eta_la_guaira || rec.fecha_llegada || 'S/N';
                         const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
                         
                         const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
@@ -165,6 +167,7 @@ async function iniciarBaileysWhatsApp() {
                         const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
                         const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
+                        // 1. Alertas de ETA Próximo
                         if (dArriboObj && !hasLlegadaRegistrada) {
                             const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                             if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -176,7 +179,7 @@ async function iniciarBaileysWhatsApp() {
                                     const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
                                     if (dVencimientoDai) {
                                         const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
+                                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
                                     } else {
                                         detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
                                     }
@@ -191,13 +194,14 @@ async function iniciarBaileysWhatsApp() {
                             }
                         }
 
+                        // 2. Vencimiento de la Vigencia de la DAI (Captura DAI vencida hace 11 días)
                         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-                        if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+                        if (dVencimientoDai) {
                             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                             if (diffVencDays < 0) {
                                 const diasVencida = Math.abs(diffVencDays);
                                 alertasVencimientos.push({
-                                    texto: `🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                                    texto: `🚨 *VENCIDO / MULTA ART. 177 (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
                                     fechaSort: dVencimientoDai
                                 });
                             }
@@ -214,7 +218,7 @@ async function iniciarBaileysWhatsApp() {
                     }
 
                     let mensajesEnumerados = listaFinalOrdenada.map((item, index) => `${index + 1}️⃣ ${item}`);
-                    await sock.sendMessage(remitente, { text: `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA)* 🚨\n\n` + mensajesEnumerados.join("\n\n") });
+                    await sock.sendMessage(remitente, { text: `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA/VENCIMIENTO)* 🚨\n\n` + mensajesEnumerados.join("\n\n") });
                     return;
                 }
 
@@ -295,7 +299,7 @@ async function iniciarBaileysWhatsApp() {
                                     const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
                                     if (dVencimientoDai) {
                                         const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                                        res += diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
+                                        res += diffVencDays < 0 ? `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA*` : `\n   • DAI: *Registrada (${fechaDaiFormatted}) - ✅ Vigente*`;
                                     } else {
                                         res += `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
                                     }
@@ -470,7 +474,7 @@ app.get('/api/whatsapp/estado', (req, res) => {
 });
 
 // =========================================================================
-// RUTA DE FORZAR ALERTAS (ORDENADAS POR ETA Y RESPETA CANALES ACTIVOS)
+// RUTA DE FORZAR ALERTAS (CON CAPTURA DE ETA Y VENCIMIENTO DE DAI CORREGIDOS)
 // =========================================================================
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
@@ -491,7 +495,8 @@ app.post('/api/alertas/forzar', async (req, res) => {
             const expName = rec.num_expediente || 'S/N';
             const clientName = rec.cliente || 'S/C';
             const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
-            const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+            
+            const fechaEtaRaw = rec.eta_la_guaira || rec.fecha_llegada || 'S/N';
             const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
             
             const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
@@ -503,6 +508,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
             const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
             const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
+            // 1. Alertas de ETA Próximo
             if (dArriboObj && !hasLlegadaRegistrada) {
                 const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
                 if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -529,13 +535,14 @@ app.post('/api/alertas/forzar', async (req, res) => {
                 }
             }
 
+            // 2. Vencimiento de la Vigencia de la DAI (Captura DAI vencida hace 11 días sin requerir que no tenga DAI)
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-            if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
+            if (dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                 if (diffVencDays < 0) {
                     const diasVencida = Math.abs(diffVencDays);
                     alertasVencimientos.push({
-                        texto: `🚨 *VENCIDO / MULTA ART. 177*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                        texto: `🚨 *VENCIDO / MULTA ART. 177 (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
                         fechaSort: dVencimientoDai
                     });
                 }
