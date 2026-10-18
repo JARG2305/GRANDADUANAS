@@ -322,7 +322,7 @@ async function iniciarBaileysWhatsApp() {
                 }
 
                 // =========================================================================
-                // ⚙️ 4. ACTUALIZACIÓN O ELIMINACIÓN RÁPIDA DESDE EL CHAT
+                // ⚙️ 4. ACTUALIZACIÓN O ELIMINACIÓN RÁPIDA (CON DETALLE EXP, CLIENTE, BL)
                 // =========================================================================
                 let campoAModificar = "";
                 let nombreCampoLegible = "";
@@ -360,7 +360,13 @@ async function iniciarBaileysWhatsApp() {
                         let numExp = (fields.num_expediente?.stringValue || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                         let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
                         if (numExp.length > 1 && limpioTexto.includes(numExp)) {
-                            expedienteEncontrado = { id: doc.name.split('/').pop(), fields, numExpediente: fields.num_expediente?.stringValue };
+                            expedienteEncontrado = { 
+                                id: doc.name.split('/').pop(), 
+                                fields, 
+                                numExpediente: fields.num_expediente?.stringValue || 'S/N',
+                                cliente: fields.cliente?.stringValue || 'S/C',
+                                bl: fields.awb_bl?.stringValue || fields.bl?.stringValue || fields.numero_bl?.stringValue || 'S/N'
+                            };
                             break;
                         }
                     }
@@ -386,9 +392,13 @@ async function iniciarBaileysWhatsApp() {
 
                     if (patchRes.ok) {
                         if (esBorrar) {
-                            await sock.sendMessage(remitente, { text: `🗑️ *¡CAMPO ELIMINADO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n⚙️ Campo: *${nombreCampoLegible}* ha quedado vacío.` });
+                            await sock.sendMessage(remitente, { 
+                                text: `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).` 
+                            });
                         } else {
-                            await sock.sendMessage(remitente, { text: `✅ *¡ACTUALIZADO CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Nueva Fecha: *${formatearFechaDDMMYYYY(valorFecha)}*` });
+                            await sock.sendMessage(remitente, { 
+                                text: `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Actualizada: *${formatearFechaDDMMYYYY(valorFecha)}*` 
+                            });
                         }
                     } else {
                         await sock.sendMessage(remitente, { text: `❌ Error al actualizar en Firestore.` });
@@ -555,7 +565,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
 });
 
 // ==========================================
-// 2. FUNCIONES AUXILIARES
+// 2. FUNCIONES DE SERVICIO AUXILIARES
 // ==========================================
 function formatearFechaDDMMYYYY(str) {
     const d = parseFechaLocalServidor(str);
