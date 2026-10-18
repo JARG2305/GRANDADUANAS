@@ -30,7 +30,7 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 0.2 INICIALIZACIÓN DE WHATSAPP (BAILEYS)
+// 0.2 INICIALIZACIÓN DE WHATSAPP CON BAILEYS (INTELIGENCIA DE COMANDOS COMPLETA)
 // ==========================================
 let sock = null;
 let whatsappClientReady = false;
@@ -50,13 +50,17 @@ async function iniciarBaileysWhatsApp() {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
+                console.log('📱 [WHATSAPP] Nuevo código QR generado.');
                 estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
                 try {
                     ultimoQrGenerado = await qrcode.toDataURL(qr);
-                } catch (err) { console.error("Error QR:", err); }
+                } catch (err) {
+                    console.error("❌ Error al convertir QR:", err);
+                }
             }
 
             if (connection === 'open') {
+                console.log('✅ [WHATSAPP] ¡Conectado y listo!');
                 whatsappClientReady = true;
                 estadoConexionWhatsapp = "CONECTADO";
                 ultimoQrGenerado = "";
@@ -72,7 +76,7 @@ async function iniciarBaileysWhatsApp() {
 
         sock.ev.on('creds.update', saveCreds);
 
-        // ESCUCHA DE MENSAJES EN WHATSAPP (COMANDOS)
+        // ESCUCHA INTELIGENTE Y COMPLETA PARA WHATSAPP
         sock.ev.on('messages.upsert', async (m) => {
             try {
                 if (m.type !== 'notify') return;
@@ -86,28 +90,132 @@ async function iniciarBaileysWhatsApp() {
                 
                 if (remitente !== GRUPO_AUTORIZADO_JID) return;
 
-                if (textoLower.includes('resumen') || textoLower.includes('conteo') || textoLower.includes('totales')) {
+                // COMANDO RESUMEN Y CONTEO COMPLETO
+                if (
+                    textoLower.includes('resumen') || 
+                    textoLower.includes('conteo') || 
+                    textoLower.includes('totales') || 
+                    textoLower.includes('activos') || 
+                    textoLower.includes('en proceso') ||
+                    textoLower.includes('resumen de expedientes') ||
+                    textoLower.includes('expedientes activos')
+                ) {
                     const records = await obtenerExpedientesFirestore();
                     if (!records || records.length === 0) {
-                        await sock.sendMessage(remitente, { text: "✅ No hay registros." });
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para resumir." });
                         return;
                     }
-                    await sock.sendMessage(remitente, { text: `📊 *RESUMEN DE EXPEDIENTES*\nTotal registros activos: ${records.filter(r => !r.despacho).length}` });
+
+                    let porLlegar = [], porRegistrar = [], porReconocer = [], porValidar = [], porDespachar = [];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    for (const rec of records) {
+                        if (rec.despacho) continue;
+                        const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+                        const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+                        const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
+                        const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
+
+                        if (hasValidacion) porDespachar.push(rec);
+                        else if (hasReconocimiento) porValidar.push(rec);
+                        else if (hasTransmision) porReconocer.push(rec);
+                        else if (hasLlegada) porRegistrar.push(rec);
+                        else porLlegar.push(rec);
+                    }
+
+                    const formatearBloque = (titulo, lista, esPorRegistrar = false) => {
+                        if (lista.length === 0) return `*${titulo} (0)*\n• Ninguno\n\n`;
+                        let res = `*${titulo} (${lista.length})*\n`;
+                        lista.forEach((rec, idx) => {
+                            const exp = rec.num_expediente || 'S/N';
+                            const cli = rec.cliente || 'S/C';
+                            const prov = rec.proveedor || 'N/A';
+                            const bl = rec.awb_bl || rec.bl || 'S/N';
+                            const obs = rec.observaciones ? rec.observaciones.trim() : '';
+                            const valorFecha = rec.eta_la_guaira || rec.fecha_llegada || 'Pendiente';
+
+                            res += `${idx + 1}️⃣ Exp: *${exp}*\n` +
+                                   `   • Cliente: *${cli}*\n` +
+                                   `   • Prov: *${prov}*\n` +
+                                   `   • B/L: *${bl}*\n` +
+                                   `   • ETA/Llegada: *${valorFecha}*`;
+                            if (obs !== '' && obs !== 'Ninguna') res += `\n   • Obs: _${obs}_`;
+                            res += `\n\n`;
+                        });
+                        return res;
+                    };
+
+                    let mensajeDetallado = `📊 *EXPEDIENTES EN PROCESO - LOGISTATUS PRO* 📊\n\n` +
+                        formatearBloque("🚢✈️ 1. POR LLEGAR", porLlegar) +
+                        formatearBloque("📝 2. POR REGISTRAR", porRegistrar, true) +
+                        formatearBloque("🔍 3. POR RECONOCER", porReconocer, false) +
+                        formatearBloque("📋 4. POR VALIDAR", porValidar, false) +
+                        formatearBloque("🚚 5. POR DESPACHAR", porDespachar, false);
+
+                    await sock.sendMessage(remitente, { text: mensajeDetallado });
                     return;
                 }
-            } catch (err) { console.error("Error en Baileys upsert:", err); }
+
+                // COMANDO ALERTAS ACTIVAS
+                if (textoLower === 'alertas' || textoLower === 'alertas activas' || textoLower === 'urgentes' || textoLower === 'vencimientos') {
+                    const records = await obtenerExpedientesFirestore();
+                    if (!records || records.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ No hay registros en Firestore para evaluar." });
+                        return;
+                    }
+
+                    let alertasEta = [];
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+
+                    for (const rec of records) {
+                        if (rec.despacho) continue;
+                        const expName = rec.num_expediente || 'S/N';
+                        const clientName = rec.cliente || 'S/C';
+                        const blInfo = rec.awb_bl || rec.bl || 'S/N'; 
+                        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+                        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
+                        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+                        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
+
+                        if (dArriboObj && !hasLlegadaRegistrada) {
+                            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+                            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                                alertasEta.push(`🚢 *ETA PRÓXIMO*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})`);
+                            }
+                        }
+                    }
+
+                    if (alertasEta.length === 0) {
+                        await sock.sendMessage(remitente, { text: "✅ No hay alertas activas de ETA en este momento." });
+                        return;
+                    }
+
+                    let mensajesEnumerados = alertasEta.map((item, index) => `${index + 1}️⃣ ${item}`);
+                    let mensajeConsolidado = `🚨 *ALERTAS ACTIVAS - LOGISTATUS PRO* 🚨\n\n` + mensajesEnumerados.join("\n\n");
+                    await sock.sendMessage(remitente, { text: mensajeConsolidado });
+                    return;
+                }
+
+            } catch (err) {
+                console.error("❌ Error en Baileys upsert:", err);
+            }
         });
-    } catch (err) { console.error("Error al iniciar Baileys:", err); }
+
+    } catch (err) {
+        console.error("❌ Error al iniciar Baileys:", err);
+    }
 }
 iniciarBaileysWhatsApp();
 
 // ==========================================
-// 0.3 INICIALIZACIÓN DE TELEGRAM (COMANDOS Y POLLING)
+// 0.3 INICIALIZACIÓN DE TELEGRAM (COMANDOS)
 // ==========================================
 async function iniciarTelegramPolling() {
     if (!TELEGRAM_BOT_TOKEN) return;
     let offset = 0;
-    
     setInterval(async () => {
         try {
             const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=30`;
@@ -121,20 +229,16 @@ async function iniciarTelegramPolling() {
 
                     const chatId = String(update.message.chat.id);
                     const texto = update.message.text.trim().toLowerCase();
-
-                    // Validar si el chat coincide con el autorizado
                     if (TELEGRAM_CHAT_ID && chatId !== String(TELEGRAM_CHAT_ID)) continue;
 
                     if (texto.includes('resumen') || texto.includes('conteo') || texto.includes('alertas')) {
                         const records = await obtenerExpedientesFirestore();
-                        let msgRespuesta = `📊 *REPORTE SOLICITADO DESDE TELEGRAM*\nTotal registros activos: ${records.filter(r => !r.despacho).length}`;
+                        let msgRespuesta = `📊 *REPORTE TELEGRAM*\nTotal registros activos: ${records.filter(r => !r.despacho).length}`;
                         await enviarAlertaTelegramServidor(msgRespuesta);
                     }
                 }
             }
-        } catch (err) {
-            // Ignorar errores de red temporales en polling
-        }
+        } catch (err) {}
     }, 5000);
 }
 iniciarTelegramPolling();
@@ -153,17 +257,16 @@ app.get('/api/config', (req, res) => {
 
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/health', (req, res) => { res.status(200).send('LOGISTATUS PRO - Servidor Activo OK'); });
-
 app.get('/api/whatsapp/estado', (req, res) => {
     res.json({ success: true, estado: estadoConexionWhatsapp, ready: whatsappClientReady, qrCodeDataUrl: ultimoQrGenerado });
 });
 
 // =========================================================================
-// RUTA DE FORZAR ALERTAS (RESPETA ESTRICTAMENTE LOS CANALES ENCENDIDOS)
+// RUTA DE FORZAR ALERTAS (RESPETA CANALES Y CAPTURA SOTO ADUANAS)
 // =========================================================================
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
-        const { canales } = req.body; // { whatsapp: true/false, telegram: true/false }
+        const { canales } = req.body; 
         
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) {
@@ -232,7 +335,7 @@ app.post('/api/alertas/forzar', async (req, res) => {
                 }
             }
 
-            // 4. Vencimiento DUA / DAI (Art. 177 Num 9) - Captura Soto Aduanas
+            // 4. Vencimiento DUA / DAI (Captura Soto Aduanas y Grand Aduanas)
             const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
             if (!hasLlegadaRegistrada && !hasRegistroDai && dVencimientoDai) {
                 const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
@@ -248,7 +351,6 @@ app.post('/api/alertas/forzar', async (req, res) => {
             return res.json({ success: false, message: "No hay alertas activas en este momento para enviar." });
         }
 
-        // VALIDACIÓN ESTRICTA: Solo envía a los canales que el usuario tenga encendidos en la interfaz
         let canalesActivos = {
             whatsapp: Boolean(canales?.whatsapp && whatsappClientReady && sock),
             telegram: Boolean(canales?.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)
