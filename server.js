@@ -375,7 +375,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (LLAVE EXACTA DOC_VALORADO)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (LLAVES REALES CORREGIDAS)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -386,6 +386,7 @@ async function procesarComandoLogistica(textoMensaje) {
 
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
+    // LLAVES REALES DE FIRESTORE MAPMADAS AL INTERFAZ
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
         campoAModificar = "recibido_doc_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
@@ -395,7 +396,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Prevaloración Enviada";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
-        campoAModificar = "doc_valorado"; // Llave exacta mapeada a Doc. Valorado en Sistema
+        campoAModificar = "documento_valorado"; // LLAVE REAL CORREGIDA
         nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
