@@ -260,13 +260,12 @@ async function procesarComandoLogistica(textoMensaje) {
                `🚨 *1. Alertas Activas*\n• *"alertas activas"* | *"alerta sistema"*\n\n` +
                `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
                `✅ *3. Indicadores (Sí / No)*\n` +
-               `• *"Retirado bl [Exp o BL]"* | *"No retirado bl [Exp o BL]"*\n` +
-               `• *"Valorado [Exp o BL]"* | *"No valorado [Exp o BL]"*\n` +
-               `• *"Factura recibida [Exp o BL]"* | *"No factura recibida [Exp o BL]"*\n` +
-               `• *"Prevaloración enviada [Exp o BL]"* | *"No prevaloración enviada [Exp o BL]"*\n\n` +
+               `• *"Retirado bl [Exp o BL]"* | *"Valorado [Exp o BL]"* | *"Factura recibida [Exp o BL]"* | *"Prevaloración enviada [Exp o BL]"*\n\n` +
                `🎨 *4. Canal Aduanero*\n` +
                `• *"Canal [Exp o BL] verde"*, *"amarillo"*, *"rojo"*\n\n` +
-               `✏️ *5. Fechas*\n` +
+               `👤 *5. Funcionario (Texto Libre)*\n` +
+               `• *"Funcionario exp 26-030 Juan Pérez"* o *"Funcionario bl 12345 Licdo. Gómez"*\n\n` +
+               `✏️ *6. Fechas*\n` +
                `• *"ETA [Exp o BL] al DD/MM/AAAA"*`;
     }
 
@@ -375,19 +374,20 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA CON LAS LLAVES EXACTAS DEL INDEX.HTML
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (INCLUYENDO FUNCIONARIO)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
     let esIndicadorSiNo = false;
     let esCanal = false;
+    let esFuncionario = false;
     let valorCanal = "";
     let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
 
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
-        campoAModificar = "recibido_documento_transporte"; // Llave exacta del HTML
+        campoAModificar = "recibido_documento_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('prevaloración enviada') || textoLower.includes('prevaloracion enviada')) {
@@ -395,7 +395,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Prevaloración Enviada";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
-        campoAModificar = "documento_valorado_en_sistema"; // Llave exacta del HTML
+        campoAModificar = "documento_valorado_en_sistema";
         nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
@@ -406,9 +406,13 @@ async function procesarComandoLogistica(textoMensaje) {
         campoAModificar = "canal";
         nombreCampoLegible = "Canal Aduanero";
         esCanal = true;
-        if (textoLower.includes('verde')) valorCanal = "VERDE"; // Mayúscula exacta del HTML
+        if (textoLower.includes('verde')) valorCanal = "VERDE";
         else if (textoLower.includes('amarillo')) valorCanal = "AMARILLO";
         else if (textoLower.includes('rojo')) valorCanal = "ROJO";
+    } else if (textoLower.includes('funcionario')) {
+        campoAModificar = "funcionario";
+        nombreCampoLegible = "Funcionario";
+        esFuncionario = true;
     } else if (textoLower.includes('eta')) {
         campoAModificar = "eta_la_guaira";
         nombreCampoLegible = "ETA";
@@ -435,7 +439,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Retiro de Acta";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada') || textoLower.includes('verde') || textoLower.includes('amarillo') || textoLower.includes('rojo'))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esFuncionario || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada') || textoLower.includes('verde') || textoLower.includes('amarillo') || textoLower.includes('rojo') || textoLower.includes('funcionario'))) {
         
         let valorNuevo = "";
         if (esBorrar) {
@@ -445,6 +449,11 @@ async function procesarComandoLogistica(textoMensaje) {
         } else if (esCanal) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
+        } else if (esFuncionario) {
+            // Extrae el texto del funcionario removiendo la palabra clave y el identificador (exp/bl)
+            let textoLimpio = textoMensaje.replace(/funcionario/gi, '').replace(/(exp|bl)\s*[\w-]+/gi, '').trim();
+            valorNuevo = textoLimpio;
+            if (!valorNuevo) return `❌ Debes indicar el nombre del funcionario a registrar.`;
         } else {
             const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
             if (matchFecha) {
@@ -503,6 +512,8 @@ async function procesarComandoLogistica(textoMensaje) {
                 return `✅ *¡INDICADOR ACTUALIZADO A ${valorNuevo.toUpperCase()}!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* ➔ *${valorNuevo.toUpperCase()}*`;
             } else if (esCanal) {
                 return `🎨 *¡CANAL ACTUALIZADO CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *Canal Aduanero* ➔ *${valorNuevo.toUpperCase()}*`;
+            } else if (esFuncionario) {
+                return `👤 *¡FUNCIONARIO ASIGNADO CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Funcionario: *${valorNuevo}*`;
             } else {
                 return `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Actualizada: *${formatearFechaDDMMYYYY(valorNuevo)}*`;
             }
