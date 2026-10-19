@@ -375,7 +375,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (CON LOGS DE DEPURACIÓN)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA CON LAS LLAVES EXACTAS DEL INDEX.HTML
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -387,7 +387,7 @@ async function procesarComandoLogistica(textoMensaje) {
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
-        campoAModificar = "recibido_doc_transporte";
+        campoAModificar = "recibido_documento_transporte"; // Llave exacta del HTML
         nombreCampoLegible = "Recibido Doc. Transporte";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('prevaloración enviada') || textoLower.includes('prevaloracion enviada')) {
@@ -395,7 +395,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Prevaloración Enviada";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
-        campoAModificar = "documento_valorado";
+        campoAModificar = "documento_valorado_en_sistema"; // Llave exacta del HTML
         nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
@@ -406,9 +406,9 @@ async function procesarComandoLogistica(textoMensaje) {
         campoAModificar = "canal";
         nombreCampoLegible = "Canal Aduanero";
         esCanal = true;
-        if (textoLower.includes('verde')) valorCanal = "Verde";
-        else if (textoLower.includes('amarillo')) valorCanal = "Amarillo";
-        else if (textoLower.includes('rojo')) valorCanal = "Rojo";
+        if (textoLower.includes('verde')) valorCanal = "VERDE"; // Mayúscula exacta del HTML
+        else if (textoLower.includes('amarillo')) valorCanal = "AMARILLO";
+        else if (textoLower.includes('rojo')) valorCanal = "ROJO";
     } else if (textoLower.includes('eta')) {
         campoAModificar = "eta_la_guaira";
         nombreCampoLegible = "ETA";
@@ -484,9 +484,6 @@ async function procesarComandoLogistica(textoMensaje) {
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
-        // 🔍 DEPURACIÓN: Verificamos en consola del servidor las llaves reales que tiene este documento exacto
-        console.log(`🔍 [DEBUGR] Expediente ID: ${expedienteEncontrado.id} | Campos actuales en Firestore:`, Object.keys(expedienteEncontrado.fields));
-
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
 
@@ -500,7 +497,6 @@ async function procesarComandoLogistica(textoMensaje) {
         });
 
         if (patchRes.ok) {
-            console.log(`✅ [DEBUG] Actualizado con éxito en Firestore -> Campo: ${campoAModificar} = ${valorNuevo}`);
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
             } else if (esIndicadorSiNo) {
