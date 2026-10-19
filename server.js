@@ -253,7 +253,7 @@ async function procesarComandoLogistica(textoMensaje) {
     const textoLower = textoMensaje.toLowerCase();
     const palabrasEnMensaje = textoLower.split(/\s+/);
 
-    // 1. GUÍA DE COMANDOS (menu sistema / ayuda sistema)
+    // 1. GUÍA DE COMANDOS
     const palabrasAyuda = ['comandos', 'ayuda', 'menu', 'menú', 'sistema'];
     const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
 
@@ -263,24 +263,20 @@ async function procesarComandoLogistica(textoMensaje) {
                `• *"alertas activas"*, *"alertas exp"*, *"alerta sistema"*\n\n` +
                `📊 *2. Resumen y Conteo*\n` +
                `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*\n\n` +
-               `✏️ *3. Actualización de Fechas (usa Exp o BL)*\n` +
-               `• *ETA:* "Actualizar ETA exp 26-030 al 26/10/2026"\n` +
+               `✏️ *3. Actualización de Fechas (usa Exp o BL - Si omites fecha toma el día de hoy)*\n` +
+               `• *ETA:* "Actualizar ETA exp 26-030"\n` +
                `• *Llegada:* "Actualiza llegada bl 12345 al 26/10/2026"\n` +
-               `• *DAI:* "Actualiza DAI exp 26-030 al 20/10/2026"\n` +
-               `• *Transmitido:* "Transmitido bl 12345 al 22/10/2026"\n` +
-               `• *Reconocido:* "Reconocido exp 26-030 al 23/10/2026"\n` +
-               `• *Validado:* "Validado bl 12345 al 24/10/2026"\n` +
-               `• *Despachado:* "Despachado exp 26-030 al 25/10/2026"\n` +
-               `• *Retiro de acta:* "Retirada acta bl 12345 al 21/10/2026"\n\n` +
-               `✅ *4. Indicadores Automáticos a SI (usa Exp o BL)*\n` +
-               `• *"Retirado bl bl 12345"* o *"Retirado bl del exp 26-030"*\n` +
-               `• *"Prevaloración enviada exp 26-030"* o *"Prevaloración enviada bl 12345"*\n` +
-               `• *"Valorado bl 12345"* o *"Valorado exp 26-030"*\n` +
-               `• *"Factura recibida bl 12345"* o *"Factura recibida exp 26-030"*\n\n` +
+               `• *Transmitido:* "Transmitido bl 12345"\n` +
+               `• *Reconocido:* "Reconocido exp 26-030"\n` +
+               `• *Validado:* "Validado bl 12345"\n` +
+               `• *Despachado:* "Despachado exp 26-030"\n` +
+               `• *Retiro de acta:* "Retirada acta bl 12345"\n\n` +
+               `✅ *4. Indicadores a SI*\n` +
+               `• *"Retirado bl bl 12345"* | *"Prevaloración enviada exp 26-030"* | *"Valorado bl 12345"* | *"Factura recibida bl 12345"*\n\n` +
                `🟢 *5. Canal (Verde / Amarillo / Rojo)*\n` +
-               `• *"Canal exp 26-030 verde"* o *"Canal bl 12345 rojo"*\n\n` +
+               `• *"Canal exp 26-030 verde"* | *"Canal bl 12345 rojo"*\n\n` +
                `🗑️ *6. Borrar Campo*\n` +
-               `• *"Borrar ETA exp 26-030"* o *"Eliminar canal bl 12345"*\n\n` +
+               `• *"Borrar ETA exp 26-030"* | *"Eliminar canal bl 12345"*\n\n` +
                `⚙️ *Ayuda:* "menu sistema"`;
     }
 
@@ -391,7 +387,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN DE CAMPO Y VALOR A MODIFICAR (EXP O BL DUAL)
+    // 4. DETECCIÓN DE CAMPO Y VALOR A MODIFICAR (FECHA AUTOMÁTICA SI SE OMITE)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -400,7 +396,6 @@ async function procesarComandoLogistica(textoMensaje) {
     let valorCanal = "";
     let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
 
-    // A. Indicadores automáticos a SI
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl')) {
         campoAModificar = "retiro_bl";
         nombreCampoLegible = "Retiro de B/L";
@@ -417,18 +412,14 @@ async function procesarComandoLogistica(textoMensaje) {
         campoAModificar = "recibida_factura";
         nombreCampoLegible = "Recibida Factura";
         esIndicadorSi = true;
-    }
-    // B. Canal
-    else if (textoLower.includes('canal')) {
+    } else if (textoLower.includes('canal')) {
         campoAModificar = "canal";
         nombreCampoLegible = "Canal Aduanero";
         esCanal = true;
         if (textoLower.includes('verde')) valorCanal = "Verde";
         else if (textoLower.includes('amarillo')) valorCanal = "Amarillo";
         else if (textoLower.includes('rojo')) valorCanal = "Rojo";
-    }
-    // C. Fechas Clave e Hitos
-    else if (textoLower.includes('eta')) {
+    } else if (textoLower.includes('eta')) {
         campoAModificar = "eta_la_guaira";
         nombreCampoLegible = "ETA";
     } else if (textoLower.includes('llegada')) {
@@ -465,9 +456,17 @@ async function procesarComandoLogistica(textoMensaje) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
         } else {
+            // Intenta buscar fecha en el texto; si no la encuentra, usa la fecha actual del día (DD/MM/YYYY)
             const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
-            if (!matchFecha) return `❌ Debes indicar una fecha válida (Ej: 26/10/2026).`;
-            valorNuevo = matchFecha[0].replace(/-/g, '/');
+            if (matchFecha) {
+                valorNuevo = matchFecha[0].replace(/-/g, '/');
+            } else {
+                const ahora = new Date();
+                const dia = String(ahora.getDate()).padStart(2, '0');
+                const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+                const anio = ahora.getFullYear();
+                valorNuevo = `${dia}/${mes}/${anio}`;
+            }
         }
 
         const recordsQuery = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes`);
@@ -482,7 +481,6 @@ async function procesarComandoLogistica(textoMensaje) {
             
             let limpioTexto = textoLower.replace(/[^a-z0-9]/g, '');
 
-            // Validación dual: coincide si el texto incluye el número de expediente o el B/L
             if ((numExp.length > 1 && limpioTexto.includes(numExp)) || (blNum.length > 2 && limpioTexto.includes(blNum))) {
                 expedienteEncontrado = { 
                     id: doc.name.split('/').pop(), 
@@ -647,7 +645,6 @@ cron.schedule('0 10,18 * * 1-5', async () => {
         if (!correoCliente) return;
         const records = await obtenerExpedientesFirestore();
         if (!records || records.length === 0) return;
-        // Lógica de correo existente...
     } catch (error) {
         console.error("❌ [CRON CORREO] Error:", error);
     }
