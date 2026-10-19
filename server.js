@@ -121,18 +121,6 @@ async function iniciarTelegramPolling() {
     
     console.log("🤖 [TELEGRAM] Iniciando sondeo (Polling) de comandos...");
 
-    cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
-        try {
-            console.log("⏰ [CRON MULTICANAL] Ejecutando reporte automático de alertas...");
-            const alertasGeneradas = await generarListaAlertasSistema();
-            if (alertasGeneradas && alertasGeneradas.length > 0) {
-                await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO PROGRAMADO");
-            }
-        } catch (error) {
-            console.error("❌ [CRON MULTICANAL] Error en reporte automático:", error);
-        }
-    }, { timezone: "America/Caracas" });
-
     setInterval(async () => {
         try {
             const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=30`;
