@@ -375,7 +375,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (LLAVE EXACTA DOC_VALORADO)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -395,7 +395,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Prevaloración Enviada";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
-        campoAModificar = "documento_valorado";
+        campoAModificar = "doc_valorado"; // Llave exacta mapeada a Doc. Valorado en Sistema
         nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
@@ -484,7 +484,6 @@ async function procesarComandoLogistica(textoMensaje) {
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
-        // Modificación clave: Mezcla completa del documento conservando los demás campos intactos y asegurando el tipo stringValue
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
 
