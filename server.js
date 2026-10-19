@@ -261,12 +261,17 @@ async function procesarComandoLogistica(textoMensaje) {
                `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
                `✅ *3. Indicadores (Sí / No)*\n` +
                `• *"Retirado bl [Exp o BL]"* | *"Valorado [Exp o BL]"* | *"Factura recibida [Exp o BL]"* | *"Prevaloración enviada [Exp o BL]"*\n\n` +
-               `🎨 *4. Canal Aduanero (Requiere Fecha de Transmisión previa)*\n` +
+               `🎨 *4. Canal Aduanero*\n` +
                `• *"Canal [Exp o BL] verde"*, *"amarillo"*, *"rojo"*\n\n` +
-               `👤 *5. Funcionario (Requiere Canal asignado previamente)*\n` +
-               `• *"Funcionario exp 26-030 Juan Pérez"* o *"Funcionario bl 12345 Licdo. Gómez"*\n\n` +
-               `✏️ *6. Fechas*\n` +
-               `• *"ETA [Exp o BL] al DD/MM/AAAA"*`;
+               `👤 *5. Funcionario*\n` +
+               `• *"Funcionario exp 26-030 [Nombre]"*\n\n` +
+               `✏️ *6. Fechas (Evaluando Secuencia Estricta)*\n` +
+               `• *"Llegada [Exp o BL] al..."* ➔ *Requiere ETA*\n` +
+               `• *"Acta / Recibido acta [Exp o BL] al..."* ➔ *Requiere Llegada*\n` +
+               `• *"Transmitido / Transmisión [Exp o BL] al..."* ➔ *Requiere Acta*\n` +
+               `• *"Reconocido [Exp o BL] al..."* ➔ *Requiere Transmisión*\n` +
+               `• *"Validado [Exp o BL] al..."* ➔ *Requiere Reconocimiento*\n` +
+               `• *"Despachado [Exp o BL] al..."* ➔ *Requiere Validación*`;
     }
 
     const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
@@ -284,7 +289,7 @@ async function procesarComandoLogistica(textoMensaje) {
 
     if (coincidenciasResumen >= 2) {
         const records = await obtenerExpedientesFirestore();
-        if (!records || records.length === 0) return "✅ No hay registros en Firestore.";
+        if (!records || records.length === 0) return "✅ No hay registros in Firestore.";
 
         let porLlegar = [], porRegistrar = [], porReconocer = [], porValidar = [], porDespachar = [];
         const today = new Date();
@@ -374,7 +379,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (CON VALIDACIONES DE SECUENCIA)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA (CON EVALUACIÓN DE SECUENCIA ESTRICTA)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -435,11 +440,11 @@ async function procesarComandoLogistica(textoMensaje) {
         campoAModificar = "despacho";
         nombreCampoLegible = "Despacho";
     } else if (textoLower.includes('acta')) {
-        campoAModificar = "retiro_acta";
-        nombreCampoLegible = "Retiro de Acta";
+        campoAModificar = "recibida_acta_recepcion";
+        nombreCampoLegible = "Recibida Acta de Recepción";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esFuncionario || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada') || textoLower.includes('verde') || textoLower.includes('amarillo') || textoLower.includes('rojo') || textoLower.includes('funcionario'))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esFuncionario || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada') || textoLower.includes('verde') || textoLower.includes('amarillo') || textoLower.includes('rojo') || textoLower.includes('funcionario') || textoLower.includes('acta'))) {
         
         let valorNuevo = "";
         if (esBorrar) {
@@ -493,17 +498,48 @@ async function procesarComandoLogistica(textoMensaje) {
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
         // =========================================================================
-        // VALIDACIONES DE SECUENCIA REQUERIDAS
+        // EVALUACIÓN ESTRICTA DE SECUENCIA (EVENTO ANTERIOR OBLIGATORIO)
         // =========================================================================
-        const hasTransmision = Boolean(expedienteEncontrado.fields.fecha_transmision?.stringValue && expedienteEncontrado.fields.fecha_transmision.stringValue.trim() !== "");
-        const hasCanal = Boolean(expedienteEncontrado.fields.canal?.stringValue && expedienteEncontrado.fields.canal.stringValue.trim() !== "");
+        const f = expedienteEncontrado.fields;
+        const hasEta = Boolean(f.eta_la_guaira?.stringValue && f.eta_la_guaira.stringValue.trim() !== "");
+        const hasLlegada = Boolean(f.fecha_llegada?.stringValue && f.fecha_llegada.stringValue.trim() !== "");
+        const hasActa = Boolean(f.recibida_acta_recepcion?.stringValue && f.recibida_acta_recepcion.stringValue.trim() !== "");
+        const hasTransmision = Boolean(f.fecha_transmision?.stringValue && f.fecha_transmision.stringValue.trim() !== "");
+        const hasCanal = Boolean(f.canal?.stringValue && f.canal.stringValue.trim() !== "");
+        const hasReconocimiento = Boolean(f.reconocimiento?.stringValue && f.reconocimiento.stringValue.trim() !== "");
+        const hasValidacion = Boolean(f.validacion?.stringValue && f.validacion.stringValue.trim() !== "");
 
-        if (esCanal && !hasTransmision) {
-            return `⚠️ *Acción Denegada:* Para asignar el *Canal*, el expediente *${expedienteEncontrado.numExpediente}* debe tener registrada previamente la *Fecha de Transmisión*.`;
+        // 1. Llegada requiere ETA
+        if (campoAModificar === "fecha_llegada" && !hasEta) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Llegada* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **ETA**.`;
         }
-
+        // 2. Acta requiere Llegada
+        if (campoAModificar === "recibida_acta_recepcion" && !hasLlegada) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Acta de Recepción* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Llegada**.`;
+        }
+        // 3. Transmisión requiere Acta
+        if (campoAModificar === "fecha_transmision" && !hasActa) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Transmisión* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada el **Acta de Recepción**.`;
+        }
+        // 4. Canal requiere Transmisión
+        if (esCanal && !hasTransmision) {
+            return `⚠️ *Secuencia Requerida:* No se puede asignar el *Canal* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
+        }
+        // 5. Reconocimiento requiere Transmisión (y Canal recomendado)
+        if (campoAModificar === "reconocimiento" && !hasTransmision) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Reconocimiento* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
+        }
+        // 6. Validación requiere Reconocimiento
+        if (campoAModificar === "validacion" && !hasReconocimiento) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Validación* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **Reconocimiento**.`;
+        }
+        // 7. Despacho requiere Validación
+        if (campoAModificar === "despacho" && !hasValidacion) {
+            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Despacho* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Validación**.`;
+        }
+        // 8. Funcionario requiere Canal asignado
         if (esFuncionario && !hasCanal) {
-            return `⚠️ *Acción Denegada:* Para asignar el *Funcionario*, el expediente *${expedienteEncontrado.numExpediente}* debe tener asignado previamente el *Canal* aduanero.`;
+            return `⚠️ *Secuencia Requerida:* No se puede asignar el *Funcionario* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene asignado un **Canal** aduanero.`;
         }
 
         const camposActualizados = { ...expedienteEncontrado.fields };
