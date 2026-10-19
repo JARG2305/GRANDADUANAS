@@ -375,7 +375,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (LLAVES REALES CORREGIDAS)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (CON LOGS DE DEPURACIÓN)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -386,7 +386,6 @@ async function procesarComandoLogistica(textoMensaje) {
 
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
-    // LLAVES REALES DE FIRESTORE MAPMADAS AL INTERFAZ
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
         campoAModificar = "recibido_doc_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
@@ -396,7 +395,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Prevaloración Enviada";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
-        campoAModificar = "documento_valorado"; // LLAVE REAL CORREGIDA
+        campoAModificar = "documento_valorado";
         nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
@@ -485,6 +484,9 @@ async function procesarComandoLogistica(textoMensaje) {
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
+        // 🔍 DEPURACIÓN: Verificamos en consola del servidor las llaves reales que tiene este documento exacto
+        console.log(`🔍 [DEBUGR] Expediente ID: ${expedienteEncontrado.id} | Campos actuales en Firestore:`, Object.keys(expedienteEncontrado.fields));
+
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
 
@@ -498,6 +500,7 @@ async function procesarComandoLogistica(textoMensaje) {
         });
 
         if (patchRes.ok) {
+            console.log(`✅ [DEBUG] Actualizado con éxito en Firestore -> Campo: ${campoAModificar} = ${valorNuevo}`);
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
             } else if (esIndicadorSiNo) {
