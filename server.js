@@ -259,11 +259,9 @@ async function procesarComandoLogistica(textoMensaje) {
         return `🤖 *GUÍA DE COMANDOS - LOGISTATUS PRO* 🤖\n\n` +
                `🚨 *1. Alertas Activas*\n• *"alertas activas"* | *"alerta sistema"*\n\n` +
                `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
-               `✅ *3. Indicadores (Sí)*\n` +
-               `• *"Retirado bl [Exp o BL]"*\n` +
-               `• *"Prevaloración enviada [Exp o BL]"*\n` +
-               `• *"Valorado [Exp o BL]"*\n` +
-               `• *"Factura recibida [Exp o BL]"*\n\n` +
+               `✅ *3. Indicadores (SÍ / NO)*\n` +
+               `• *Activar:* *"Retirado bl"*, *"Valorado"*, *"Factura recibida"*, *"Prevaloración enviada"* (con Exp o BL)\n` +
+               `• *Desactivar:* *"No valorado bl 12345"*, *"No recibido bl 12345"*, *"No factura recibida exp..."*\n\n` +
                `✏️ *4. Fechas y Canales*\n` +
                `• *"ETA [Exp o BL] al DD/MM/AAAA"*\n` +
                `• *"Canal [Exp o BL] verde/amarillo/rojo"*\n\n` +
@@ -376,32 +374,35 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN DE CAMPO CON NOMBRES REALES DE FIRESTORE
+    // 4. DETECCIÓN DE CAMPO Y ACTUALIZACIÓN (SÍ / NO DUAL)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
-    let esIndicadorSi = false;
+    let esIndicadorSiNo = false;
+    let valorIndicador = "Sí"; // Por defecto "Sí", pero cambia a "No" si el comando comienza con "no"
     let esCanal = false;
     let valorCanal = "";
     let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
 
-    // Mapeo corregido con las llaves exactas de Firestore
-    if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl')) {
+    // Detectar si la orden indica "no" para apagar el indicador
+    const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
+
+    if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl')) {
         campoAModificar = "recibido_doc_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
-        esIndicadorSi = true;
+        esIndicadorSiNo = true;
     } else if (textoLower.includes('prevaloración enviada') || textoLower.includes('prevaloracion enviada')) {
         campoAModificar = "prevaloracion_enviada";
         nombreCampoLegible = "Prevaloración Enviada";
-        esIndicadorSi = true;
+        esIndicadorSiNo = true;
     } else if (textoLower.includes('valorado')) {
         campoAModificar = "documento_valorado";
         nombreCampoLegible = "Doc. Valorado en Sistema";
-        esIndicadorSi = true;
+        esIndicadorSiNo = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
         campoAModificar = "factura_recibida";
         nombreCampoLegible = "Factura Recibida";
-        esIndicadorSi = true;
+        esIndicadorSiNo = true;
     } else if (textoLower.includes('canal')) {
         campoAModificar = "canal";
         nombreCampoLegible = "Canal Aduanero";
@@ -435,13 +436,13 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Retiro de Acta";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSi || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado'))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no '))) {
         
         let valorNuevo = "";
         if (esBorrar) {
             valorNuevo = "";
-        } else if (esIndicadorSi) {
-            valorNuevo = "Sí"; // Formato exacto que usa la interfaz web en sus selects
+        } else if (esIndicadorSiNo) {
+            valorNuevo = esNegativo ? "No" : "Sí"; // Cambia dinámicamente entre Sí y No
         } else if (esCanal) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
@@ -501,8 +502,8 @@ async function procesarComandoLogistica(textoMensaje) {
         if (patchRes.ok) {
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
-            } else if (esIndicadorSi) {
-                return `✅ *¡INDICADOR ACTUALIZADO A SÍ!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* ➔ *SÍ*`;
+            } else if (esIndicadorSiNo) {
+                return `✅ *¡INDICADOR ACTUALIZADO A ${valorNuevo.toUpperCase()}!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* ➔ *${valorNuevo.toUpperCase()}*`;
             } else if (esCanal) {
                 return `🎨 *¡CANAL ACTUALIZADO CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *Canal Aduanero* ➔ *${valorNuevo.toUpperCase()}*`;
             } else {
