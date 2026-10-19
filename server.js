@@ -240,6 +240,38 @@ async function procesarComandoLogistica(textoMensaje) {
     const textoLower = textoMensaje.toLowerCase();
     const palabrasEnMensaje = textoLower.split(/\s+/);
 
+if (textoLower.includes('razón social:') || textoLower.includes('razon social:') || textoLower.includes('rif:')) {
+        try {
+            const razonSocialMatch = textoMensaje.match(/(?:Razón Social|Razon Social):\s*([^\n]+)/i);
+            const rifMatch = textoMensaje.match(/RIF:\s*([^\n]+)/i);
+            const direccionMatch = textoMensaje.match(/Dirección:\s*([^\n]+)/i);
+            const telefonoMatch = textoMensaje.match(/Teléfono:\s*([^\n]+)/i);
+            const correoMatch = textoMensaje.match(/Correo:\s*([^\n]+)/i);
+
+            const nuevoCliente = {
+                razonSocial: razonSocialMatch ? razonSocialMatch[1].trim() : "S/N",
+                rif: rifMatch ? rifMatch[1].trim() : "S/N",
+                direccion: direccionMatch ? direccionMatch[1].trim() : "",
+                telefono: telefonoMatch ? telefonoMatch[1].trim() : "",
+                correo: correoMatch ? correoMatch[1].trim() : ""
+            };
+
+            const guardadoExitoso = await guardarClienteFirestore(nuevoCliente);
+            if (guardadoExitoso) {
+                return `✅ *¡CLIENTE REGISTRADO CON ÉXITO EN LA NUBE!* 🚀\n\n` +
+                       `🏢 *Razón Social:* ${nuevoCliente.razonSocial}\n` +
+                       `📄 *RIF:* ${nuevoCliente.rif}\n` +
+                       `📍 *Dirección:* ${nuevoCliente.direccion}\n` +
+                       `📞 *Teléfono:* ${nuevoCliente.telefono}\n` +
+                       `📧 *Correo:* ${nuevoCliente.correo}`;
+            } else {
+                return `❌ Hubo un error al guardar el cliente en la base de datos de Firestore.`;
+            }
+        } catch (e) {
+            console.error("Error procesando nuevo cliente:", e);
+        }
+    }
+
     const palabrasAyuda = ['comandos', 'ayuda', 'menu', 'menú', 'sistema'];
     const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
 
@@ -585,6 +617,18 @@ app.get('/api/whatsapp/estado', (req, res) => {
     res.json({ success: true, estado: estadoConexionWhatsapp, ready: whatsappClientReady, qrCodeDataUrl: ultimoQrGenerado });
 });
 
+// Obtener todos los clientes desde la web o backend
+app.get('/api/clientes', async (req, res) => {
+    const clientes = await obtenerClientesFirestore();
+    res.json({ success: true, clientes });
+});
+
+// Guardar un cliente nuevo desde la web
+app.post('/api/clientes', async (req, res) => {
+    const exito = await guardarClienteFirestore(req.body);
+    res.json({ success: exito });
+});
+
 // =========================================================================
 // RUTA DE FORZAR ALERTAS (MULTICANAL)
 // =========================================================================
@@ -686,7 +730,60 @@ function generarPlantillaClienteNuevo(nombreBuscado) {
            `• *Teléfono:* [Número de contacto]\n` +
            `• *Correo:* [Correo electrónico]`;
 }
+// ==========================================
+// GESTIÓN DE CLIENTES EN FIRESTORE (NUBE)
+// ==========================================
 
+async function obtenerClientesFirestore() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.documents) return [];
+
+        return result.documents.map(doc => {
+            let fields = doc.fields || {};
+            return {
+                id: doc.name.split('/').pop(),
+                razonSocial: fields.razonSocial?.stringValue || '',
+                rif: fields.rif?.stringValue || '',
+                direccion: fields.direccion?.stringValue || '',
+                telefono: fields.telefono?.stringValue || '',
+                correo: fields.correo?.stringValue || ''
+            };
+        });
+    } catch (err) {
+        console.error("❌ Error obteniendo clientes de Firestore:", err);
+        return [];
+    }
+}
+
+async function guardarClienteFirestore(datosCliente) {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const body = {
+            fields: {
+                razonSocial: { stringValue: datosCliente.razonSocial || '' },
+                rif: { stringValue: datosCliente.rif || '' },
+                direccion: { stringValue: datosCliente.direccion || '' },
+                telefono: { stringValue: datosCliente.telefono || '' },
+                correo: { stringValue: datosCliente.correo || '' },
+                fechaCreacion: { stringValue: new Date().toISOString() }
+            }
+        };
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        return response.ok;
+    } catch (err) {
+        console.error("❌ Error guardando cliente en Firestore:", err);
+        return false;
+    }
+}
 // ==========================================
 // 3. TAREAS PROGRAMADAS (CRON)
 // ==========================================
