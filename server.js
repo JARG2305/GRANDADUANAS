@@ -810,6 +810,79 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
         console.error("❌ [CRON MULTICANAL] Error en reporte automático:", error);
     }
 }, { timezone: "America/Caracas" });
+// Función que escanea automáticamente todas las variables de Render y arranca el bot de cada cliente
+function iniciarTodosLosBotsAutomaticos() {
+    console.log("🤖 [MULTIBOT] Escaneando variables de Render para iniciar los bots...");
+
+    // Recorremos todo process.env buscando variables que terminen en _TOKEN o _BOT_TOKEN
+    for (const [key, value] of Object.entries(process.env)) {
+        if ((key.endsWith('_TOKEN') || key.endsWith('_BOT_TOKEN')) && value) {
+            const tokenBot = value;
+            // Extraemos el prefijo (ej: de SOTO_BOT_TOKEN o SOTO_TOKEN sacamos SOTO)
+            const prefijoCliente = key.replace(/(_BOT_TOKEN|_TOKEN)$/, '');
+            const chatIdEsperado = process.env[`${prefijoCliente}_CHAT_ID`];
+
+            console.log(`🚀 [BOT DETECTADO] Activando vigilancia para el cliente: ${prefijoCliente}`);
+            
+            // Iniciamos un ciclo de escucha independiente para este bot
+            ejecutarPollingParaBot(tokenBot, chatIdEsperado, prefijoCliente);
+        }
+    }
+}
+
+// Ciclo de escucha independiente por cada bot encontrado
+function ejecutarPollingParaBot(tokenBot, chatIdEsperado, nombreCliente) {
+    let offset = 0;
+
+    setInterval(async () => {
+        try {
+            const url = `https://api.telegram.org/bot${tokenBot}/getUpdates?offset=${offset}&timeout=30`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.ok && data.result.length > 0) {
+                for (const update of data.result) {
+                    offset = update.update_id + 1;
+                    if (!update.message || !update.message.text) continue;
+
+                    const chatIdRecibido = String(update.message.chat.id);
+                    const textoMensaje = update.message.text.trim();
+
+                    // Si se configuró un Chat ID específico para este cliente, validamos que coincida por seguridad
+                    if (chatIdEsperado && chatIdRecibido !== String(chatIdEsperado)) {
+                        continue; 
+                    }
+
+                    console.log(`💬 Mensaje recibido en el bot de [${nombreCliente}] (Chat: ${chatIdRecibido})`);
+
+                    // Procesar el comando de logística
+                    const respuestaProcesada = await procesarComandoLogistica(textoMensaje);
+
+                    if (respuestaProcesada) {
+                        await enviarRespuestaTelegramCliente(tokenBot, chatIdRecibido, respuestaProcesada);
+                    }
+                }
+            }
+        } catch (err) {}
+    }, 4000);
+}
+
+async function enviarRespuestaTelegramCliente(token, chatIdDestino, mensajeTexto) {
+    if (!chatIdDestino || !token) return;
+    try {
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatIdDestino, text: mensajeTexto, parse_mode: 'Markdown' })
+        });
+    } catch (err) {
+        console.error("❌ Error respondiendo en Telegram:", err);
+    }
+}
+
+// Iniciar todos los bots automáticamente al encender el servidor
+iniciarTodosLosBotsAutomaticos();
 
 // ==========================================
 // 4. INICIO DEL SERVIDOR
