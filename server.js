@@ -121,7 +121,6 @@ async function iniciarTelegramPolling() {
     
     console.log("🤖 [TELEGRAM] Iniciando sondeo (Polling) de comandos...");
 
-    // Alertas Multicanal: Todos los días a las 9, 12, 15, 18, 19, 20 horas
     cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
         try {
             console.log("⏰ [CRON MULTICANAL] Ejecutando reporte automático de alertas...");
@@ -176,7 +175,7 @@ async function enviarAlertaTelegramServidorPersonalizado(chatIdDestino, mensajeT
 }
 
 // ==========================================
-// 0.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (VALIDACIÓN DUAL EXP / BL)
+// 0.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS
 // ==========================================
 async function generarListaAlertasSistema() {
     const records = await obtenerExpedientesFirestore();
@@ -253,34 +252,25 @@ async function procesarComandoLogistica(textoMensaje) {
     const textoLower = textoMensaje.toLowerCase();
     const palabrasEnMensaje = textoLower.split(/\s+/);
 
-    // 1. GUÍA DE COMANDOS
     const palabrasAyuda = ['comandos', 'ayuda', 'menu', 'menú', 'sistema'];
     const coincidenciasAyuda = palabrasEnMensaje.filter(p => palabrasAyuda.includes(p)).length;
 
     if (coincidenciasAyuda >= 2 || textoLower === 'ayuda' || textoLower === 'comandos') {
         return `🤖 *GUÍA DE COMANDOS - LOGISTATUS PRO* 🤖\n\n` +
-               `🚨 *1. Alertas Activas*\n` +
-               `• *"alertas activas"*, *"alertas exp"*, *"alerta sistema"*\n\n` +
-               `📊 *2. Resumen y Conteo*\n` +
-               `• *"resumen exp"*, *"resumen expedientes"*, *"expedientes activos"*\n\n` +
-               `✏️ *3. Actualización de Fechas (usa Exp o BL - Si omites fecha toma el día de hoy)*\n` +
-               `• *ETA:* "Actualizar ETA exp 26-030"\n` +
-               `• *Llegada:* "Actualiza llegada bl 12345 al 26/10/2026"\n` +
-               `• *Transmitido:* "Transmitido bl 12345"\n` +
-               `• *Reconocido:* "Reconocido exp 26-030"\n` +
-               `• *Validado:* "Validado bl 12345"\n` +
-               `• *Despachado:* "Despachado exp 26-030"\n` +
-               `• *Retiro de acta:* "Retirada acta bl 12345"\n\n` +
-               `✅ *4. Indicadores a SI*\n` +
-               `• *"Retirado bl bl 12345"* | *"Prevaloración enviada exp 26-030"* | *"Valorado bl 12345"* | *"Factura recibida bl 12345"*\n\n` +
-               `🟢 *5. Canal (Verde / Amarillo / Rojo)*\n` +
-               `• *"Canal exp 26-030 verde"* | *"Canal bl 12345 rojo"*\n\n` +
-               `🗑️ *6. Borrar Campo*\n` +
-               `• *"Borrar ETA exp 26-030"* | *"Eliminar canal bl 12345"*\n\n` +
-               `⚙️ *Ayuda:* "menu sistema"`;
+               `🚨 *1. Alertas Activas*\n• *"alertas activas"* | *"alerta sistema"*\n\n` +
+               `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
+               `✅ *3. Indicadores (Sí)*\n` +
+               `• *"Retirado bl [Exp o BL]"*\n` +
+               `• *"Prevaloración enviada [Exp o BL]"*\n` +
+               `• *"Valorado [Exp o BL]"*\n` +
+               `• *"Factura recibida [Exp o BL]"*\n\n` +
+               `✏️ *4. Fechas y Canales*\n` +
+               `• *"ETA [Exp o BL] al DD/MM/AAAA"*\n` +
+               `• *"Canal [Exp o BL] verde/amarillo/rojo"*\n\n` +
+               `🗑️ *5. Borrar*\n` +
+               `• *"Borrar ETA [Exp o BL]"*`;
     }
 
-    // 2. CONSULTAR ALERTAS ACTIVAS
     const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
     const coincidenciasAlertas = palabrasEnMensaje.filter(p => palabrasAlertas.includes(p)).length;
 
@@ -291,7 +281,6 @@ async function procesarComandoLogistica(textoMensaje) {
         return `🚨 *ALERTAS ACTIVAS (ORDENADAS POR ETA/VENCIMIENTO)* 🚨\n\n` + mensajesEnumerados.join("\n\n");
     }
 
-    // 3. CONSULTAR RESUMEN / CONTEO
     const palabrasResumen = ['resumen', 'exp', 'expedientes', 'activos', 'conteo', 'totales', 'proceso'];
     const coincidenciasResumen = palabrasEnMensaje.filter(p => palabrasResumen.includes(p)).length;
 
@@ -387,7 +376,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN DE CAMPO Y VALOR A MODIFICAR (FECHA AUTOMÁTICA SI SE OMITE)
+    // 4. DETECCIÓN DE CAMPO CON NOMBRES REALES DE FIRESTORE
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -396,9 +385,10 @@ async function procesarComandoLogistica(textoMensaje) {
     let valorCanal = "";
     let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
 
+    // Mapeo corregido con las llaves exactas de Firestore
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl')) {
-        campoAModificar = "retiro_bl";
-        nombreCampoLegible = "Retiro de B/L";
+        campoAModificar = "recibido_doc_transporte";
+        nombreCampoLegible = "Recibido Doc. Transporte";
         esIndicadorSi = true;
     } else if (textoLower.includes('prevaloración enviada') || textoLower.includes('prevaloracion enviada')) {
         campoAModificar = "prevaloracion_enviada";
@@ -406,11 +396,11 @@ async function procesarComandoLogistica(textoMensaje) {
         esIndicadorSi = true;
     } else if (textoLower.includes('valorado')) {
         campoAModificar = "documento_valorado";
-        nombreCampoLegible = "Documento Valorado";
+        nombreCampoLegible = "Doc. Valorado en Sistema";
         esIndicadorSi = true;
     } else if (textoLower.includes('factura recibida') || textoLower.includes('recibida factura')) {
-        campoAModificar = "recibida_factura";
-        nombreCampoLegible = "Recibida Factura";
+        campoAModificar = "factura_recibida";
+        nombreCampoLegible = "Factura Recibida";
         esIndicadorSi = true;
     } else if (textoLower.includes('canal')) {
         campoAModificar = "canal";
@@ -445,18 +435,17 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Retiro de Acta";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSi || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración'))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSi || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado'))) {
         
         let valorNuevo = "";
         if (esBorrar) {
             valorNuevo = "";
         } else if (esIndicadorSi) {
-            valorNuevo = "SI";
+            valorNuevo = "Sí"; // Formato exacto que usa la interfaz web en sus selects
         } else if (esCanal) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
         } else {
-            // Intenta buscar fecha en el texto; si no la encuentra, usa la fecha actual del día (DD/MM/YYYY)
             const matchFecha = textoMensaje.match(/\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/);
             if (matchFecha) {
                 valorNuevo = matchFecha[0].replace(/-/g, '/');
@@ -637,7 +626,6 @@ function parseFechaLocalServidor(str) {
 // ==========================================
 // 3. TAREAS PROGRAMADAS (CRON)
 // ==========================================
-// A. Correos automáticos: Lunes a Viernes a las 10:00 AM y 6:00 PM
 cron.schedule('0 10,18 * * 1-5', async () => {
     try {
         console.log("⏰ [CRON CORREO] Ejecutando envío automático de correo...");
@@ -650,7 +638,6 @@ cron.schedule('0 10,18 * * 1-5', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// B. Alertas Multicanal (WhatsApp y Telegram): Todos los días a las 9, 12, 15, 18, 19, 20 horas
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         console.log("⏰ [CRON MULTICANAL] Ejecutando reporte automático de alertas...");
