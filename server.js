@@ -266,8 +266,8 @@ async function procesarComandoLogistica(textoMensaje) {
                `• *"Prevaloración enviada [Exp o BL]"* | *"No prevaloración enviada [Exp o BL]"*\n\n` +
                `🎨 *4. Canal Aduanero*\n` +
                `• *"Canal [Exp o BL] verde"*, *"amarillo"*, *"rojo"*\n\n` +
-               `✏️ *5. Fechas (ETA, Llegada, Transmitido, etc.)*\n` +
-               `• *"ETA [Exp o BL] al DD/MM/AAAA"* (Si omites fecha, toma hoy)`;
+               `✏️ *5. Fechas*\n` +
+               `• *"ETA [Exp o BL] al DD/MM/AAAA"*`;
     }
 
     const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
@@ -386,7 +386,6 @@ async function procesarComandoLogistica(textoMensaje) {
 
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
-    // Mapeo exacto a las llaves de la base de datos de expedientes
     if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
         campoAModificar = "recibido_doc_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
@@ -436,7 +435,7 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Retiro de Acta";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada'))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada') || textoLower.includes('verde') || textoLower.includes('amarillo') || textoLower.includes('rojo'))) {
         
         let valorNuevo = "";
         if (esBorrar) {
@@ -485,14 +484,12 @@ async function procesarComandoLogistica(textoMensaje) {
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
-        // Construcción limpia del payload de actualización para Firestore REST API
-        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
-        const patchBody = {
-            fields: {
-                ...expedienteEncontrado.fields,
-                [campoAModificar]: { stringValue: valorNuevo }
-            }
-        };
+        // Modificación clave: Mezcla completa del documento conservando los demás campos intactos y asegurando el tipo stringValue
+        const camposActualizados = { ...expedienteEncontrado.fields };
+        camposActualizados[campoAModificar] = { stringValue: valorNuevo };
+
+        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}`;
+        const patchBody = { fields: camposActualizados };
 
         const patchRes = await fetch(updateUrl, {
             method: 'PATCH',
@@ -511,6 +508,8 @@ async function procesarComandoLogistica(textoMensaje) {
                 return `✅ *¡FECHA ACTUALIZADA CON ÉXITO!* 🚀\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}*\n📅 Fecha Actualizada: *${formatearFechaDDMMYYYY(valorNuevo)}*`;
             }
         } else {
+            const errBody = await patchRes.text();
+            console.error("❌ Error Firestore PATCH:", errBody);
             return `❌ Error al actualizar en Firestore.`;
         }
     }
