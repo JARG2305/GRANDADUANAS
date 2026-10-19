@@ -261,9 +261,9 @@ async function procesarComandoLogistica(textoMensaje) {
                `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
                `✅ *3. Indicadores (Sí / No)*\n` +
                `• *"Retirado bl [Exp o BL]"* | *"Valorado [Exp o BL]"* | *"Factura recibida [Exp o BL]"* | *"Prevaloración enviada [Exp o BL]"*\n\n` +
-               `🎨 *4. Canal Aduanero*\n` +
+               `🎨 *4. Canal Aduanero (Requiere Fecha de Transmisión previa)*\n` +
                `• *"Canal [Exp o BL] verde"*, *"amarillo"*, *"rojo"*\n\n` +
-               `👤 *5. Funcionario (Texto Libre)*\n` +
+               `👤 *5. Funcionario (Requiere Canal asignado previamente)*\n` +
                `• *"Funcionario exp 26-030 Juan Pérez"* o *"Funcionario bl 12345 Licdo. Gómez"*\n\n` +
                `✏️ *6. Fechas*\n` +
                `• *"ETA [Exp o BL] al DD/MM/AAAA"*`;
@@ -374,7 +374,7 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (INCLUYENDO FUNCIONARIO)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS (CON VALIDACIONES DE SECUENCIA)
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
@@ -450,7 +450,6 @@ async function procesarComandoLogistica(textoMensaje) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
         } else if (esFuncionario) {
-            // Extrae el texto del funcionario removiendo la palabra clave y el identificador (exp/bl)
             let textoLimpio = textoMensaje.replace(/funcionario/gi, '').replace(/(exp|bl)\s*[\w-]+/gi, '').trim();
             valorNuevo = textoLimpio;
             if (!valorNuevo) return `❌ Debes indicar el nombre del funcionario a registrar.`;
@@ -492,6 +491,20 @@ async function procesarComandoLogistica(textoMensaje) {
         }
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
+
+        // =========================================================================
+        // VALIDACIONES DE SECUENCIA REQUERIDAS
+        // =========================================================================
+        const hasTransmision = Boolean(expedienteEncontrado.fields.fecha_transmision?.stringValue && expedienteEncontrado.fields.fecha_transmision.stringValue.trim() !== "");
+        const hasCanal = Boolean(expedienteEncontrado.fields.canal?.stringValue && expedienteEncontrado.fields.canal.stringValue.trim() !== "");
+
+        if (esCanal && !hasTransmision) {
+            return `⚠️ *Acción Denegada:* Para asignar el *Canal*, el expediente *${expedienteEncontrado.numExpediente}* debe tener registrada previamente la *Fecha de Transmisión*.`;
+        }
+
+        if (esFuncionario && !hasCanal) {
+            return `⚠️ *Acción Denegada:* Para asignar el *Funcionario*, el expediente *${expedienteEncontrado.numExpediente}* debe tener asignado previamente el *Canal* aduanero.`;
+        }
 
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
