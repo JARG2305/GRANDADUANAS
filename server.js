@@ -259,14 +259,15 @@ async function procesarComandoLogistica(textoMensaje) {
         return `🤖 *GUÍA DE COMANDOS - LOGISTATUS PRO* 🤖\n\n` +
                `🚨 *1. Alertas Activas*\n• *"alertas activas"* | *"alerta sistema"*\n\n` +
                `📊 *2. Resumen*\n• *"resumen exp"*\n\n` +
-               `✅ *3. Indicadores (SÍ / NO)*\n` +
-               `• *Activar:* *"Retirado bl"*, *"Valorado"*, *"Factura recibida"*, *"Prevaloración enviada"* (con Exp o BL)\n` +
-               `• *Desactivar:* *"No valorado bl 12345"*, *"No recibido bl 12345"*, *"No factura recibida exp..."*\n\n` +
-               `✏️ *4. Fechas y Canales*\n` +
-               `• *"ETA [Exp o BL] al DD/MM/AAAA"*\n` +
-               `• *"Canal [Exp o BL] verde/amarillo/rojo"*\n\n` +
-               `🗑️ *5. Borrar*\n` +
-               `• *"Borrar ETA [Exp o BL]"*`;
+               `✅ *3. Indicadores (Sí / No)*\n` +
+               `• *"Retirado bl [Exp o BL]"* | *"No retirado bl [Exp o BL]"*\n` +
+               `• *"Valorado [Exp o BL]"* | *"No valorado [Exp o BL]"*\n` +
+               `• *"Factura recibida [Exp o BL]"* | *"No factura recibida [Exp o BL]"*\n` +
+               `• *"Prevaloración enviada [Exp o BL]"* | *"No prevaloración enviada [Exp o BL]"*\n\n` +
+               `🎨 *4. Canal Aduanero*\n` +
+               `• *"Canal [Exp o BL] verde"*, *"amarillo"*, *"rojo"*\n\n` +
+               `✏️ *5. Fechas (ETA, Llegada, Transmitido, etc.)*\n` +
+               `• *"ETA [Exp o BL] al DD/MM/AAAA"* (Si omites fecha, toma hoy)`;
     }
 
     const palabrasAlertas = ['alertas', 'alerta', 'activas', 'exp', 'expedientes', 'sistema', 'urgentes', 'vencimientos'];
@@ -374,20 +375,19 @@ async function procesarComandoLogistica(textoMensaje) {
     }
 
     // =========================================================================
-    // 4. DETECCIÓN DE CAMPO Y ACTUALIZACIÓN (SÍ / NO DUAL)
+    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA DE CAMPOS
     // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
     let esIndicadorSiNo = false;
-    let valorIndicador = "Sí"; // Por defecto "Sí", pero cambia a "No" si el comando comienza con "no"
     let esCanal = false;
     let valorCanal = "";
     let esBorrar = textoLower.includes('borrar') || textoLower.includes('eliminar') || textoLower.includes('quitar');
 
-    // Detectar si la orden indica "no" para apagar el indicador
     const esNegativo = textoLower.startsWith('no ') || textoLower.includes(' no ');
 
-    if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl')) {
+    // Mapeo exacto a las llaves de la base de datos de expedientes
+    if (textoLower.includes('retirado bl') || textoLower.includes('retiro bl') || textoLower.includes('recibido bl') || textoLower.includes('doc transporte')) {
         campoAModificar = "recibido_doc_transporte";
         nombreCampoLegible = "Recibido Doc. Transporte";
         esIndicadorSiNo = true;
@@ -436,13 +436,13 @@ async function procesarComandoLogistica(textoMensaje) {
         nombreCampoLegible = "Retiro de Acta";
     }
 
-    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no '))) {
+    if (campoAModificar && (textoLower.includes('actualizar') || textoLower.includes('actualiza') || esIndicadorSiNo || esCanal || esBorrar || textoLower.includes('transmitido') || textoLower.includes('reconocido') || textoLower.includes('validado') || textoLower.includes('despachado') || textoLower.includes('retirada') || textoLower.includes('canal') || textoLower.includes('valorado') || textoLower.includes('factura') || textoLower.includes('prevaloración') || textoLower.includes('retirado') || textoLower.includes('recibido') || textoLower.includes('no ') || textoLower.includes('eta') || textoLower.includes('llegada'))) {
         
         let valorNuevo = "";
         if (esBorrar) {
             valorNuevo = "";
         } else if (esIndicadorSiNo) {
-            valorNuevo = esNegativo ? "No" : "Sí"; // Cambia dinámicamente entre Sí y No
+            valorNuevo = esNegativo ? "No" : "Sí";
         } else if (esCanal) {
             valorNuevo = valorCanal;
             if (!valorNuevo) return `❌ Debes indicar el color del canal (Verde, Amarillo o Rojo).`;
@@ -485,6 +485,7 @@ async function procesarComandoLogistica(textoMensaje) {
 
         if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
 
+        // Construcción limpia del payload de actualización para Firestore REST API
         const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?updateMask.fieldPaths=${campoAModificar}`;
         const patchBody = {
             fields: {
