@@ -207,7 +207,7 @@ async function generarListaAlertasSistema() {
                         detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
                     }
                 } else {
-                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI / DUA*`;
+                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI*`;
                 }
 
                 alertasEta.push({
