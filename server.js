@@ -495,8 +495,11 @@ async function procesarComandoLogistica(textoMensaje) {
             }
         }
 
-        if (!expedienteEncontrado) return `⚠️ No se encontró el expediente o B/L indicado en el mensaje.`;
-
+        // ⚠️ AQUÍ ESTÁ LA CORRECCIÓN: Debe evaluarse dentro de este "if"
+        if (!expedienteEncontrado) {
+            const terminoBuscado = textoMensaje.split(" ")[1] || "desconocido";
+            return generarPlantillaClienteNuevo(terminoBuscado);
+        }
         // =========================================================================
         // EVALUACIÓN ESTRICTA DE SECUENCIA (EVENTO ANTERIOR OBLIGATORIO)
         // =========================================================================
@@ -681,6 +684,19 @@ function parseFechaLocalServidor(str) {
         if (p.length === 3 && p[0].length === 4) return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);
     }
     return null;
+}
+
+// Validación cuando un cliente no es encontrado en la base de datos
+function generarPlantillaClienteNuevo(nombreBuscado) {
+    return `⚠️ *CLIENTE NO ENCONTRADO EN LA BASE DE DATOS* ⚠️\n\n` +
+           `El cliente o expediente "*${nombreBuscado}*" no se encuentra registrado.\n\n` +
+           `Por favor, envíe los datos con el siguiente formato exacto para agregarlo:\n\n` +
+           `📌 *REGISTRAR CLIENTE*\n` +
+           `• *Razón Social:* [Nombre o Razón Social]\n` +
+           `• *RIF:* [Ej: J-XXXXXXXX-X]\n` +
+           `• *Dirección:* [Dirección fiscal completa]\n` +
+           `• *Teléfono:* [Número de contacto]\n` +
+           `• *Correo:* [Correo electrónico]`;
 }
 
 // ==========================================
