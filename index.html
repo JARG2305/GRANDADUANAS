@@ -487,9 +487,9 @@
                         <!-- CLIENTE -->
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
-                            <input type="text" id="cliente" autocomplete="off" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
-                            <div id="dropdown_cliente" class="custom-dropdown-list"></div>
-                        </div>
+                            <input type="text" id="cliente" autocomplete="off" required onblur="verificarClienteAlSalir(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
+				<div id="dropdown_cliente" class="custom-dropdown-list"></div>
+			</div>
 
                         <!-- PROVEEDOR -->
                         <div class="relative">
@@ -1001,6 +1001,34 @@
                 }
             } catch (err) {
                 alert("❌ Error de red al guardar: " + err.message);
+            }
+        };
+	window.verificarClienteAlSalir = function(nombreCliente) {
+            nombreCliente = nombreCliente.trim();
+            if (!nombreCliente) return;
+
+            // Verificamos si ya existe en la caché de clientes
+            const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
+            
+            if (!existe) {
+                const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos (RIF, Teléfono, Correo)?`);
+                
+                if (confirmar) {
+                    // 1. Abrimos el modal de clientes
+                    openClientesModal();
+                    
+                    // 2. Prellenamos la Razón Social automáticamente
+                    const inputRazon = document.getElementById("web_razonSocial");
+                    if (inputRazon) {
+                        inputRazon.value = nombreCliente;
+                    }
+                    
+                    // 3. Enfocamos el campo RIF para continuar escribiendo rápido
+                    const inputRif = document.getElementById("web_rif");
+                    if (inputRif) {
+                        inputRif.focus();
+                    }
+                }
             }
         };
 
