@@ -487,7 +487,7 @@
                         <!-- CLIENTE -->
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
-                            <input type="text" id="cliente" autocomplete="off" required onblur="verificarClienteAlSalir(this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
+                            <input type="text" id="cliente" autocomplete="off" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
 				<div id="dropdown_cliente" class="custom-dropdown-list"></div>
 			</div>
 
@@ -2272,23 +2272,28 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
 
-            try {
-                let registroAnterior = null;
-                if (idVal) {
-                    registroAnterior = allRecords.find(r => r.id === idVal);
+            const nombreCliente = record.cliente;
+            if (nombreCliente) {
+                const existe = cacheClientes.some(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                if (!existe) {
+                    const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos?`);
+                    if (confirmar) {
+                        openClientesModal();
+                        const inputRazon = document.getElementById("web_razonSocial");
+                        if (inputRazon) inputRazon.value = nombreCliente;
+                        const inputRif = document.getElementById("web_rif");
+                        if (inputRif) inputRif.focus();
+                        return; // Detiene el guardado del expediente para que primero registres al cliente
+                    }
                 }
+            }
 
+            try {
                 if (idVal) {
                     await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
                 } else {
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
-
-                // Llamada para autoguardar el cliente si es nuevo
-                if (record.cliente) {
-                    await verificarYAutoGuardarCliente(record.cliente);
-                }
-
                 closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
