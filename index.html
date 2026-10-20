@@ -485,10 +485,11 @@
                         </div>
                         
                         <!-- CLIENTE -->
-                        <div class="relative">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
-                            <input type="text" id="cliente" autocomplete="off" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
-			<div id="dropdown_cliente" class="custom-dropdown-list"></div>
+                        <<!-- CLIENTE -->
+			<div class="relative">
+   			 <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
+  			  <input type="text" id="cliente" autocomplete="off" spellcheck="false" role="presentation" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
+  			  <div id="dropdown_cliente" class="custom-dropdown-list"></div>
 			</div>
 
                         <!-- PROVEEDOR -->
@@ -1361,16 +1362,17 @@
                 const dropdown = document.getElementById(`dropdown_${campoId}`);
                 if (!input || !dropdown) return;
 
-                let valoresUnicos = [...new Set(data.map(r => r[campoId]).filter(Boolean))];
+                let valoresUnicos = [];
 
-                // AQUÍ SE INTEGRAN LOS CLIENTES DE LA NUBE PARA LA AUTOCOMPLETACIÓN
-                if (campoId === 'cliente' && typeof cacheClientes !== 'undefined' && cacheClientes.length > 0) {
-                    const clientesNube = cacheClientes.map(c => c.razonSocial).filter(Boolean);
-                    valoresUnicos = [...new Set([...valoresUnicos, ...clientesNube])];
+                // CONDICIÓN EXCLUSIVA PARA EL CAMPO CLIENTE: Solo base de datos de la nube
+                if (campoId === 'cliente') {
+                    if (typeof cacheClientes !== 'undefined' && cacheClientes.length > 0) {
+                        valoresUnicos = cacheClientes.map(c => c.razonSocial).filter(Boolean);
+                    }
+                } else {
+                    // Para los demás campos, mantiene el comportamiento habitual
+                    valoresUnicos = [...new Set(data.map(r => r[campoId]).filter(Boolean))];
                 }
-
-                valoresUnicos.sort();
-                // ... (el resto de la lógica del dropdown se mantiene igual)
 
                 valoresUnicos.sort();
                 let currentIndex = -1;
@@ -1408,19 +1410,19 @@
                 }
 
                 function mostrarOpciones(filtro = "") {
-                    if (filtro.trim() === "") {
-                        cerrarDropdown();
-                        return;
-                    }
-                    const filtrados = valoresUnicos.values ? Array.from(valoresUnicos).filter(v => String(v).toLowerCase().includes(filtro.toLowerCase())) : valoresUnicos.filter(v => String(v).toLowerCase().includes(filtro.toLowerCase()));
+                    const filtrados = valoresUnicos.filter(v => String(v).toLowerCase().includes(filtro.toLowerCase()));
                     renderizarOpciones(filtrados);
                 }
 
                 input.onfocus = function() {
-                    if (this.value.trim() !== "") {
-                        mostrarOpciones(this.value);
+                    if (campoId === 'cliente') {
+                        renderizarOpciones(valoresUnicos); // Muestra todos los clientes de la BD al hacer foco
                     } else {
-                        renderizarOpciones(valoresUnicos);
+                        if (this.value.trim() !== "") {
+                            mostrarOpciones(this.value);
+                        } else {
+                            renderizarOpciones(valoresUnicos);
+                        }
                     }
                 };
 
@@ -1481,7 +1483,6 @@
                 };
             });
         }
-
         document.addEventListener("click", function(e) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
             campos.forEach(campoId => {
@@ -2185,9 +2186,9 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
         }
 
         window.openModal = async function(record = null) {
-            await sincronizarClientesCache(); // Refresca los clientes al abrir el modal
-            actualizarListasDatalists(allRecords); // Actualiza el autocompletado
-            
+            await sincronizarClientesCache(); // Carga los clientes de la nube
+            actualizarListasDatalists(allRecords); // Refresca las opciones del desplegable
+
             document.getElementById("expModal").classList.remove("hidden");
             if (record) {
                 document.getElementById("modalTitle").innerText = "Editar Exp";
