@@ -973,22 +973,28 @@
                 rif: document.getElementById("web_rif").value.trim(),
                 direccion: document.getElementById("web_direccion").value.trim(),
                 telefono: document.getElementById("web_telefono").value.trim(),
-                correo: document.getElementById("web_correo").value.trim(),
-                fechaCreacion: new Date().toISOString()
+                correo: document.getElementById("web_correo").value.trim()
             };
 
             try {
-                if (idVal) {
-                    await updateDoc(doc(db, "clientes", idVal), clienteData);
-                    alert("✅ ¡Cliente actualizado con éxito!");
+                const response = await fetch(`${BACKEND_URL}/api/clientes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(clienteData)
+                });
+                const resData = await response.json();
+
+                if (resData.success) {
+                    alert("✅ ¡Cliente guardado con éxito!");
+                    limpiarFormularioCliente();
+                    closeClientesModal();
+                    await sincronizarClientesCache();
+                    renderizarTablaClientesModal();
                 } else {
-                    await addDoc(collection(db, "clientes"), clienteData);
-                    alert("✅ ¡Cliente registrado con éxito!");
+                    alert("❌ Error al guardar: " + (resData.message || "Error desconocido"));
                 }
-                limpiarFormularioCliente();
-                renderizarTablaClientesModal();
             } catch (err) {
-                alert("❌ Error al guardar: " + err.message);
+                alert("❌ Error de red al guardar: " + err.message);
             }
         };
 
