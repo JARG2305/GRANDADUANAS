@@ -994,7 +994,7 @@
                 const resData = await response.json();
 
                 if (resData.success) {
-                    alert("✅ ¡Cliente guardado con éxito en la nube!");
+                    alert("✅ ¡Cliente guardado con éxito!");
                     limpiarFormularioCliente();
                     await sincronizarClientesCache();
                     renderizarTablaClientesModal();
