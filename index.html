@@ -939,18 +939,7 @@
                 tbody.appendChild(tr);
             });
         }
-	async function sincronizarClientesCache() {
-    try {
-        const res = await fetch(`${BACKEND_URL}/api/clientes`);
-        const data = await res.json();
-        console.log("Respuesta del servidor de clientes:", data); // <-- Añade esto para depurar
-        if (data.success && data.clientes) {
-            cacheClientes = data.clientes;
-        }
-    } catch (err) {
-        console.error("Error sincronizando caché de clientes:", err);
-    }
-}
+	
 
         window.editarClienteModal = function(id) {
             const cliente = cacheClientes.find(c => c.id === id);
@@ -1022,6 +1011,19 @@
                 }
             }
         }
+	async function sincronizarClientesCache() {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/clientes`);
+        const data = await res.json();
+        console.log("Respuesta del servidor de clientes:", data); // <-- Añade esto para depurar
+        if (data.success && data.clientes) {
+            cacheClientes = data.clientes;
+        }
+    } catch (err) {
+        console.error("Error sincronizando caché de clientes:", err);
+    }
+}
+	
 
         async function inicializarConfiguracionDinamica() {
             try {
