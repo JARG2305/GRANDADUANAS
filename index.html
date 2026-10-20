@@ -973,6 +973,7 @@
             }
         };
 
+        // 1. Guardar o actualizar cliente desde la web vía API del servidor
         window.guardarClienteWeb = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("web_clienteId").value;
@@ -1005,7 +1006,7 @@
             }
         };
 
-        // Autoguardado automático si escribes un cliente nuevo al registrar un expediente
+        // 2. Autoguardado automático al registrar expedientes vía API del servidor
         async function verificarYAutoGuardarCliente(nombreCliente) {
             if (!nombreCliente) return;
             const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
