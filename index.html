@@ -488,7 +488,7 @@
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente *</label>
                             <input type="text" id="cliente" autocomplete="off" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500" placeholder="Seleccione o escriba...">
-				<div id="dropdown_cliente" class="custom-dropdown-list"></div>
+			<div id="dropdown_cliente" class="custom-dropdown-list"></div>
 			</div>
 
                         <!-- PROVEEDOR -->
@@ -2726,6 +2726,35 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
         document.addEventListener("DOMContentLoaded", () => {
             actualizarEstiloBot('whatsapp', estadosBots.whatsapp);
             actualizarEstiloBot('telegram', estadosBots.telegram);
+
+            // 2. Agregamos aquí mismo el escuchador para validar el cliente al salir del campo
+            const inputCliente = document.getElementById("cliente");
+            if (inputCliente) {
+                inputCliente.addEventListener("blur", function() {
+                    const nombreCliente = this.value.trim();
+                    if (!nombreCliente) return;
+
+                    setTimeout(() => {
+                        const existe = cacheClientes.some(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                        
+                        if (!existe) {
+                            const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos (RIF, Teléfono, Correo)?`);
+                            
+                            if (confirmar) {
+                                openClientesModal();
+                                const inputRazon = document.getElementById("web_razonSocial");
+                                if (inputRazon) {
+                                    inputRazon.value = nombreCliente;
+                                }
+                                const inputRif = document.getElementById("web_rif");
+                                if (inputRif) {
+                                    inputRif.focus();
+                                }
+                            }
+                        }
+                    }, 250);
+                });
+            }
         });
 
         window.toggleBotUnificado = function(tipo) {
