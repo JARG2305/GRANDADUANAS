@@ -619,14 +619,48 @@ app.get('/api/whatsapp/estado', (req, res) => {
 
 // Obtener todos los clientes desde la web o backend
 app.get('/api/clientes', async (req, res) => {
-    const clientes = await obtenerClientesFirestore();
-    res.json({ success: true, clientes });
+    try {
+        if (!db) {
+            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
+        }
+        const snapshot = await db.collection("clientes").get();
+        let clientes = [];
+        snapshot.forEach(doc => {
+            clientes.push({ id: doc.id, ...doc.data() });
+        });
+        res.json({ success: true, clientes });
+    } catch (error) {
+        console.error("Error obteniendo clientes:", error);
+        res.json({ success: false, clientes: [] });
+    }
 });
 
 // Guardar un cliente nuevo desde la web
 app.post('/api/clientes', async (req, res) => {
-    const exito = await guardarClienteFirestore(req.body);
-    res.json({ success: exito });
+    try {
+        if (!db) {
+            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
+        }
+        const { razonSocial, rif, direccion, telefono, correo } = req.body;
+        if (!razonSocial) {
+            return res.json({ success: false, message: "La razón social es obligatoria" });
+        }
+
+        const nuevoCliente = {
+            razonSocial: razonSocial.trim(),
+            rif: (rif || "S/N").trim(),
+            direccion: (direccion || "").trim(),
+            telefono: (telefono || "").trim(),
+            correo: (correo || "").trim(),
+            fechaCreacion: new Date().toISOString()
+        };
+
+        await db.collection("clientes").add(nuevoCliente);
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error guardando cliente:", error);
+        res.json({ success: false, message: error.message });
+    }
 });
 
 // =========================================================================
