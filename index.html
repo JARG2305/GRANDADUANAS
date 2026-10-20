@@ -881,13 +881,14 @@
         let sortColumnIndex = null;
         let sortDirection = 'asc';
 
-	let cacheClientes = [];
+	// Sincronizar caché de clientes desde la nube
+        let cacheClientes = [];
 
-        // Sincronizar caché de clientes desde la nube
         async function sincronizarClientesCache() {
             try {
                 const res = await fetch(`${BACKEND_URL}/api/clientes`);
                 const data = await res.json();
+                console.log("Respuesta del servidor de clientes:", data);
                 if (data.success && data.clientes) {
                     cacheClientes = data.clientes;
                 }
@@ -1290,7 +1291,16 @@
                 const dropdown = document.getElementById(`dropdown_${campoId}`);
                 if (!input || !dropdown) return;
 
-                const valoresUnicos = [...new Set(data.map(r => r[campoId]).filter(Boolean))].sort();
+                // Extraemos valores únicos de los expedientes
+                let valoresUnicos = [...new Set(data.map(r => r[campoId]).filter(Boolean))];
+
+                // SI EL CAMPO ES CLIENTE, INTEGRAMOS LA BASE DE DATOS DE CLIENTES DE LA NUBE
+                if (campoId === 'cliente' && typeof cacheClientes !== 'undefined' && cacheClientes.length > 0) {
+                    const clientesNube = cacheClientes.map(c => c.razonSocial).filter(Boolean);
+                    valoresUnicos = [...new Set([...valoresUnicos, ...clientesNube])];
+                }
+
+                valoresUnicos.sort();
                 let currentIndex = -1;
 
                 function cerrarDropdown() {
@@ -1330,7 +1340,7 @@
                         cerrarDropdown();
                         return;
                     }
-                    const filtrados = valoresUnicos.filter(v => String(v).toLowerCase().includes(filtro.toLowerCase()));
+                    const filtrados = valoresUnicos.values ? Array.from(valoresUnicos).filter(v => String(v).toLowerCase().includes(filtro.toLowerCase())) : valoresUnicos.filter(v => String(v).toLowerCase().includes(filtro.toLowerCase()));
                     renderizarOpciones(filtrados);
                 }
 
