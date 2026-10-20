@@ -1007,23 +1007,25 @@
         async function verificarYAutoGuardarCliente(nombreCliente) {
             if (!nombreCliente) return;
             const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
+            
             if (!existe) {
-                try {
-                    await fetch(`${BACKEND_URL}/api/clientes`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            razonSocial: nombreCliente,
-                            rif: "S/N",
-                            direccion: "",
-                            telefono: "",
-                            correo: ""
-                        })
-                    });
-                    await sincronizarClientesCache();
-                    actualizarListasDatalists(allRecords);
-                } catch (e) {
-                    console.error("Error al auto-guardar nuevo cliente:", e);
+                const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos (RIF, Teléfono, Correo)?`);
+                
+                if (confirmar) {
+                    // 1. Abrimos el modal de clientes
+                    openClientesModal();
+                    
+                    // 2. Prellenamos la Razón Social con lo que escribiste en el expediente
+                    const inputRazon = document.getElementById("web_razonSocial");
+                    if (inputRazon) {
+                        inputRazon.value = nombreCliente;
+                    }
+                    
+                    // 3. Enfocamos el campo RIF para que continúes escribiendo rápido
+                    const inputRif = document.getElementById("web_rif");
+                    if (inputRif) {
+                        inputRif.focus();
+                    }
                 }
             }
         }
