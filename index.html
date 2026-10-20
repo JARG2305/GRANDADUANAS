@@ -1790,7 +1790,7 @@
                 if (alertasParaMostrar.length > 0) {
                     alertasParaMostrar.forEach(alert => {
                         const div = document.createElement("div");
-                        div.className = `p-2 rounded-lg border flex items-center justify-between gap-2 text-xs truncate ${alert.type === 'danger' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`;
+div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2 text-xs font-semibold ${alert.type === 'danger' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-800'}`;
                         div.innerHTML = `<span>${alert.textWeb}</span>`;
                         container.appendChild(div);
                     });
