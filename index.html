@@ -882,6 +882,7 @@
         let sortDirection = 'asc';
 
 	// Sincronizar caché de clientes desde la nube
+        // Sincronizar caché de clientes desde la nube
         let cacheClientes = [];
 
         async function sincronizarClientesCache() {
@@ -940,7 +941,6 @@
                 tbody.appendChild(tr);
             });
         }
-	
 
         window.editarClienteModal = function(id) {
             const cliente = cacheClientes.find(c => c.id === id);
@@ -973,10 +973,8 @@
             }
         };
 
-        // 1. Guardar o actualizar cliente desde la web vía API del servidor
         window.guardarClienteWeb = async function(e) {
             e.preventDefault();
-            const idVal = document.getElementById("web_clienteId").value;
             const clienteData = {
                 razonSocial: document.getElementById("web_razonSocial").value.trim(),
                 rif: document.getElementById("web_rif").value.trim(),
@@ -994,7 +992,7 @@
                 const resData = await response.json();
 
                 if (resData.success) {
-                    alert("✅ ¡Cliente guardado con éxito!");
+                    alert("✅ ¡Cliente guardado con éxito en la nube!");
                     limpiarFormularioCliente();
                     await sincronizarClientesCache();
                     renderizarTablaClientesModal();
@@ -1006,7 +1004,6 @@
             }
         };
 
-        // 2. Autoguardado automático al registrar expedientes vía API del servidor
         async function verificarYAutoGuardarCliente(nombreCliente) {
             if (!nombreCliente) return;
             const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
