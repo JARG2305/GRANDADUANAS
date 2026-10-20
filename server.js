@@ -621,13 +621,21 @@ app.get('/api/whatsapp/estado', (req, res) => {
 // Obtener todos los clientes desde la nube
 app.get('/api/clientes', async (req, res) => {
     try {
-        if (!db) {
-            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
-        }
-        const snapshot = await db.collection("clientes").get();
-        let clientes = [];
-        snapshot.forEach(doc => {
-            clientes.push({ id: doc.id, ...doc.data() });
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.documents) return res.json({ success: true, clientes: [] });
+
+        const clientes = result.documents.map(doc => {
+            let fields = doc.fields || {};
+            return {
+                id: doc.name.split('/').pop(),
+                razonSocial: fields.razonSocial?.stringValue || '',
+                rif: fields.rif?.stringValue || '',
+                direccion: fields.direccion?.stringValue || '',
+                telefono: fields.telefono?.stringValue || '',
+                correo: fields.correo?.stringValue || ''
+            };
         });
         res.json({ success: true, clientes });
     } catch (error) {
@@ -639,25 +647,37 @@ app.get('/api/clientes', async (req, res) => {
 // Guardar un cliente nuevo desde la web
 app.post('/api/clientes', async (req, res) => {
     try {
-        if (!db) {
-            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
-        }
         const { razonSocial, rif, direccion, telefono, correo } = req.body;
         if (!razonSocial) {
             return res.status(400).json({ success: false, message: "La razón social es obligatoria." });
         }
 
-        const nuevoCliente = {
-            razonSocial: razonSocial.trim(),
-            rif: (rif || "S/N").trim(),
-            direccion: (direccion || "").trim(),
-            telefono: (telefono || "").trim(),
-            correo: (correo || "").trim(),
-            fechaCreacion: new Date().toISOString()
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const body = {
+            fields: {
+                razonSocial: { stringValue: razonSocial.trim() },
+                rif: { stringValue: (rif || "S/N").trim() },
+                direccion: { stringValue: (direccion || "").trim() },
+                telefono: { stringValue: (telefono || "").trim() },
+                correo: { stringValue: (correo || "").trim() },
+                fechaCreacion: { stringValue: new Date().toISOString() }
+            }
         };
 
-        const docRef = await db.collection("clientes").add(nuevoCliente);
-        res.json({ success: true, id: docRef.id });
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const id = data.name.split('/').pop();
+            res.json({ success: true, id });
+        } else {
+            const errText = await response.text();
+            res.status(500).json({ success: false, message: errText });
+        }
     } catch (error) {
         console.error("Error guardando cliente:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -667,12 +687,15 @@ app.post('/api/clientes', async (req, res) => {
 // Eliminar un cliente desde la web
 app.delete('/api/clientes/:id', async (req, res) => {
     try {
-        if (!db) {
-            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
-        }
         const clienteId = req.params.id;
-        await db.collection("clientes").doc(clienteId).delete();
-        res.json({ success: true });
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes/${clienteId}`;
+        const response = await fetch(url, { method: 'DELETE' });
+        if (response.ok || response.status === 404) {
+            res.json({ success: true });
+        } else {
+            const errText = await response.text();
+            res.status(500).json({ success: false, message: errText });
+        }
     } catch (error) {
         console.error("Error eliminando cliente:", error);
         res.status(500).json({ success: false, message: error.message });
