@@ -618,6 +618,7 @@ app.get('/api/whatsapp/estado', (req, res) => {
 });
 
 // Obtener todos los clientes desde la web o backend
+// Obtener todos los clientes desde la nube
 app.get('/api/clientes', async (req, res) => {
     try {
         if (!db) {
@@ -631,7 +632,7 @@ app.get('/api/clientes', async (req, res) => {
         res.json({ success: true, clientes });
     } catch (error) {
         console.error("Error obteniendo clientes:", error);
-        res.json({ success: false, clientes: [] });
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -643,7 +644,7 @@ app.post('/api/clientes', async (req, res) => {
         }
         const { razonSocial, rif, direccion, telefono, correo } = req.body;
         if (!razonSocial) {
-            return res.json({ success: false, message: "La razón social es obligatoria" });
+            return res.status(400).json({ success: false, message: "La razón social es obligatoria." });
         }
 
         const nuevoCliente = {
@@ -655,11 +656,11 @@ app.post('/api/clientes', async (req, res) => {
             fechaCreacion: new Date().toISOString()
         };
 
-        await db.collection("clientes").add(nuevoCliente);
-        res.json({ success: true });
+        const docRef = await db.collection("clientes").add(nuevoCliente);
+        res.json({ success: true, id: docRef.id });
     } catch (error) {
         console.error("Error guardando cliente:", error);
-        res.json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
