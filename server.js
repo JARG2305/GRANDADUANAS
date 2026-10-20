@@ -812,22 +812,36 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
 }, { timezone: "America/Caracas" });
 // Función que escanea automáticamente todas las variables de Render y arranca el bot de cada cliente
 function iniciarTodosLosBotsAutomaticos() {
-    console.log("🤖 [MULTIBOT] Escaneando variables de Render para iniciar los bots...");
+    console.log("🤖 [MULTIBOT] Escaneando variables de Render...");
 
-    // Recorremos todo process.env buscando variables que terminen en _TOKEN o _BOT_TOKEN
+    let tokensEncontrados = [];
+
+    // 1. Si tienes las variables generales clásicas, las agregamos de una vez
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+        tokensEncontrados.push({
+            token: process.env.TELEGRAM_BOT_TOKEN,
+            chatId: process.env.TELEGRAM_CHAT_ID || '',
+            nombre: "CLIENTE_PRINCIPAL"
+        });
+    }
+
+    // 2. Escaneamos las demás variables por si tienes de otros clientes (_TOKEN, _BOT_TOKEN)
     for (const [key, value] of Object.entries(process.env)) {
-        if ((key.endsWith('_TOKEN') || key.endsWith('_BOT_TOKEN')) && value) {
-            const tokenBot = value;
-            // Extraemos el prefijo (ej: de SOTO_BOT_TOKEN o SOTO_TOKEN sacamos SOTO)
+        if ((key.endsWith('_TOKEN') || key.endsWith('_BOT_TOKEN')) && key !== 'TELEGRAM_BOT_TOKEN' && value) {
             const prefijoCliente = key.replace(/(_BOT_TOKEN|_TOKEN)$/, '');
-            const chatIdEsperado = process.env[`${prefijoCliente}_CHAT_ID`];
-
-            console.log(`🚀 [BOT DETECTADO] Activando vigilancia para el cliente: ${prefijoCliente}`);
-            
-            // Iniciamos un ciclo de escucha independiente para este bot
-            ejecutarPollingParaBot(tokenBot, chatIdEsperado, prefijoCliente);
+            tokensEncontrados.push({
+                token: value,
+                chatId: process.env[`${prefijoCliente}_CHAT_ID`] || '',
+                nombre: prefijoCliente
+            });
         }
     }
+
+    // Activamos la vigilancia para cada uno
+    tokensEncontrados.forEach(bot => {
+        console.log(`🚀 [BOT ACTIVADO] Vigilando para: ${bot.nombre}`);
+        ejecutarPollingParaBot(bot.token, bot.chatId, bot.nombre);
+    });
 }
 
 // Ciclo de escucha independiente por cada bot encontrado
