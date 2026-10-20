@@ -663,6 +663,48 @@ app.post('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+// Guardar un cliente nuevo desde la web
+app.post('/api/clientes', async (req, res) => {
+    try {
+        if (!db) {
+            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
+        }
+        const { razonSocial, rif, direccion, telefono, correo } = req.body;
+        if (!razonSocial) {
+            return res.status(400).json({ success: false, message: "La razón social es obligatoria." });
+        }
+
+        const nuevoCliente = {
+            razonSocial: razonSocial.trim(),
+            rif: (rif || "S/N").trim(),
+            direccion: (direccion || "").trim(),
+            telefono: (telefono || "").trim(),
+            correo: (correo || "").trim(),
+            fechaCreacion: new Date().toISOString()
+        };
+
+        const docRef = await db.collection("clientes").add(nuevoCliente);
+        res.json({ success: true, id: docRef.id });
+    } catch (error) {
+        console.error("Error guardando cliente:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Eliminar un cliente desde la web
+app.delete('/api/clientes/:id', async (req, res) => {
+    try {
+        if (!db) {
+            return res.status(500).json({ success: false, message: "Firestore no inicializado" });
+        }
+        const clienteId = req.params.id;
+        await db.collection("clientes").doc(clienteId).delete();
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error eliminando cliente:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 // =========================================================================
 // RUTA DE FORZAR ALERTAS (MULTICANAL)

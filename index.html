@@ -957,11 +957,19 @@
         window.eliminarClienteModal = async function(id) {
             if (!confirm("¿Desea eliminar este cliente de la base de datos?")) return;
             try {
-                await deleteDoc(doc(db, "clientes", id));
-                alert("🗑️ Cliente eliminado con éxito.");
-                renderizarTablaClientesModal();
+                const response = await fetch(`${BACKEND_URL}/api/clientes/${id}`, {
+                    method: 'DELETE'
+                });
+                const resData = await response.json();
+                if (resData.success) {
+                    alert("🗑️ Cliente eliminado con éxito.");
+                    await sincronizarClientesCache();
+                    renderizarTablaClientesModal();
+                } else {
+                    alert("❌ Error al eliminar: " + (resData.message || "Error desconocido"));
+                }
             } catch (err) {
-                alert("❌ Error al eliminar: " + err.message);
+                alert("❌ Error de red al eliminar: " + err.message);
             }
         };
 
@@ -1003,13 +1011,16 @@
             const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
             if (!existe) {
                 try {
-                    await addDoc(collection(db, "clientes"), {
-                        razonSocial: nombreCliente,
-                        rif: "S/N",
-                        direccion: "",
-                        telefono: "",
-                        correo: "",
-                        fechaCreacion: new Date().toISOString()
+                    await fetch(`${BACKEND_URL}/api/clientes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razonSocial: nombreCliente,
+                            rif: "S/N",
+                            direccion: "",
+                            telefono: "",
+                            correo: ""
+                        })
                     });
                     await sincronizarClientesCache();
                 } catch (e) {
