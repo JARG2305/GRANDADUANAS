@@ -183,6 +183,9 @@
                         <button onclick="openArchiveModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition">
                             📁 Archivo Histórico <span class="text-xs text-slate-400 font-normal">(&gt;30d)</span>
                         </button>
+<button type="button" onclick="openClientesModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+    🏢 Gestión de Clientes
+</button>
                         <button onclick="openMultasModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition text-red-700">
                             ⚠️ Expedientes con Multas <span class="text-xs text-slate-400 font-normal">(Historial)</span>
                         </button>
@@ -796,6 +799,65 @@
             <button onclick="closeWhatsAppModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">Cerrar</button>
         </div>
     </div>
+<!-- MODAL DE GESTIÓN DE CLIENTES -->
+    <div id="clientesModal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col my-auto">
+            <div class="bg-navy-900 text-white p-4 flex justify-between items-center rounded-t-2xl">
+                <h3 class="font-bold text-lg">🏢 Directorio de Clientes (Nube)</h3>
+                <button type="button" onclick="closeClientesModal()" class="text-slate-300 hover:text-white text-2xl font-bold px-2">&times;</button>
+            </div>
+            <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+                <form id="clienteForm" onsubmit="guardarClienteWeb(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <input type="hidden" id="web_clienteId">
+                    <h4 id="clienteFormTitle" class="text-xs font-bold text-slate-700 uppercase">Registrar / Editar Cliente</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Razón Social *</label>
+                            <input type="text" id="web_razonSocial" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">RIF *</label>
+                            <input type="text" id="web_rif" required placeholder="Ej: J-12345678-9" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Dirección Fiscal</label>
+                            <input type="text" id="web_direccion" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Teléfono</label>
+                            <input type="text" id="web_telefono" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
+                            <input type="email" id="web_correo" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" onclick="limpiarFormularioCliente()" class="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-bold text-slate-700">Cancelar</button>
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
+                    </div>
+                </form>
+
+                <div>
+                    <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Listado de Clientes</h4>
+                    <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
+                        <table class="w-full text-left border-collapse text-xs whitespace-nowrap bg-white">
+                            <thead class="bg-slate-700 text-white font-bold sticky top-0">
+                                <tr>
+                                    <th class="p-2.5 text-center">Acciones</th>
+                                    <th class="p-2.5">Razón Social</th>
+                                    <th class="p-2.5">RIF</th>
+                                    <th class="p-2.5">Teléfono</th>
+                                    <th class="p-2.5">Correo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientesTableBody" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Script de Firebase y Lógica del Sistema Corregida -->
     <script type="module">
@@ -818,6 +880,136 @@
         let selectedRecordId = null;
         let sortColumnIndex = null;
         let sortDirection = 'asc';
+
+	let cacheClientes = [];
+
+        // Sincronizar caché de clientes desde la nube
+        async function sincronizarClientesCache() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/clientes`);
+                const data = await res.json();
+                if (data.success && data.clientes) {
+                    cacheClientes = data.clientes;
+                }
+            } catch (err) {
+                console.error("Error sincronizando caché de clientes:", err);
+            }
+        }
+        sincronizarClientesCache();
+
+        window.openClientesModal = function() {
+            document.getElementById("clientesModal").classList.remove("hidden");
+            renderizarTablaClientesModal();
+        };
+
+        window.closeClientesModal = function() {
+            document.getElementById("clientesModal").classList.add("hidden");
+        };
+
+        window.limpiarFormularioCliente = function() {
+            document.getElementById("clienteForm").reset();
+            document.getElementById("web_clienteId").value = "";
+            document.getElementById("clienteFormTitle").innerText = "Registrar / Editar Cliente";
+        };
+
+        async function renderizarTablaClientesModal() {
+            await sincronizarClientesCache();
+            const tbody = document.getElementById("clientesTableBody");
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            if (cacheClientes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">No hay clientes registrados.</td></tr>`;
+                return;
+            }
+
+            cacheClientes.forEach(c => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="p-2.5 text-center">
+                        <button type="button" onclick="editarClienteModal('${c.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button>
+                        <button type="button" onclick="eliminarClienteModal('${c.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button>
+                    </td>
+                    <td class="p-2.5 font-bold text-blue-900">${c.razonSocial || ''}</td>
+                    <td class="p-2.5">${c.rif || ''}</td>
+                    <td class="p-2.5">${c.telefono || ''}</td>
+                    <td class="p-2.5">${c.correo || ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        window.editarClienteModal = function(id) {
+            const cliente = cacheClientes.find(c => c.id === id);
+            if (!cliente) return;
+            document.getElementById("web_clienteId").value = cliente.id;
+            document.getElementById("web_razonSocial").value = cliente.razonSocial || '';
+            document.getElementById("web_rif").value = cliente.rif || '';
+            document.getElementById("web_direccion").value = cliente.direccion || '';
+            document.getElementById("web_telefono").value = cliente.telefono || '';
+            document.getElementById("web_correo").value = cliente.correo || '';
+            document.getElementById("clienteFormTitle").innerText = "Editar Cliente: " + cliente.razonSocial;
+        };
+
+        window.eliminarClienteModal = async function(id) {
+            if (!confirm("¿Desea eliminar este cliente de la base de datos?")) return;
+            try {
+                await deleteDoc(doc(db, "clientes", id));
+                alert("🗑️ Cliente eliminado con éxito.");
+                renderizarTablaClientesModal();
+            } catch (err) {
+                alert("❌ Error al eliminar: " + err.message);
+            }
+        };
+
+        window.guardarClienteWeb = async function(e) {
+            e.preventDefault();
+            const idVal = document.getElementById("web_clienteId").value;
+            const clienteData = {
+                razonSocial: document.getElementById("web_razonSocial").value.trim(),
+                rif: document.getElementById("web_rif").value.trim(),
+                direccion: document.getElementById("web_direccion").value.trim(),
+                telefono: document.getElementById("web_telefono").value.trim(),
+                correo: document.getElementById("web_correo").value.trim(),
+                fechaCreacion: new Date().toISOString()
+            };
+
+            try {
+                if (idVal) {
+                    await updateDoc(doc(db, "clientes", idVal), clienteData);
+                    alert("✅ ¡Cliente actualizado con éxito!");
+                } else {
+                    await addDoc(collection(db, "clientes"), clienteData);
+                    alert("✅ ¡Cliente registrado con éxito!");
+                }
+                limpiarFormularioCliente();
+                renderizarTablaClientesModal();
+            } catch (err) {
+                alert("❌ Error al guardar: " + err.message);
+            }
+        };
+
+        // Autoguardado automático si escribes un cliente nuevo al registrar un expediente
+        async function verificarYAutoGuardarCliente(nombreCliente) {
+            if (!nombreCliente) return;
+            const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
+            if (!existe) {
+                try {
+                    await addDoc(collection(db, "clientes"), {
+                        razonSocial: nombreCliente,
+                        rif: "S/N",
+                        direccion: "",
+                        telefono: "",
+                        correo: "",
+                        fechaCreacion: new Date().toISOString()
+                    });
+                    await sincronizarClientesCache();
+                } catch (e) {
+                    console.error("Error al auto-guardar nuevo cliente:", e);
+                }
+            }
+        }
 
         async function inicializarConfiguracionDinamica() {
             try {
@@ -2040,20 +2232,28 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                     
                     await enviarAlertaTelegram(mensajeAlertaInmediata);
                 }
+		await verificarYAutoGuardarCliente(record.cliente);
 
                 closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
         }
+	
 
         window.enviarAlertasPendientes = async function() {
             if (!window._todasLasAlertasActivas || window._todasLasAlertasActivas.length === 0) {
-                alert("⚠️ No hay alertas activas para enviar.");
+                alert("⚠️ No hay alertas activas en pantalla para enviar.");
                 return;
             }
 
+            if (!confirm("¿Desea disparar y forzar todas las alertas visibles en pantalla?")) return;
+
             try {
+                // Armamos el reporte completo directamente desde la web con todas las alertas
+                let listaTextosWeb = window._todasLasAlertasActivas.map((a, i) => `${i + 1}️⃣ ${(a.textWeb || "").replace(/<[^>]*>/g, '')}`);
+                let mensajeConsolidado = `🚨 *LOGISTATUS PRO - REPORTE FORZADO MANUAL* 🚨\n\n` + listaTextosWeb.join("\n\n. . . . . . . . . . . . . . . . . . . . . . . .\n\n");
+
                 const canalesSeleccionados = {
                     whatsapp: typeof estadosBots !== 'undefined' ? estadosBots.whatsapp : true,
                     telegram: typeof estadosBots !== 'undefined' ? estadosBots.telegram : true
@@ -2062,13 +2262,16 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 const response = await fetch(`${BACKEND_URL}/api/alertas/forzar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ canales: canalesSeleccionados })
+                    body: JSON.stringify({ 
+                        canales: canalesSeleccionados,
+                        textoForzadoDirecto: mensajeConsolidado 
+                    })
                 });
                 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    alert("✅ ¡Alertas forzadas y enviadas con éxito a través de los canales activos!");
+                    alert("✅ ¡Todas las alertas visibles en pantalla fueron enviadas con éxito!");
                 } else {
                     alert("❌ Error al enviar las alertas: " + (data.message || "Error desconocido"));
                 }
@@ -2077,7 +2280,6 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 alert("❌ Ocurrió un error de red al conectar con el servidor: " + err.message);
             }
         };
-
         window.editRecord = function(id) { 
             const rec = allRecords.find(r => r.id === id); 
             if (rec) openModal(rec); 

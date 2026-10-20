@@ -380,7 +380,7 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
                             res += `\n   • DAI: *Registrada (${fechaDaiFormatted})*`;
                         }
                     } else {
-                        res += `\n   • DAI: *⚠️ FALTA REGISTRAR DAI / DUA*`;
+                        res += `\n   • DAI: *⚠️ FALTA REGISTRAR DAI*`;
                     }
                 }
 
