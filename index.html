@@ -1004,32 +1004,38 @@
             }
         };
 	window.verificarClienteAlSalir = function(nombreCliente) {
-            nombreCliente = nombreCliente.trim();
-            if (!nombreCliente) return;
-
-            // Verificamos si ya existe en la caché de clientes
-            const existe = cacheClientes.some(c => String(c.razonSocial).toLowerCase() === String(nombreCliente).toLowerCase());
-            
-            if (!existe) {
-                const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos (RIF, Teléfono, Correo)?`);
+            // Usamos un pequeño retraso para asegurar que el valor esté completamente escrito y capturado
+            setTimeout(async () => {
+                const inputCliente = document.getElementById("cliente");
+                if (!inputCliente) return;
                 
-                if (confirmar) {
-                    // 1. Abrimos el modal de clientes
-                    openClientesModal();
+                const valorActual = inputCliente.value.trim();
+                if (!valorActual) return;
+
+                // Verificamos si ya existe en la caché de clientes (ignorando mayúsculas/minúsculas)
+                const existe = cacheClientes.some(c => String(c.razonSocial).trim().toLowerCase() === String(valorActual).toLowerCase());
+                
+                if (!existe) {
+                    const confirmar = confirm(`⚠️ El cliente "${valorActual}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos (RIF, Teléfono, Correo)?`);
                     
-                    // 2. Prellenamos la Razón Social automáticamente
-                    const inputRazon = document.getElementById("web_razonSocial");
-                    if (inputRazon) {
-                        inputRazon.value = nombreCliente;
-                    }
-                    
-                    // 3. Enfocamos el campo RIF para continuar escribiendo rápido
-                    const inputRif = document.getElementById("web_rif");
-                    if (inputRif) {
-                        inputRif.focus();
+                    if (confirmar) {
+                        // 1. Abrimos el modal de clientes
+                        openClientesModal();
+                        
+                        // 2. Prellenamos la Razón Social automáticamente
+                        const inputRazon = document.getElementById("web_razonSocial");
+                        if (inputRazon) {
+                            inputRazon.value = valorActual;
+                        }
+                        
+                        // 3. Enfocamos el campo RIF para continuar escribiendo rápido
+                        const inputRif = document.getElementById("web_rif");
+                        if (inputRif) {
+                            inputRif.focus();
+                        }
                     }
                 }
-            }
+            }, 200); // 200 milisegundos de respiro para el navegador
         };
 
         async function verificarYAutoGuardarCliente(nombreCliente) {
