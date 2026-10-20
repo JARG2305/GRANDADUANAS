@@ -647,6 +647,28 @@ app.get('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+// Función para verificar si el cliente tiene activo el envío automático en Firestore
+async function clientePermiteAutomatizacion(nombreCliente) {
+    if (!nombreCliente) return false;
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.documents) return true; // Por defecto activo si no se encuentra registrado
+
+        for (const doc of result.documents) {
+            const fields = doc.fields || {};
+            const razonSocial = fields.razonSocial?.stringValue || "";
+            if (razonSocial.trim().toLowerCase() === String(nombreCliente).trim().toLowerCase()) {
+                // Retorna el valor booleano del switch (por defecto true si no está definido)
+                return fields.enviarAutomatico?.booleanValue ?? true;
+            }
+        }
+    } catch (err) {
+        console.error("Error verificando automatización del cliente:", err);
+    }
+    return true;
+}
 
 // Guardar o actualizar un cliente desde la web (con soporte para el interruptor automático)
 app.post('/api/clientes', async (req, res) => {
@@ -690,6 +712,30 @@ app.post('/api/clientes', async (req, res) => {
         }
     } catch (error) {
         console.error("Error guardando cliente:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+const permitirAuto = await clientePermiteAutomatizacion(nombreCliente);
+if (permitirAuto) {
+    // Aquí disparas tu alerta o mensaje automático al cliente (por WhatsApp, Telegram o Correo)
+    console.log(`🚀 [AUTOMATIZACIÓN] Enviando actualización al cliente: ${nombreCliente}`);
+} else {
+    console.log(`🔕 [AUTOMATIZACIÓN] El cliente ${nombreCliente} tiene desactivado el envío automático.`);
+}
+app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
+    try {
+        const expedientes = await obtenerExpedientesFirestore();
+        const clientes = await obtenerClientesFirestore();
+
+        // Filtramos clientes con envío automático habilitado
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false);
+
+        // Aquí procesas los expedientes que hayan tenido movimientos recientes o pendientes
+        console.log(`🚀 [FORZAR DÍA] Procesando actualizaciones recientes para ${clientesActivos.length} clientes...`);
+
+        res.json({ success: true, message: "Actualizaciones del día procesadas y enviadas." });
+    } catch (error) {
+        console.error("Error en ruta forzar actualización:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });

@@ -172,6 +172,9 @@
                 <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow whitespace-nowrap">
                     ➕ Nuevo
                 </button>
+		<button onclick="forzarEnvioActualizacionesHoy()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+   		 🚀 Forzar Envío de Estatus del Día
+		</button>
 
                 <div class="relative group">
                     <button class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow whitespace-nowrap">
@@ -843,14 +846,15 @@
                     <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
                         <table class="w-full text-left border-collapse text-xs whitespace-nowrap bg-white">
                             <thead class="bg-slate-700 text-white font-bold sticky top-0">
-                                <tr>
-                                    <th class="p-2.5 text-center">Acciones</th>
-                                    <th class="p-2.5">Razón Social</th>
-                                    <th class="p-2.5">RIF</th>
-                                    <th class="p-2.5">Teléfono</th>
-                                    <th class="p-2.5">Correo</th>
-                                </tr>
-                            </thead>
+    <tr>
+        <th class="p-2.5 text-center">Acciones</th>
+        <th class="p-2.5">Razón Social</th>
+        <th class="p-2.5">RIF</th>
+        <th class="p-2.5">Teléfono</th>
+        <th class="p-2.5">Correo</th>
+        <th class="p-2.5 text-center">Auto (Switch)</th>
+    </tr>
+</thead>
                             <tbody id="clientesTableBody" class="divide-y divide-slate-200"></tbody>
                         </table>
                     </div>
@@ -2510,6 +2514,26 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 alert("❌ Ocurrió un error de red al procesar y enviar el archivo.");
             }
         };
+window.forzarEnvioActualizacionesHoy = async function() {
+    if (!confirm("¿Desea forzar el envío de las actualizaciones y estatus recientes del día a los clientes con envío automático habilitado?")) return;
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/clientes/forzar-actualizacion-dia`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const resultado = await response.json();
+
+        if (response.ok && resultado.success) {
+            alert("✅ ¡Actualizaciones recientes del día enviadas de forma forzada con éxito!");
+        } else {
+            alert("❌ Error al forzar el envío: " + (resultado.message || "Error desconocido"));
+        }
+    } catch (error) {
+        console.error("Error al forzar actualizaciones:", error);
+        alert("❌ Ocurrió un error de red al intentar forzar el envío.");
+    }
+};
 
         function buildRows(records, isArchivedSheet = false) {
             return records.map(rec => {
