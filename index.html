@@ -1021,6 +1021,7 @@
                         })
                     });
                     await sincronizarClientesCache();
+                    actualizarListasDatalists(allRecords);
                 } catch (e) {
                     console.error("Error al auto-guardar nuevo cliente:", e);
                 }
@@ -1292,14 +1293,16 @@
                 const dropdown = document.getElementById(`dropdown_${campoId}`);
                 if (!input || !dropdown) return;
 
-                // Extraemos valores únicos de los expedientes
                 let valoresUnicos = [...new Set(data.map(r => r[campoId]).filter(Boolean))];
 
-                // SI EL CAMPO ES CLIENTE, INTEGRAMOS LA BASE DE DATOS DE CLIENTES DE LA NUBE
+                // AQUÍ SE INTEGRAN LOS CLIENTES DE LA NUBE PARA LA AUTOCOMPLETACIÓN
                 if (campoId === 'cliente' && typeof cacheClientes !== 'undefined' && cacheClientes.length > 0) {
                     const clientesNube = cacheClientes.map(c => c.razonSocial).filter(Boolean);
                     valoresUnicos = [...new Set([...valoresUnicos, ...clientesNube])];
                 }
+
+                valoresUnicos.sort();
+                // ... (el resto de la lógica del dropdown se mantiene igual)
 
                 valoresUnicos.sort();
                 let currentIndex = -1;
@@ -2238,32 +2241,16 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
 
-                const nuevaFechaLlegada = record.fecha_llegada;
-                const fechaAnterior = registroAnterior ? registroAnterior.fecha_llegada : "";
-
-                if (nuevaFechaLlegada && nuevaFechaLlegada !== fechaAnterior) {
-                    const modo = (record.modo_transporte || "").toLowerCase();
-                    const esAereo = modo.includes("aéreo") || modo.includes("aereo");
-                    
-                    const icono = esAereo ? "✈️" : "🚢";
-                    const tipoTransporteTexto = esAereo ? "Vuelo" : "Buque";
-                    
-                    const transporteInfo = record.buque_vuelo_ve || "S/N";
-                    const almacenInfo = record.almacen || "Por Asignar";
-                    const expName = record.num_expediente || "S/N";
-                    const clienteInfo = record.cliente || "S/N";
-
-                    const mensajeAlertaInmediata = `${icono} **NUEVO ARRIBO REGISTRADO**\n\nExp: *${expName}*\nCliente: *${clienteInfo}*\nCarga arribada al Pais en Fecha *${nuevaFechaLlegada}* ${tipoTransporteTexto} *${transporteInfo}* Almacenada en *${almacenInfo}*.`;
-                    
-                    await enviarAlertaTelegram(mensajeAlertaInmediata);
+                // Llamada para autoguardar el cliente si es nuevo
+                if (record.cliente) {
+                    await verificarYAutoGuardarCliente(record.cliente);
                 }
-		await verificarYAutoGuardarCliente(record.cliente);
 
                 closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
-        }
+        };
 	
 
         window.enviarAlertasPendientes = async function() {
