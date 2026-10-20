@@ -987,7 +987,6 @@
                 if (resData.success) {
                     alert("✅ ¡Cliente guardado con éxito!");
                     limpiarFormularioCliente();
-                    closeClientesModal();
                     await sincronizarClientesCache();
                     renderizarTablaClientesModal();
                 } else {
