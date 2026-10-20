@@ -715,13 +715,7 @@ app.post('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-const permitirAuto = await clientePermiteAutomatizacion(nombreCliente);
-if (permitirAuto) {
-    // Aquí disparas tu alerta o mensaje automático al cliente (por WhatsApp, Telegram o Correo)
-    console.log(`🚀 [AUTOMATIZACIÓN] Enviando actualización al cliente: ${nombreCliente}`);
-} else {
-    console.log(`🔕 [AUTOMATIZACIÓN] El cliente ${nombreCliente} tiene desactivado el envío automático.`);
-}
+
 app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
     try {
         const expedientes = await obtenerExpedientesFirestore();
