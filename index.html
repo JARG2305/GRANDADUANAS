@@ -1426,7 +1426,10 @@
             });
         });
 
-        function initCloudDB() {
+       async function initCloudDB() {
+            // 1. CARGAMOS LOS CLIENTES PRIMERO PARA LA AUTOCOMPLETACIÓN
+            await sincronizarClientesCache();
+
             const logoRef = doc(db, CONFIG_COLLECTION, LOGO_DOC_ID);
             getDoc(logoRef).then((docSnap) => {
                 if (docSnap.exists() && docSnap.data().imagenBase64) {
@@ -1458,6 +1461,7 @@
                     return expA.localeCompare(expB, undefined, { numeric: true, sensitivity: 'base' });
                 });
 
+                // ESTO ACTUALIZA LOS DATALISTS CON LOS CLIENTES DE LA NUBE Y LOS EXPEDIENTES
                 actualizarListasDatalists(allRecords);
                 updateTabCounters(allRecords);
                 filterData();
@@ -2112,7 +2116,10 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
             updateTabCounters(allRecords);
         }
 
-        window.openModal = function(record = null) {
+        window.openModal = async function(record = null) {
+            await sincronizarClientesCache(); // Refresca los clientes al abrir el modal
+            actualizarListasDatalists(allRecords); // Actualiza el autocompletado
+            
             document.getElementById("expModal").classList.remove("hidden");
             if (record) {
                 document.getElementById("modalTitle").innerText = "Editar Exp";
@@ -2128,7 +2135,7 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 document.getElementById("modo_transporte").value = "Marítimo";
             }
             toggleFechaPermisologia();
-        }
+        };
 
         window.closeModal = function() { document.getElementById("expModal").classList.add("hidden"); }
 
