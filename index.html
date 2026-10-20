@@ -935,8 +935,16 @@
                     </td>
                     <td class="p-2.5 font-bold text-blue-900">${c.razonSocial || ''}</td>
                     <td class="p-2.5">${c.rif || ''}</td>
-                    <td class="p-2.5">${c.telefono || ''}</td>
-                    <td class="p-2.5">${c.correo || ''}</td>
+                    <td class="p-2.5 text-center">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${c.enviarAutomatico !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                            ${c.enviarAutomatico !== false ? 'Activado' : 'Desactivado'}
+                        </span>
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <button type="button" onclick="forzarEstatusCliente('${c.id}', '${c.razonSocial}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-[11px] font-bold shadow">
+                            🚀 Enviar Forzado
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -951,6 +959,7 @@
             document.getElementById("web_direccion").value = cliente.direccion || '';
             document.getElementById("web_telefono").value = cliente.telefono || '';
             document.getElementById("web_correo").value = cliente.correo || '';
+            document.getElementById("web_enviarAutomatico").checked = cliente.enviarAutomatico !== false;
             document.getElementById("clienteFormTitle").innerText = "Editar Cliente: " + cliente.razonSocial;
         };
 
@@ -976,11 +985,13 @@
         window.guardarClienteWeb = async function(e) {
             e.preventDefault();
             const clienteData = {
+                id: document.getElementById("web_clienteId").value.trim(),
                 razonSocial: document.getElementById("web_razonSocial").value.trim(),
                 rif: document.getElementById("web_rif").value.trim(),
                 direccion: document.getElementById("web_direccion").value.trim(),
                 telefono: document.getElementById("web_telefono").value.trim(),
-                correo: document.getElementById("web_correo").value.trim()
+                correo: document.getElementById("web_correo").value.trim(),
+                enviarAutomatico: document.getElementById("web_enviarAutomatico").checked
             };
 
             try {
@@ -1001,6 +1012,27 @@
                 }
             } catch (err) {
                 alert("❌ Error de red al guardar: " + err.message);
+            }
+        };
+
+        window.forzarEstatusCliente = async function(clienteId, razonSocial) {
+            const mensaje = prompt(`Ingrese el estatus o mensaje forzado a enviar para el cliente: ${razonSocial}`, "Estimado cliente, su carga presenta actualización de estatus reciente.");
+            if (!mensaje) return;
+
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/clientes/enviar-estatus`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clienteId, mensajeForzado: mensaje })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ ¡Estatus forzado enviado correctamente al cliente!");
+                } else {
+                    alert("❌ Error: " + (data.message || "No se pudo enviar."));
+                }
+            } catch (err) {
+                alert("❌ Error de red al intentar enviar el estatus forzado.");
             }
         };
 	window.verificarClienteAlSalir = function(nombreCliente) {

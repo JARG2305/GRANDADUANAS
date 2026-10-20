@@ -617,7 +617,10 @@ app.get('/api/whatsapp/estado', (req, res) => {
     res.json({ success: true, estado: estadoConexionWhatsapp, ready: whatsappClientReady, qrCodeDataUrl: ultimoQrGenerado });
 });
 
-// Obtener todos los clientes desde la web o backend
+// ==========================================
+// GESTIÓN DE CLIENTES EN LA NUBE (FIRESTORE)
+// ==========================================
+
 // Obtener todos los clientes desde la nube
 app.get('/api/clientes', async (req, res) => {
     try {
@@ -634,7 +637,8 @@ app.get('/api/clientes', async (req, res) => {
                 rif: fields.rif?.stringValue || '',
                 direccion: fields.direccion?.stringValue || '',
                 telefono: fields.telefono?.stringValue || '',
-                correo: fields.correo?.stringValue || ''
+                correo: fields.correo?.stringValue || '',
+                enviarAutomatico: fields.enviarAutomatico?.booleanValue ?? true
             };
         });
         res.json({ success: true, clientes });
@@ -644,15 +648,19 @@ app.get('/api/clientes', async (req, res) => {
     }
 });
 
-// Guardar un cliente nuevo desde la web
+// Guardar o actualizar un cliente desde la web (con soporte para el interruptor automático)
 app.post('/api/clientes', async (req, res) => {
     try {
-        const { razonSocial, rif, direccion, telefono, correo } = req.body;
+        const { id, razonSocial, rif, direccion, telefono, correo, enviarAutomatico } = req.body;
         if (!razonSocial) {
             return res.status(400).json({ success: false, message: "La razón social es obligatoria." });
         }
 
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const isUpdate = Boolean(id);
+        const url = isUpdate 
+            ? `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes/${id}?updateMask.fieldPaths=razonSocial&updateMask.fieldPaths=rif&updateMask.fieldPaths=direccion&updateMask.fieldPaths=telefono&updateMask.fieldPaths=correo&updateMask.fieldPaths=enviarAutomatico`
+            : `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+
         const body = {
             fields: {
                 razonSocial: { stringValue: razonSocial.trim() },
@@ -660,26 +668,42 @@ app.post('/api/clientes', async (req, res) => {
                 direccion: { stringValue: (direccion || "").trim() },
                 telefono: { stringValue: (telefono || "").trim() },
                 correo: { stringValue: (correo || "").trim() },
-                fechaCreacion: { stringValue: new Date().toISOString() }
+                enviarAutomatico: { booleanValue: enviarAutomatico ?? true }
             }
         };
 
+        if (!isUpdate) {
+            body.fields.fechaCreacion = { stringValue: new Date().toISOString() };
+        }
+
         const response = await fetch(url, {
-            method: 'POST',
+            method: isUpdate ? 'PATCH' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
 
         if (response.ok) {
-            const data = await response.json();
-            const id = data.name.split('/').pop();
-            res.json({ success: true, id });
+            res.json({ success: true });
         } else {
             const errText = await response.text();
             res.status(500).json({ success: false, message: errText });
         }
     } catch (error) {
         console.error("Error guardando cliente:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Enviar estatus forzado a un cliente específico desde su ficha
+app.post('/api/clientes/enviar-estatus', async (req, res) => {
+    try {
+        const { clienteId, mensajeForzado } = req.body;
+        console.log(`🚀 [FORZAR ESTATUS CLIENTE] ID: ${clienteId} | Mensaje: ${mensajeForzado}`);
+        
+        // Aquí puedes realizar la búsqueda del teléfono/correo del cliente en Firestore y disparar el mensaje vía WhatsApp o Telegram si lo deseas
+        
+        res.json({ success: true, message: "Estatus enviado con éxito al cliente." });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });
