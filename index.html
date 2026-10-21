@@ -803,81 +803,80 @@
         </div>
     </div>
 <!-- MODAL DE GESTIÓN DE CLIENTES -->
-    <div id="clientesModal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col my-auto">
-            <div class="bg-navy-900 text-white p-4 flex justify-between items-center rounded-t-2xl">
-                <h3 class="font-bold text-lg">🏢 Directorio de Clientes (Nube)</h3>
-                <button type="button" onclick="closeClientesModal()" class="text-slate-300 hover:text-white text-2xl font-bold px-2">&times;</button>
-            </div>
-            <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
-                <form id="clienteForm" onsubmit="guardarClienteWeb(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                    <input type="hidden" id="web_clienteId">
-                    <h4 id="clienteFormTitle" class="text-xs font-bold text-slate-700 uppercase">Registrar / Editar Cliente</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Razón Social *</label>
-                            <input type="text" id="web_razonSocial" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">RIF *</label>
-                            <input type="text" id="web_rif" required placeholder="Ej: J-12345678-9" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Dirección Fiscal</label>
-                            <input type="text" id="web_direccion" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Teléfono</label>
-                            <input type="text" id="web_telefono" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
-                            <input type="email" id="web_correo" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
-                        </div>
-                    </div>
-		  
-    <!-- Pega el switch aquí -->
-    <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg sm:col-span-2 mt-3">
-        <div>
-            <span class="text-sm font-medium text-slate-700">Notificaciones automáticas por correo</span>
-            <p class="text-xs text-slate-500">Enviar correo automáticamente al actualizar estatus de sus expedientes.</p>
+<div id="clientesModal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col my-auto">
+        <div class="bg-navy-900 text-white p-4 flex justify-between items-center rounded-t-2xl">
+            <h3 class="font-bold text-lg">🏢 Directorio de Clientes (Nube)</h3>
+            <button type="button" onclick="closeClientesModal()" class="text-slate-300 hover:text-white text-2xl font-bold px-2">&times;</button>
         </div>
-        <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="web_enviarAutomatico" class="sr-only peer" checked>
-            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-        </label>
-    </div>
-
-    <!-- Botones de Guardar / Cancelar -->
-    <div class="flex justify-end gap-2 pt-2 mt-3">
-        <button type="button" onclick="limpiarFormularioCliente()" class="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-bold text-slate-700">Cancelar</button>
-        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
-    </div>
-</form>
-                    
-                <div>
-                    <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Listado de Clientes</h4>
-                    <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
-                        <table class="w-full text-left border-collapse text-xs whitespace-nowrap bg-white">
-                            <thead class="bg-slate-700 text-white font-bold sticky top-0">
-    <thead>
-    <tr>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Acciones</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Razón Social</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">RIF</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Teléfono</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Correo Electrónico</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Enviar Forzado</th>
-        <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Auto (Switch)</th>
-    </tr>
-</thead>
-                            <tbody id="clientesTableBody" class="divide-y divide-slate-200"></tbody>
-                        </table>
+        <div class="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+            <form id="clienteForm" onsubmit="guardarClienteWeb(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <input type="hidden" id="web_clienteId">
+                <h4 id="clienteFormTitle" class="text-xs font-bold text-slate-700 uppercase">Registrar / Editar Cliente</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Razón Social *</label>
+                        <input type="text" id="web_razonSocial" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
                     </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">RIF *</label>
+                        <input type="text" id="web_rif" required placeholder="Ej: J-12345678-9" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Dirección Fiscal</label>
+                        <input type="text" id="web_direccion" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Teléfono</label>
+                        <input type="text" id="web_telefono" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico</label>
+                        <input type="email" id="web_correo" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                    </div>
+                </div>
+
+                <!-- Switch de Notificaciones Automáticas -->
+                <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg sm:col-span-2 mt-3">
+                    <div>
+                        <span class="text-sm font-medium text-slate-700">Notificaciones automáticas por correo</span>
+                        <p class="text-xs text-slate-500">Enviar correo automáticamente al actualizar estatus de sus expedientes.</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="web_enviarAutomatico" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                </div>
+
+                <!-- Botones de Guardar / Cancelar -->
+                <div class="flex justify-end gap-2 pt-2 mt-3">
+                    <button type="button" onclick="limpiarFormularioCliente()" class="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-bold text-slate-700">Cancelar</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
+                </div>
+            </form>
+            
+            <div>
+                <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Listado de Clientes</h4>
+                <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl bg-white">
+                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap bg-white">
+                        <thead class="bg-slate-700 text-white font-bold sticky top-0">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Acciones</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Razón Social</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">RIF</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Teléfono</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Correo Electrónico</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-300">Enviar Forzado</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-300">Auto (Switch)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientesTableBody" class="divide-y divide-slate-200"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Script de Firebase y Lógica del Sistema Corregida -->
     <script type="module">
