@@ -940,47 +940,47 @@
         };
 
         async function renderizarTablaClientesModal() {
-            await sincronizarClientesCache();
-            const tbody = document.getElementById("clientesTableBody");
-            if (!tbody) return;
-            tbody.innerHTML = "";
+    await sincronizarClientesCache();
+    const tbody = document.getElementById("clientesTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
 
-            if (cacheClientes.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-400">No hay clientes registrados.</td></tr>`;
-                return;
-            }
+    if (cacheClientes.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-400">No hay clientes registrados.</td></tr>`;
+        return;
+    }
 
-            cacheClientes.forEach(c => {
-                // Generar el switch individual para cada cliente
-                let estadoChecked = c.enviarAutomatico !== false ? 'checked' : '';
-                let switchHtml = `
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" ${estadoChecked} onchange="cambiarEstadoAutoCliente('${c.id}', this.checked)" class="sr-only peer">
-                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
-                `;
+    cacheClientes.forEach(c => {
+        // Creamos el interruptor (switch) único para este cliente
+        let estadoChecked = c.enviarAutomatico !== false ? 'checked' : '';
+        let switchHtml = `
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" ${estadoChecked} onchange="cambiarEstadoAutoCliente('${c.id}', this.checked)" class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
+        `;
 
-                const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-50 border-b border-slate-100 text-xs";
-                tr.innerHTML = `
-                    <td class="p-2.5 text-center">
-                        <button type="button" onclick="editarClienteModal('${c.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button>
-                        <button type="button" onclick="eliminarClienteModal('${c.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button>
-                    </td>
-                    <td class="p-2.5 font-bold text-blue-900">${c.razonSocial || ''}</td>
-                    <td class="p-2.5 text-slate-600">${c.rif || ''}</td>
-                    <td class="p-2.5 text-slate-600">${c.telefono || 'S/N'}</td>
-                    <td class="p-2.5 text-slate-600">${c.correo || 'S/C'}</td>
-                    <td class="p-2.5 text-center">
-                        <button type="button" onclick="forzarEstatusCliente('${c.id}', '${c.razonSocial}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-[11px] font-bold shadow">
-                            🚀 Enviar Forzado
-                        </button>
-                    </td>
-                    <td class="p-2.5 text-center">${switchHtml}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50 border-b border-slate-100 text-xs";
+        tr.innerHTML = `
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="editarClienteModal('${c.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button>
+                <button type="button" onclick="eliminarClienteModal('${c.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button>
+            </td>
+            <td class="p-2.5 font-bold text-blue-900">${c.razonSocial || ''}</td>
+            <td class="p-2.5 text-slate-600">${c.rif || ''}</td>
+            <td class="p-2.5 text-slate-600">${c.telefono || 'S/N'}</td>
+            <td class="p-2.5 text-slate-600">${c.correo || 'S/C'}</td>
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="forzarEstatusCliente('${c.id}', '${c.razonSocial}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-[11px] font-bold shadow">
+                    🚀 Enviar Forzado
+                </button>
+            </td>
+            <td class="p-2.5 text-center">${switchHtml}</td> <!-- 👈 Se dibuja el switch aquí -->
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
         window.editarClienteModal = function(id) {
             const cliente = cacheClientes.find(c => c.id === id);
