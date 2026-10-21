@@ -859,12 +859,7 @@
         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
     </div>
 </form>
-                    <div class="flex justify-end gap-2 pt-2">
-                        <button type="button" onclick="limpiarFormularioCliente()" class="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-bold text-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
-                    </div>
-                </form>
-
+                    
                 <div>
                     <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Listado de Clientes</h4>
                     <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl">
@@ -951,30 +946,37 @@
             tbody.innerHTML = "";
 
             if (cacheClientes.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">No hay clientes registrados.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-400">No hay clientes registrados.</td></tr>`;
                 return;
             }
 
             cacheClientes.forEach(c => {
+                // Generar el switch individual para cada cliente
+                let estadoChecked = c.enviarAutomatico !== false ? 'checked' : '';
+                let switchHtml = `
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" ${estadoChecked} onchange="cambiarEstadoAutoCliente('${c.id}', this.checked)" class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                `;
+
                 const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-50";
+                tr.className = "hover:bg-slate-50 border-b border-slate-100 text-xs";
                 tr.innerHTML = `
                     <td class="p-2.5 text-center">
                         <button type="button" onclick="editarClienteModal('${c.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button>
                         <button type="button" onclick="eliminarClienteModal('${c.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button>
                     </td>
                     <td class="p-2.5 font-bold text-blue-900">${c.razonSocial || ''}</td>
-                    <td class="p-2.5">${c.rif || ''}</td>
-                    <td class="p-2.5 text-center">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${c.enviarAutomatico !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                            ${c.enviarAutomatico !== false ? 'Activado' : 'Desactivado'}
-                        </span>
-                    </td>
+                    <td class="p-2.5 text-slate-600">${c.rif || ''}</td>
+                    <td class="p-2.5 text-slate-600">${c.telefono || 'S/N'}</td>
+                    <td class="p-2.5 text-slate-600">${c.correo || 'S/C'}</td>
                     <td class="p-2.5 text-center">
                         <button type="button" onclick="forzarEstatusCliente('${c.id}', '${c.razonSocial}')" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-[11px] font-bold shadow">
                             🚀 Enviar Forzado
                         </button>
                     </td>
+                    <td class="p-2.5 text-center">${switchHtml}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -991,6 +993,31 @@
             document.getElementById("web_correo").value = cliente.correo || '';
             document.getElementById("web_enviarAutomatico").checked = cliente.enviarAutomatico !== false;
             document.getElementById("clienteFormTitle").innerText = "Editar Cliente: " + cliente.razonSocial;
+        };
+	window.cambiarEstadoAutoCliente = async function(id, nuevoEstado) {
+            try {
+                const cliente = cacheClientes.find(c => c.id === id);
+                if (!cliente) return;
+                
+                cliente.enviarAutomatico = nuevoEstado;
+
+                await fetch(`${BACKEND_URL}/api/clientes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: cliente.id,
+                        razonSocial: cliente.razonSocial,
+                        rif: cliente.rif,
+                        direccion: cliente.direccion,
+                        telefono: cliente.telefono,
+                        correo: cliente.correo,
+                        enviarAutomatico: cliente.enviarAutomatico
+                    })
+                });
+                console.log(`✅ Automatización actualizada para ${cliente.razonSocial}: ${nuevoEstado}`);
+            } catch (e) {
+                console.error("❌ Error al actualizar switch automático:", e);
+            }
         };
 	// Ejemplo de dónde ubicarlo en tu script del index.html:
 
