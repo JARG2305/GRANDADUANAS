@@ -1,11 +1,4 @@
-require('dotenv').config();
-const express = require('express');
-const app = express(); 
-const path = require('path');
-const XLSX = require('xlsx-js-style');
-const cron = require('node-cron');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode');
+	
 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
@@ -762,6 +755,43 @@ app.delete('/api/clientes/:id', async (req, res) => {
         }
     } catch (error) {
         console.error("Error eliminando cliente:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ==========================================
+// RUTA PARA EL ENVÍO DE CORREOS DE ESTATUS
+// ==========================================
+app.post('/api/enviar-correo-cliente', async (req, res) => {
+    const { correoCliente, nombreCliente, numExpediente, statusActual } = req.body;
+
+    if (!correoCliente) {
+        return res.status(400).json({ success: false, message: "El cliente no tiene un correo electrónico registrado." });
+    }
+
+    try {
+        await transporter.sendMail({
+            from: '"Logistatus Pro / Grand Aduanas" <statusepga@gmail.com>',
+            to: correoCliente,
+            bcc: 'statusepga@gmail.com',
+            subject: `Actualización de Expediente N° ${numExpediente}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                    <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
+                    <p>Estimado/a <b>${nombreCliente}</b>,</p>
+                    <p>Le informamos que su expediente N° <b>${numExpediente}</b> ha registrado la siguiente actualización:</p>
+                    <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${statusActual}</b></p>
+                    </div>
+                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Grand Aduanas / Logistatus Pro.</p>
+                </div>
+            `
+        });
+
+        console.log(`📧 [CORREO EXITOSO] Estatus enviado a ${correoCliente} para el expediente ${numExpediente}`);
+        res.json({ success: true, message: "Correo enviado correctamente desde statusepga@gmail.com." });
+    } catch (error) {
+        console.error("❌ Error al enviar correo con Nodemailer:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
