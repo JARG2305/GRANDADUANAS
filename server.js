@@ -1,4 +1,21 @@
-	
+require('dotenv').config();
+const express = require('express');
+const app = express(); 
+const path = require('path');
+const XLSX = require('xlsx-js-style');
+const cron = require('node-cron');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode');
+const nodemailer = require('nodemailer');
+
+// --- CONFIGURACIÓN DEL TRANSPORTADOR DE CORREO ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'statusepga@gmail.com',
+        pass: 'AQUÍ_COLOCAS_TU_CONTRASEÑA_DE_APLICACIÓN'
+    }
+});	
 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
