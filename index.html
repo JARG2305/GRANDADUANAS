@@ -966,6 +966,15 @@
             document.getElementById("web_enviarAutomatico").checked = cliente.enviarAutomatico !== false;
             document.getElementById("clienteFormTitle").innerText = "Editar Cliente: " + cliente.razonSocial;
         };
+	// Ejemplo de dónde ubicarlo en tu script del index.html:
+
+window.abrirModalNuevoCliente = function() {
+    // Limpia los campos para un cliente nuevo
+    document.getElementById("clienteId").value = "";
+    document.getElementById("web_razonSocial").value = "";
+    // ...
+    openClientesModal();
+};
 
         window.eliminarClienteModal = async function(id) {
             if (!confirm("¿Desea eliminar este cliente de la base de datos?")) return;
