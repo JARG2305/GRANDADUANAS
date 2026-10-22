@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: 'statusepga@gmail.com',
-        pass: 'AQUÍ_COLOCAS_TU_CONTRASEÑA_DE_APLICACIÓN'
+        pass: 'ppkijcjkhwxoqmdi'
     }
 });	
 
