@@ -1096,25 +1096,38 @@ window.abrirModalNuevoCliente = function() {
         };
 
         window.forzarEstatusCliente = async function(clienteId, razonSocial) {
-            const mensaje = prompt(`Ingrese el estatus o mensaje forzado a enviar para el cliente: ${razonSocial}`, "Estimado cliente, su carga presenta actualización de estatus reciente.");
-            if (!mensaje) return;
+    const mensaje = prompt(`Ingrese el estatus o mensaje forzado a enviar para el cliente: ${razonSocial}`, "Estimado cliente, su carga presenta actualización de estatus reciente.");
+    if (!mensaje) return;
 
-            try {
-                const res = await fetch(`${BACKEND_URL}/api/clientes/enviar-estatus`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clienteId, mensajeForzado: mensaje })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    alert("✅ ¡Estatus forzado enviado correctamente al cliente!");
-                } else {
-                    alert("❌ Error: " + (data.message || "No se pudo enviar."));
-                }
-            } catch (err) {
-                alert("❌ Error de red al intentar enviar el estatus forzado.");
-            }
-        };
+    // Buscamos el correo del cliente directamente de la caché o tabla
+    const clienteObj = cacheClientes.find(c => c.id === clienteId);
+    if (!clienteObj || !clienteObj.correo) {
+        alert("⚠️ Este cliente no tiene un correo electrónico registrado en su ficha.");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                correoCliente: clienteObj.correo, 
+                nombreCliente: razonSocial, 
+                numExpediente: "GENERAL", 
+                statusActual: mensaje 
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert("✅ ¡Correo de estatus forzado enviado correctamente al cliente!");
+        } else {
+            alert("❌ Error: " + (data.message || "No se pudo enviar el correo."));
+        }
+    } catch (err) {
+        console.error("Error al enviar estatus forzado:", err);
+        alert("❌ Error de red al intentar enviar el correo forzado.");
+    }
+};
 	window.verificarClienteAlSalir = function(nombreCliente) {
             // Usamos un pequeño retraso para asegurar que el valor esté completamente escrito y capturado
             setTimeout(async () => {
