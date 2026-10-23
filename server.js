@@ -7,6 +7,22 @@ const cron = require('node-cron');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+async function obtenerResendClient() {
+    let apiKey = process.env.RESEND_API_KEY;
+    try {
+        const urlConfig = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/credenciales_correo`;
+        const respConfig = await fetch(urlConfig);
+        const dataConfig = await respConfig.json();
+        if (dataConfig.fields && dataConfig.fields.resendApiKey?.stringValue) {
+            apiKey = dataConfig.fields.resendApiKey.stringValue;
+        }
+    } catch (e) {
+        console.error("Usando Resend API Key por defecto de entorno");
+    }
+    return new Resend(apiKey);
+}
 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
