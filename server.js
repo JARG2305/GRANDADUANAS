@@ -756,16 +756,23 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
         let enviadosCount = 0;
 
         for (const cliente of clientesActivos) {
-            // Buscamos si este cliente tiene expedientes activos
+            // Buscamos los expedientes activos de este cliente
             const expedientesCliente = expedientes.filter(e => 
                 String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
             );
 
             if (expedientesCliente.length > 0) {
-                const listaExps = expedientesCliente.map(e => `• Exp: ${e.num_expediente} (B/L: ${e.awb_bl || e.bl || 'S/N'})`).join('\n');
-                
+                // Construimos el detalle de cada expediente con la estructura solicitada
+                let detallesExpedientes = expedientesCliente.map(e => {
+                    const expNum = e.num_expediente || 'XXXX';
+                    const blNum = e.awb_bl || e.bl || 'XXXXX';
+                    const obs = e.observaciones ? e.observaciones : 'Actualización de estatus en expediente';
+                    
+                    return `• Expediente: ${expNum}\n  BL o GUIA: ${blNum}\n  CAMPO OBSERVACION: ${obs}`;
+                }).join('\n\n');
+
                 const asunto = `Reporte Diario de Estatus - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nLe presentamos el resumen de sus expedientes activos en proceso:\n\n${listaExps}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nLe informamos que sus expedientes activos presentan la siguiente actualización:\n\n${detallesExpedientes}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
                 await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje);
                 enviadosCount++;
