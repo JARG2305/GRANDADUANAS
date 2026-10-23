@@ -646,32 +646,24 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
                             // O llamamos directamente al método que uses para enviar
                             console.log(`📧 [AUTOMÁTICO] Preparando envío de correo para ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
                             
-                            // Llamada a la función de envío de correo del sistema
-                            const resend = await obtenerResendClient();
-                            await resend.emails.send({
-                                from: 'Logistatus Pro <onboarding@resend.dev>',
-                                to: [correoDestino],
-                                bcc: ['statusepga@gmail.com'],
-                                subject: `Actualización de Expediente N° ${expedienteEncontrado.numExpediente}`,
-                                html: `
-                                    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                                        <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
-                                        <p>Estimado/a <b>${nombreClienteExp}</b>,</p>
-                                        <p>Le informamos que su expediente N° <b>${expedienteEncontrado.numExpediente}</b> ha registrado la siguiente actualización:</p>
-                                        <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
-                                            <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${statusActualTexto}</b></p>
-                                        </div>
-                                        <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
-                                    </div>
-                                `
-                            });
-                            console.log(`✅ [AUTOMÁTICO] Correo enviado exitosamente a ${correoDestino}`);
+                            if (clienteEncontrado) {
+                        const fieldsCli = clienteEncontrado.fields || {};
+                        const correoDestino = fieldsCli.correo?.stringValue;
+                        const permiteAuto = fieldsCli.enviarAutomatico?.booleanValue ?? true;
+
+                        if (correoDestino && permiteAuto) {
+                            const statusActualTexto = `Actualización en campo [${nombreCampoLegible}]: ${valorNuevo || 'Modificado'}`;
+                            const asunto = `Actualización de Expediente N° ${expedienteEncontrado.numExpediente}`;
+                            const mensaje = `Estimado/a ${nombreClienteExp},\n\nLe informamos que su expediente N° ${expedienteEncontrado.numExpediente} ha registrado la siguiente actualización:\n\n${statusActualTexto}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+
+                            console.log(`📧 [AUTOMÁTICO] Enviando correo mediante Google Apps Script a ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
+                            
+                            // Llamada a tu función dinámica de Google Apps Script
+                            await enviarCorreoConGoogleScriptDinamico(correoDestino, asunto, mensaje);
+                            
+                            console.log(`✅ [AUTOMÁTICO] Proceso completado para ${correoDestino}`);
                         }
                     }
-                }
-            } catch (autoErr) {
-                console.error("❌ Error en el envío automático de correo:", autoErr);
-            }
             // ==========================================
 
             if (esBorrar) {
@@ -943,30 +935,15 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 
     try {
-        const resend = await obtenerResendClient();
+        const asunto = `Actualización de Expediente N° ${numExpediente}`;
+        const mensaje = `Estimado/a ${nombreCliente},\n\nLe informamos que su expediente N° ${numExpediente} ha registrado la siguiente actualización:\n\n${statusActual}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-        await resend.emails.send({
-            from: 'Logistatus Pro <onboarding@resend.dev>',
-            to: [correoCliente],
-            bcc: ['statusepga@gmail.com'],
-            subject: `Actualización de Expediente N° ${numExpediente}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                    <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
-                    <p>Estimado/a <b>${nombreCliente}</b>,</p>
-                    <p>Le informamos que su expediente N° <b>${numExpediente}</b> ha registrado la siguiente actualización:</p>
-                    <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
-                        <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${statusActual}</b></p>
-                    </div>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
-                </div>
-            `
-        });
-
-        console.log(`📧 [RESEND EXITOSO] Correo enviado a ${correoCliente}`);
-        res.json({ success: true, message: "Correo enviado correctamente." });
+        // Llamamos a tu función dinámica que consulta Firestore y dispara el Apps Script hacia statusepga@gmail.com
+        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
+        
+        res.json(resultado);
     } catch (error) {
-        console.error("❌ Error al enviar correo con Resend:", error);
+        console.error("❌ Error al enviar correo con Google Apps Script:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
