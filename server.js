@@ -11,14 +11,98 @@ const nodemailer = require('nodemailer');
 // ==========================================
 // ENVÍO DINÁMICO MEDIANTE GOOGLE APPS SCRIPT (DESDE FIRESTORE)
 // ==========================================
-async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo) {
+// ==========================================
+// ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
+// ==========================================
+async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo, expedientesData = []) {
     try {
-        // Leemos la URL directamente de la variable de entorno que configuraste en Render
         const urlAppsScript = process.env.googleScriptUrl;
-
         if (!urlAppsScript) {
             console.error("❌ No se encontró la variable googleScriptUrl en las variables de entorno de Render.");
-            return { success: false, message: "URL de Google Apps Script no configurada en las variables de entorno." };
+            return { success: false, message: "URL de Google Apps Script no configurada." };
+        }
+
+        let archivoExcelBase64 = null;
+        let nombreArchivo = "Reporte_Expedientes_Logistatus.xlsx";
+
+        if (expedientesData && expedientesData.length > 0) {
+            // Preparamos los datos base
+            const wsData = [
+                ["N° Expediente", "Cliente", "Proveedor", "B/L o Guía", "ETA La Guaira", "Fecha Llegada", "Canal", "Estatus / Observaciones"]
+            ];
+
+            expedientesData.forEach(e => {
+                wsData.push([
+                    e.num_expediente || 'S/N',
+                    e.cliente || 'S/C',
+                    e.proveedor || 'N/A',
+                    e.awb_bl || e.bl || 'S/N',
+                    e.eta_la_guaira || 'S/N',
+                    e.fecha_llegada || 'Pendiente',
+                    e.canal || 'Sin asignar',
+                    e.observaciones || ''
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Aplicamos estilos profesionales idénticos a los de tu interfaz (Cabecera azul, bordes y fuentes)
+            const headerStyle = {
+                font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "2563EB" } }, // Azul institucional
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                    top: { style: "thin", color: { rgb: "CBD5E1" } },
+                    bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                    left: { style: "thin", color: { rgb: "CBD5E1" } },
+                    right: { style: "thin", color: { rgb: "CBD5E1" } }
+                }
+            };
+
+            const cellStyle = {
+                font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+                alignment: { horizontal: "left", vertical: "center" },
+                border: {
+                    top: { style: "thin", color: { rgb: "E2E8F0" } },
+                    bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                    left: { style: "thin", color: { rgb: "E2E8F0" } },
+                    right: { style: "thin", color: { rgb: "E2E8F0" } }
+                }
+            };
+
+            // Recorremos las celdas para aplicar los estilos con xlsx-js-style
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cellAddress]) continue;
+                    
+                    if (R === 0) {
+                        ws[cellAddress].s = headerStyle;
+                    } else {
+                        ws[cellAddress].s = cellStyle;
+                    }
+                }
+            }
+
+            // Ajuste automático de ancho de columnas
+            ws['!cols'] = [
+                { wch: 18 }, // N° Expediente
+                { wch: 25 }, // Cliente
+                { wch: 20 }, // Proveedor
+                { wch: 20 }, // B/L
+                { wch: 15 }, // ETA
+                { wch: 15 }, // Llegada
+                { wch: 12 }, // Canal
+                { wch: 35 }  // Observaciones
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Expedientes");
+
+            // Generamos el buffer con estilos y lo pasamos a Base64
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
+            archivoExcelBase64 = excelBuffer.toString('base64');
         }
 
         const response = await fetch(urlAppsScript, {
@@ -27,16 +111,18 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
             body: JSON.stringify({
                 destinatario: correoDestino,
                 asunto: asuntoCorreo,
-                mensaje: mensajeCorreo
+                mensaje: mensajeCorreo,
+                excelBase64: archivoExcelBase64,
+                nombreArchivo: nombreArchivo
             })
         });
 
         const resultado = await response.json();
-        console.log(`📧 [APPS SCRIPT DINÁMICO] Correo enviado a ${correoDestino}`);
+        console.log(`📧 [APPS SCRIPT CON EXCEL ESTILIZADO] Correo enviado a ${correoDestino}`);
         return resultado;
 
     } catch (error) {
-        console.error("❌ Error al conectar con Google Apps Script dinámico:", error);
+        console.error("❌ Error al enviar Excel estilizado por Google Apps Script:", error);
         return { success: false, message: error.message };
     }
 }
@@ -44,8 +130,8 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname)));
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -864,6 +950,41 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+app.post('/api/enviar-excel-correo', async (req, res) => {
+    try {
+        const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
+        
+        if (!destinatario) {
+            return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
+        }
+
+        const urlAppsScript = process.env.googleScriptUrl;
+        if (!urlAppsScript) {
+            console.error("❌ No se encontró la variable googleScriptUrl en las variables de entorno de Render.");
+            return res.status(500).json({ success: false, message: "URL de Google Apps Script no configurada." });
+        }
+
+        const response = await fetch(urlAppsScript, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                destinatario: destinatario,
+                asunto: asunto || "Reporte Consolidado - Logistatus Pro",
+                mensaje: mensaje || "Adjunto el reporte de expedientes.",
+                excelBase64: excelBase64,
+                nombreArchivo: nombreArchivo || "Reporte_Logistatus.xlsx"
+            })
+        });
+
+        const resultado = await response.json();
+        console.log(`📧 [EXCEL CORREO] Reporte enviado con éxito a: ${destinatario}`);
+        res.json(resultado);
+
+    } catch (error) {
+        console.error("❌ Error en /api/enviar-excel-correo:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
@@ -1056,6 +1177,46 @@ function iniciarTodosLosBotsAutomaticos() {
         ejecutarPollingParaBot(bot.token, bot.chatId, bot.nombre);
     });
 }
+// ==========================================
+// 3. TAREAS PROGRAMADAS (CRON)
+// ==========================================
+cron.schedule('0 10,18 * * *', async () => {
+    try {
+        console.log("⏰ [CRON AUTOMÁTICO] Ejecutando reporte de alertas y correos con Excel...");
+        
+        // 1. Envío de alertas por Telegram y WhatsApp (como ya lo tenías)
+        const alertasGeneradas = await generarListaAlertasSistema();
+        if (alertasGeneradas && alertasGeneradas.length > 0) {
+            await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO PROGRAMADO");
+        }
+        
+        // 2. Envío automático de correos con el Excel estilizado a los clientes activos
+        const expedientes = await obtenerExpedientesFirestore();
+        const clientes = await obtenerClientesFirestore();
+
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
+        let enviadosCount = 0;
+
+        for (const cliente of clientesActivos) {
+            const expedientesCliente = expedientes.filter(e => 
+                String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
+            );
+
+            if (expedientesCliente.length > 0) {
+                const asunto = `Reporte Automático de Estatus - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes correspondientes a este corte.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, expedientesCliente);
+                enviadosCount++;
+            }
+        }
+
+        console.log(`✅ [CRON CORREOS] Reportes automáticos con Excel enviados a ${enviadosCount} clientes.`);
+
+    } catch (error) {
+        console.error("❌ [CRON AUTOMÁTICO] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
 
 function ejecutarPollingParaBot(tokenBot, chatIdEsperado, nombreCliente) {
     let offset = 0;
