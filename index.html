@@ -2391,7 +2391,7 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
             });
         }
 
-        window.saveExp = async function(e) {
+       window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
             const record = {};
@@ -2419,11 +2419,53 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 } else {
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
+
+                // 🚀 DISPARAR CORREO AUTOMÁTICO DESDE LA WEB (Respetando el switch del cliente)
+if (nombreCliente) {
+    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+    
+    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+        // Obtenemos las observaciones o el campo que tenga texto relevante
+        const detalleObservacion = record.observaciones ? record.observaciones : "Actualización de estatus en expediente";
+
+        await notificarCambioAutomatico(
+            clienteObj.correo,
+            nombreCliente,
+            record.num_expediente || "XXXX",
+            detalleObservacion,
+            record.awb_bl || "XXXXX",
+            "Observación / Estatus general"
+        );
+    }
+}
+
                 closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
         };
+
+        // Función auxiliar para disparar la petición al servidor Node.js
+        async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible) {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        correoCliente: correoCliente,
+                        nombreCliente: nombreCliente,
+                        numExpediente: numExpediente,
+                        statusActual: statusActual,
+                        bl: bl,
+                        campoLegible: campoLegible
+                    })
+                });
+                const resultado = await response.json();
+                console.log("Respuesta de envío automático web:", resultado);
+            } catch (error) {
+                console.error("Error al disparar el correo automático desde la web:", error);
+            }
+        }
 	
 
         window.enviarAlertasPendientes = async function() {

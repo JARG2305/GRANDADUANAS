@@ -619,7 +619,7 @@ async function procesarComandoLogistica(textoMensaje) {
                         if (correoDestino && permiteAuto) {
                             const statusActualTexto = `Actualización en campo [${nombreCampoLegible}]: ${valorNuevo || 'Modificado'}`;
                             const asunto = `Actualización de Expediente N° ${expedienteEncontrado.numExpediente}`;
-                            const mensaje = `Estimado/a ${nombreClienteExp},\n\nLe informamos que su expediente N° ${expedienteEncontrado.numExpediente} ha registrado la siguiente actualización:\n\n${statusActualTexto}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+                            const mensaje = `Le informamos que su expediente ${numExpediente}\nBL o GUIA: ${bl}\nCAMPO OBSERVACION: ${statusActual}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
                             console.log(`📧 [AUTOMÁTICO] Enviando correo mediante Google Apps Script a ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
                             await enviarCorreoConGoogleScriptDinamico(correoDestino, asunto, mensaje);
