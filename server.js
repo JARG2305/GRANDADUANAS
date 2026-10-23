@@ -13,11 +13,11 @@ const nodemailer = require('nodemailer');
 // ==========================================
 async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo) {
     try {
-        // Leemos la URL directamente de la variable de entorno de Render
-        const urlAppsScript = process.env.GOOGLE_SCRIPT_URL;
+        // Leemos la URL directamente de la variable de entorno que configuraste en Render
+        const urlAppsScript = process.env.googleScriptUrl;
 
         if (!urlAppsScript) {
-            console.error("❌ No se encontró la variable GOOGLE_SCRIPT_URL en Render.");
+            console.error("❌ No se encontró la variable googleScriptUrl en las variables de entorno de Render.");
             return { success: false, message: "URL de Google Apps Script no configurada en las variables de entorno." };
         }
 
