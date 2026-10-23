@@ -579,6 +579,62 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
         });
 
         if (patchRes.ok) {
+            // ==========================================
+            // ENVÍO AUTOMÁTICO DE CORREO AL CLIENTE
+            // ==========================================
+            try {
+                const nombreClienteExp = expedienteEncontrado.cliente;
+                const urlClientesList = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+                const respCliList = await fetch(urlClientesList);
+                const dataCliList = await respCliList.json();
+
+                if (dataCliList.documents) {
+                    const clienteEncontrado = dataCliList.documents.find(d => {
+                        const fieldsC = d.fields || {};
+                        const razon = fieldsC.razonSocial?.stringValue || "";
+                        return razon.trim().toLowerCase() === String(nombreClienteExp).trim().toLowerCase();
+                    });
+
+                    if (clienteEncontrado) {
+                        const fieldsCli = clienteEncontrado.fields || {};
+                        const correoDestino = fieldsCli.correo?.stringValue;
+                        const permiteAuto = fieldsCli.enviarAutomatico?.booleanValue ?? true;
+
+                        if (correoDestino && permiteAuto) {
+                            const statusActualTexto = `Actualización en campo [${nombreCampoLegible}]: ${valorNuevo || 'Modificado'}`;
+                            
+                            // Reutilizamos tu ruta interna de correo para despacharlo de forma limpia
+                            // O llamamos directamente al método que uses para enviar
+                            console.log(`📧 [AUTOMÁTICO] Preparando envío de correo para ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
+                            
+                            // Llamada a la función de envío de correo del sistema
+                            const resend = await obtenerResendClient();
+                            await resend.emails.send({
+                                from: 'Logistatus Pro <onboarding@resend.dev>',
+                                to: [correoDestino],
+                                bcc: ['statusepga@gmail.com'],
+                                subject: `Actualización de Expediente N° ${expedienteEncontrado.numExpediente}`,
+                                html: `
+                                    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                                        <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
+                                        <p>Estimado/a <b>${nombreClienteExp}</b>,</p>
+                                        <p>Le informamos que su expediente N° <b>${expedienteEncontrado.numExpediente}</b> ha registrado la siguiente actualización:</p>
+                                        <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
+                                            <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${statusActualTexto}</b></p>
+                                        </div>
+                                        <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
+                                    </div>
+                                `
+                            });
+                            console.log(`✅ [AUTOMÁTICO] Correo enviado exitosamente a ${correoDestino}`);
+                        }
+                    }
+                }
+            } catch (autoErr) {
+                console.error("❌ Error en el envío automático de correo:", autoErr);
+            }
+            // ==========================================
+
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
             } else if (esIndicadorSiNo) {
@@ -737,6 +793,7 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
 
 
 // Enviar estatus forzado a un cliente específico desde su ficha (Optimizado sin timeout)
+// Enviar estatus forzado a un cliente específico desde su ficha (Usando Resend sin timeout)
 app.post('/api/clientes/enviar-estatus', async (req, res) => {
     try {
         const { clienteId, mensajeForzado } = req.body;
@@ -753,13 +810,13 @@ app.post('/api/clientes/enviar-estatus', async (req, res) => {
         const correoCliente = dataCliente.fields.correo.stringValue;
         const nombreCliente = dataCliente.fields.razonSocial?.stringValue || "Cliente";
 
-        const transportadorActivo = await obtenerTransportadorDinamico();
+        const resend = await obtenerResendClient();
 
-        // Enviamos el correo con manejo de errores interno
-        transportadorActivo.sendMail({
-            from: `"Logistatus Pro" <statusepga@gmail.com>`,
-            to: correoCliente,
-            bcc: 'statusepga@gmail.com',
+        // Enviamos el correo usando Resend en segundo plano
+        resend.emails.send({
+            from: 'Logistatus Pro <onboarding@resend.dev>',
+            to: [correoCliente],
+            bcc: ['statusepga@gmail.com'],
             subject: `Actualización de Estatus Logístico`,
             html: `
                 <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
@@ -772,9 +829,9 @@ app.post('/api/clientes/enviar-estatus', async (req, res) => {
                 </div>
             `
         }).then(() => {
-            console.log(`📧 [CORREO FORZADO EXITOSO] Enviado a ${correoCliente}`);
+            console.log(`📧 [RESEND FORZADO EXITOSO] Enviado a ${correoCliente}`);
         }).catch(mailErr => {
-            console.error("❌ Error interno al despachar correo en segundo plano:", mailErr);
+            console.error("❌ Error interno al despachar correo con Resend:", mailErr);
         });
 
         // Respondemos de inmediato al cliente web para evitar el Timeout
@@ -840,7 +897,7 @@ async function obtenerTransportadorDinamico() {
     });
 }
 
-// Ruta de correo utilizando el transportador dinámico de la nube
+// Ruta de correo utilizando Resend (API HTTP estándar sin bloqueos SMTP en Render)
 app.post('/api/enviar-correo-cliente', async (req, res) => {
     const { correoCliente, nombreCliente, numExpediente, statusActual } = req.body;
 
@@ -849,12 +906,12 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 
     try {
-        const transportadorActivo = await obtenerTransportadorDinamico();
+        const resend = await obtenerResendClient();
 
-        await transportadorActivo.sendMail({
-            from: `"Logistatus Pro" <statusepga@gmail.com>`,
-            to: correoCliente,
-            bcc: 'statusepga@gmail.com',
+        await resend.emails.send({
+            from: 'Logistatus Pro <onboarding@resend.dev>',
+            to: [correoCliente],
+            bcc: ['statusepga@gmail.com'],
             subject: `Actualización de Expediente N° ${numExpediente}`,
             html: `
                 <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
@@ -869,9 +926,10 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             `
         });
 
+        console.log(`📧 [RESEND EXITOSO] Correo enviado a ${correoCliente}`);
         res.json({ success: true, message: "Correo enviado correctamente." });
     } catch (error) {
-        console.error("❌ Error al enviar correo:", error);
+        console.error("❌ Error al enviar correo con Resend:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
