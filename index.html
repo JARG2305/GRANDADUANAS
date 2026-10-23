@@ -2419,6 +2419,30 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 } else {
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
+// Dentro de tu función saveExp en el frontend:
+if (nombreCliente) {
+    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+    
+    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+        // Armamos el texto solo si el campo observación tiene contenido
+        let textoObservacion = record.observaciones ? `CAMPO OBSERVACION: ${record.observaciones}` : "";
+        
+        // Determinamos qué evento o cambio se realizó
+        let eventoCambiado = "Actualización de estatus en expediente"; 
+
+        // Solo enviamos si hay algo relevante que reportar
+        if (record.observaciones || record.fecha_llegada || record.despacho) {
+            await notificarCambioAutomatico(
+                clienteObj.correo,
+                nombreCliente,
+                record.num_expediente || "XXXX",
+                textoObservacion ? `${eventoCambiado}\n${textoObservacion}` : eventoCambiado,
+                record.awb_bl || "XXXXX",
+                "Actualización del Día"
+            );
+        }
+    }
+}
 
                 // 🚀 DISPARAR CORREO AUTOMÁTICO DESDE LA WEB (Respetando el switch del cliente)
 if (nombreCliente) {

@@ -749,37 +749,39 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
 
-        // Filtramos clientes con envío automático habilitado y que tengan correo
         const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
-        console.log(`🚀 [FORZAR DÍA] Procesando envíos masivos para ${clientesActivos.length} clientes...`);
-
         let enviadosCount = 0;
 
         for (const cliente of clientesActivos) {
-            // Buscamos los expedientes activos de este cliente
+            // Filtramos expedientes activos de este cliente
             const expedientesCliente = expedientes.filter(e => 
                 String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
             );
 
-            if (expedientesCliente.length > 0) {
-                // Construimos el detalle de cada expediente con la estructura solicitada
-                let detallesExpedientes = expedientesCliente.map(e => {
+            let lineasActualizadas = [];
+
+            for (const e of expedientesCliente) {
+                // Verificamos si el expediente tiene una observación escrita o un cambio relevante
+                if (e.observaciones && e.observaciones.trim() !== "") {
                     const expNum = e.num_expediente || 'XXXX';
                     const blNum = e.awb_bl || e.bl || 'XXXXX';
-                    const obs = e.observaciones ? e.observaciones : 'Actualización de estatus en expediente';
                     
-                    return `• Expediente: ${expNum}\n  BL o GUIA: ${blNum}\n  CAMPO OBSERVACION: ${obs}`;
-                }).join('\n\n');
+                    let detalle = `Le informamos que su expediente ${expNum}\nBL o GUIA: ${blNum}\nCAMPO OBSERVACION: ${e.observaciones}`;
+                    lineasActualizadas.push(detalle);
+                }
+            }
 
-                const asunto = `Reporte Diario de Estatus - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nLe informamos que sus expedientes activos presentan la siguiente actualización:\n\n${detallesExpedientes}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+            // SI NO HAY ACTUALIZACIONES EN NINGÚN EXPEDIENTE DE ESTE CLIENTE, NO SE ENVÍA NADA
+            if (lineasActualizadas.length > 0) {
+                const asunto = `Actualización de Estatus Diario - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\n${lineasActualizadas.join('\n\n')}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
                 await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje);
                 enviadosCount++;
             }
         }
 
-        res.json({ success: true, message: `Reportes diarios procesados y enviados exitosamente a ${enviadosCount} clientes.` });
+        res.json({ success: true, message: `Reportes del día procesados y enviados a ${enviadosCount} clientes con actualizaciones reales.` });
     } catch (error) {
         console.error("❌ Error en ruta forzar actualización del día:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -833,15 +835,27 @@ app.delete('/api/clientes/:id', async (req, res) => {
 // RUTA DE CORREO DINÁMICA (GOOGLE APPS SCRIPT)
 // ==========================================
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible } = req.body;
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, eventoCambiado, observaciones } = req.body;
 
     if (!correoCliente) {
         return res.status(400).json({ success: false, message: "El cliente no tiene un correo electrónico registrado." });
     }
 
     try {
-        const asunto = `Actualización de Expediente N° ${numExpediente || 'S/N'}`;
-        const mensaje = `Estimado/a ${nombreCliente},\n\nLe informamos que su expediente N° ${numExpediente || 'S/N'} ha registrado la siguiente actualización:\n\n• Campo actualizado: ${campoLegible || 'Estatus general'}\n• Detalle: ${statusActual}\n• B/L o Guía: ${bl || 'S/N'}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+        const asunto = `Actualización de Expediente N° ${numExpediente || 'XXXX'}`;
+        
+        // Construimos el mensaje respetando las líneas condicionales
+        let mensaje = `Le informamos que su expediente\nN° ${numExpediente || 'XXXX'}\nB/L o Guía: ${bl || 'XXXXX'}`;
+        
+        if (eventoCambiado) {
+            mensaje += `\n${eventoCambiado}`;
+        }
+        
+        if (observaciones && observaciones.trim() !== "") {
+            mensaje += `\n${observaciones}`;
+        }
+
+        mensaje += `\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
         res.json(resultado);
