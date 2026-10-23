@@ -735,16 +735,49 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
     }
 });
 
-// Enviar estatus forzado a un cliente específico desde su ficha
+
+// Enviar estatus forzado a un cliente específico desde su ficha (con correo dinámico)
 app.post('/api/clientes/enviar-estatus', async (req, res) => {
     try {
         const { clienteId, mensajeForzado } = req.body;
         console.log(`🚀 [FORZAR ESTATUS CLIENTE] ID: ${clienteId} | Mensaje: ${mensajeForzado}`);
-        
-        // Aquí puedes realizar la búsqueda del teléfono/correo del cliente en Firestore y disparar el mensaje vía WhatsApp o Telegram si lo deseas
-        
-        res.json({ success: true, message: "Estatus enviado con éxito al cliente." });
+
+        // Buscamos los datos del cliente en Firestore para obtener su correo
+        const urlCliente = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes/${clienteId}`;
+        const respCliente = await fetch(urlCliente);
+        const dataCliente = await respCliente.json();
+
+        if (!dataCliente.fields || !dataCliente.fields.correo?.stringValue) {
+            return.status(400).json({ success: false, message: "El cliente seleccionado no tiene un correo electrónico registrado." });
+        }
+
+        const correoCliente = dataCliente.fields.correo.stringValue;
+        const nombreCliente = dataCliente.fields.razonSocial?.stringValue || "Cliente";
+
+        // Obtenemos el transportador dinámico configurado en la web
+        const transportadorActivo = await obtenerTransportadorDinamico();
+
+        await transportadorActivo.sendMail({
+            from: `"Logistatus Pro" <statusepga@gmail.com>`,
+            to: correoCliente,
+            bcc: 'statusepga@gmail.com',
+            subject: `Actualización de Estatus Logístico`,
+            html: `
+                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                    <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
+                    <p>Estimado/a <b>${nombreCliente}</b>,</p>
+                    <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${mensajeForzado}</b></p>
+                    </div>
+                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
+                </div>
+            `
+        });
+
+        console.log(`📧 [CORREO FORZADO EXITOSO] Enviado a ${correoCliente}`);
+        res.json({ success: true, message: "Estatus y correo enviados con éxito al cliente." });
     } catch (error) {
+        console.error("❌ Error enviando estatus forzado:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
