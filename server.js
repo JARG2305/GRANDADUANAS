@@ -13,18 +13,12 @@ const nodemailer = require('nodemailer');
 // ==========================================
 async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo) {
     try {
-        const urlConfig = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/credenciales_correo`;
-        const respConfig = await fetch(urlConfig);
-        const dataConfig = await respConfig.json();
-        
-        let urlAppsScript = "";
-        if (dataConfig.fields && dataConfig.fields.googleScriptUrl?.stringValue) {
-            urlAppsScript = dataConfig.fields.googleScriptUrl.stringValue;
-        }
+        // Leemos la URL directamente de la variable de entorno de Render
+        const urlAppsScript = process.env.GOOGLE_SCRIPT_URL;
 
         if (!urlAppsScript) {
-            console.error("❌ No se encontró la URL del Google Apps Script en la configuración de Firestore.");
-            return { success: false, message: "URL de Google Apps Script no configurada en la nube." };
+            console.error("❌ No se encontró la variable GOOGLE_SCRIPT_URL en Render.");
+            return { success: false, message: "URL de Google Apps Script no configurada en las variables de entorno." };
         }
 
         const response = await fetch(urlAppsScript, {
