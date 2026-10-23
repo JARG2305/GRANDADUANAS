@@ -8,15 +8,6 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
 
-// --- CONFIGURACIÓN DEL TRANSPORTADOR DE CORREO ---
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'statusepga@gmail.com',
-        pass: 'ppkijcjkhwxoqmdi'
-    }
-});	
-
 // ==========================================
 // 0. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
@@ -779,6 +770,41 @@ app.delete('/api/clientes/:id', async (req, res) => {
 // ==========================================
 // RUTA PARA EL ENVÍO DE CORREOS DE ESTATUS
 // ==========================================
+// ==========================================
+// RUTA DINÁMICA Y DE ENVÍO DE CORREOS
+// ==========================================
+
+// Función auxiliar para obtener el transportador dinámico desde Firestore
+async function obtenerTransportadorDinamico() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/credenciales_correo`;
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.fields) {
+            const user = result.fields.correoUser?.stringValue || 'statusepga@gmail.com';
+            const pass = result.fields.correoPass?.stringValue || 'ppkijcjkhwxoqmdi';
+            
+            return nodemailer.createTransport({
+                service: 'gmail',
+                auth: { user, pass }
+            });
+        }
+    } catch (err) {
+        console.error("Usando transportador por defecto por error en nube:", err);
+    }
+    
+    // Transportador por defecto si no encuentra registro en la nube
+    return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'statusepga@gmail.com',
+            pass: 'ppkijcjkhwxoqmdi'
+        }
+    });
+}
+
+// Ruta de correo utilizando el transportador dinámico de la nube
 app.post('/api/enviar-correo-cliente', async (req, res) => {
     const { correoCliente, nombreCliente, numExpediente, statusActual } = req.body;
 
@@ -787,8 +813,10 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 
     try {
-        await transporter.sendMail({
-            from: '"Logistatus Pro / Grand Aduanas" <statusepga@gmail.com>',
+        const transportadorActivo = await obtenerTransportadorDinamico();
+
+        await transportadorActivo.sendMail({
+            from: `"Logistatus Pro" <statusepga@gmail.com>`,
             to: correoCliente,
             bcc: 'statusepga@gmail.com',
             subject: `Actualización de Expediente N° ${numExpediente}`,
@@ -800,15 +828,14 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                     <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
                         <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${statusActual}</b></p>
                     </div>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Grand Aduanas / Logistatus Pro.</p>
+                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
                 </div>
             `
         });
 
-        console.log(`📧 [CORREO EXITOSO] Estatus enviado a ${correoCliente} para el expediente ${numExpediente}`);
-        res.json({ success: true, message: "Correo enviado correctamente desde statusepga@gmail.com." });
+        res.json({ success: true, message: "Correo enviado correctamente." });
     } catch (error) {
-        console.error("❌ Error al enviar correo con Nodemailer:", error);
+        console.error("❌ Error al enviar correo:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
