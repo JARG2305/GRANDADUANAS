@@ -7,21 +7,44 @@ const cron = require('node-cron');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
-const { Resend } = require('resend');
 
-async function obtenerResendClient() {
-    let apiKey = process.env.RESEND_API_KEY;
+// ==========================================
+// ENVÍO DINÁMICO MEDIANTE GOOGLE APPS SCRIPT (DESDE FIRESTORE)
+// ==========================================
+async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo) {
     try {
         const urlConfig = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/credenciales_correo`;
         const respConfig = await fetch(urlConfig);
         const dataConfig = await respConfig.json();
-        if (dataConfig.fields && dataConfig.fields.resendApiKey?.stringValue) {
-            apiKey = dataConfig.fields.resendApiKey.stringValue;
+        
+        let urlAppsScript = "";
+        if (dataConfig.fields && dataConfig.fields.googleScriptUrl?.stringValue) {
+            urlAppsScript = dataConfig.fields.googleScriptUrl.stringValue;
         }
-    } catch (e) {
-        console.error("Usando Resend API Key por defecto de entorno");
+
+        if (!urlAppsScript) {
+            console.error("❌ No se encontró la URL del Google Apps Script en la configuración de Firestore.");
+            return { success: false, message: "URL de Google Apps Script no configurada en la nube." };
+        }
+
+        const response = await fetch(urlAppsScript, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                destinatario: correoDestino,
+                asunto: asuntoCorreo,
+                mensaje: mensajeCorreo
+            })
+        });
+
+        const resultado = await response.json();
+        console.log(`📧 [APPS SCRIPT DINÁMICO] Correo enviado a ${correoDestino}`);
+        return resultado;
+
+    } catch (error) {
+        console.error("❌ Error al conectar con Google Apps Script dinámico:", error);
+        return { success: false, message: error.message };
     }
-    return new Resend(apiKey);
 }
 
 // ==========================================
@@ -876,9 +899,7 @@ app.delete('/api/clientes/:id', async (req, res) => {
     }
 });
 
-// ==========================================
-// RUTA PARA EL ENVÍO DE CORREOS DE ESTATUS
-// ==========================================
+
 // ==========================================
 // RUTA DINÁMICA Y DE ENVÍO DE CORREOS
 // ==========================================
