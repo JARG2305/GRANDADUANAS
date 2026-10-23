@@ -736,28 +736,27 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
 });
 
 
-// Enviar estatus forzado a un cliente específico desde su ficha (con correo dinámico)
+// Enviar estatus forzado a un cliente específico desde su ficha (Optimizado sin timeout)
 app.post('/api/clientes/enviar-estatus', async (req, res) => {
     try {
         const { clienteId, mensajeForzado } = req.body;
         console.log(`🚀 [FORZAR ESTATUS CLIENTE] ID: ${clienteId} | Mensaje: ${mensajeForzado}`);
 
-        // Buscamos los datos del cliente en Firestore para obtener su correo
         const urlCliente = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes/${clienteId}`;
         const respCliente = await fetch(urlCliente);
         const dataCliente = await respCliente.json();
 
         if (!dataCliente.fields || !dataCliente.fields.correo?.stringValue) {
-            return.status(400).json({ success: false, message: "El cliente seleccionado no tiene un correo electrónico registrado." });
+            return res.json({ success: false, message: "El cliente seleccionado no tiene un correo electrónico registrado." });
         }
 
         const correoCliente = dataCliente.fields.correo.stringValue;
         const nombreCliente = dataCliente.fields.razonSocial?.stringValue || "Cliente";
 
-        // Obtenemos el transportador dinámico configurado en la web
         const transportadorActivo = await obtenerTransportadorDinamico();
 
-        await transportadorActivo.sendMail({
+        // Enviamos el correo con manejo de errores interno
+        transportadorActivo.sendMail({
             from: `"Logistatus Pro" <statusepga@gmail.com>`,
             to: correoCliente,
             bcc: 'statusepga@gmail.com',
@@ -772,12 +771,16 @@ app.post('/api/clientes/enviar-estatus', async (req, res) => {
                     <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
                 </div>
             `
+        }).then(() => {
+            console.log(`📧 [CORREO FORZADO EXITOSO] Enviado a ${correoCliente}`);
+        }).catch(mailErr => {
+            console.error("❌ Error interno al despachar correo en segundo plano:", mailErr);
         });
 
-        console.log(`📧 [CORREO FORZADO EXITOSO] Enviado a ${correoCliente}`);
-        res.json({ success: true, message: "Estatus y correo enviados con éxito al cliente." });
+        // Respondemos de inmediato al cliente web para evitar el Timeout
+        res.json({ success: true, message: "Orden de envío procesada con éxito." });
     } catch (error) {
-        console.error("❌ Error enviando estatus forzado:", error);
+        console.error("❌ Error en estatus forzado:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
