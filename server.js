@@ -748,11 +748,33 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
     try {
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
-        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false);
-        console.log(`🚀 [FORZAR DÍA] Procesando actualizaciones recientes para ${clientesActivos.length} clientes...`);
-        res.json({ success: true, message: "Actualizaciones del día procesadas y enviadas." });
+
+        // Filtramos clientes con envío automático habilitado y que tengan correo
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
+        console.log(`🚀 [FORZAR DÍA] Procesando envíos masivos para ${clientesActivos.length} clientes...`);
+
+        let enviadosCount = 0;
+
+        for (const cliente of clientesActivos) {
+            // Buscamos si este cliente tiene expedientes activos
+            const expedientesCliente = expedientes.filter(e => 
+                String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
+            );
+
+            if (expedientesCliente.length > 0) {
+                const listaExps = expedientesCliente.map(e => `• Exp: ${e.num_expediente} (B/L: ${e.awb_bl || e.bl || 'S/N'})`).join('\n');
+                
+                const asunto = `Reporte Diario de Estatus - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nLe presentamos el resumen de sus expedientes activos en proceso:\n\n${listaExps}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje);
+                enviadosCount++;
+            }
+        }
+
+        res.json({ success: true, message: `Reportes diarios procesados y enviados exitosamente a ${enviadosCount} clientes.` });
     } catch (error) {
-        console.error("Error en ruta forzar actualización:", error);
+        console.error("❌ Error en ruta forzar actualización del día:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -804,15 +826,15 @@ app.delete('/api/clientes/:id', async (req, res) => {
 // RUTA DE CORREO DINÁMICA (GOOGLE APPS SCRIPT)
 // ==========================================
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, nombreCliente, numExpediente, statusActual } = req.body;
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible } = req.body;
 
     if (!correoCliente) {
         return res.status(400).json({ success: false, message: "El cliente no tiene un correo electrónico registrado." });
     }
 
     try {
-        const asunto = `Actualización de Expediente N° ${numExpediente}`;
-        const mensaje = `Estimado/a ${nombreCliente},\n\nLe informamos que su expediente N° ${numExpediente} ha registrado la siguiente actualización:\n\n${statusActual}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+        const asunto = `Actualización de Expediente N° ${numExpediente || 'S/N'}`;
+        const mensaje = `Estimado/a ${nombreCliente},\n\nLe informamos que su expediente N° ${numExpediente || 'S/N'} ha registrado la siguiente actualización:\n\n• Campo actualizado: ${campoLegible || 'Estatus general'}\n• Detalle: ${statusActual}\n• B/L o Guía: ${bl || 'S/N'}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
         res.json(resultado);
