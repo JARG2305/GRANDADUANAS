@@ -280,7 +280,7 @@ async function procesarComandoLogistica(textoMensaje) {
     const textoLower = textoMensaje.toLowerCase();
     const palabrasEnMensaje = textoLower.split(/\s+/);
 
-if (textoLower.includes('razón social:') || textoLower.includes('razon social:') || textoLower.includes('rif:')) {
+    if (textoLower.includes('razón social:') || textoLower.includes('razon social:') || textoLower.includes('rif:')) {
         try {
             const razonSocialMatch = textoMensaje.match(/(?:Razón Social|Razon Social):\s*([^\n]+)/i);
             const rifMatch = textoMensaje.match(/RIF:\s*([^\n]+)/i);
@@ -438,9 +438,6 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
                formatearBloqueSeccion("🚚 5. POR DESPACHAR", porDespachar, false, false);
     }
 
-    // =========================================================================
-    // 4. DETECCIÓN Y ACTUALIZACIÓN DIRECTA (CON EVALUACIÓN DE SECUENCIA ESTRICTA)
-    // =========================================================================
     let campoAModificar = "";
     let nombreCampoLegible = "";
     let esIndicadorSiNo = false;
@@ -555,14 +552,11 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
             }
         }
 
-        // ⚠️ AQUÍ ESTÁ LA CORRECCIÓN: Debe evaluarse dentro de este "if"
         if (!expedienteEncontrado) {
             const terminoBuscado = textoMensaje.split(" ")[1] || "desconocido";
             return generarPlantillaClienteNuevo(terminoBuscado);
         }
-        // =========================================================================
-        // EVALUACIÓN ESTRICTA DE SECUENCIA (EVENTO ANTERIOR OBLIGATORIO)
-        // =========================================================================
+
         const f = expedienteEncontrado.fields;
         const hasEta = Boolean(f.eta_la_guaira?.stringValue && f.eta_la_guaira.stringValue.trim() !== "");
         const hasLlegada = Boolean(f.fecha_llegada?.stringValue && f.fecha_llegada.stringValue.trim() !== "");
@@ -572,35 +566,27 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
         const hasReconocimiento = Boolean(f.reconocimiento?.stringValue && f.reconocimiento.stringValue.trim() !== "");
         const hasValidacion = Boolean(f.validacion?.stringValue && f.validacion.stringValue.trim() !== "");
 
-        // 1. Llegada requiere ETA
         if (campoAModificar === "fecha_llegada" && !hasEta) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Llegada* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **ETA**.`;
         }
-        // 2. Acta requiere Llegada
         if (campoAModificar === "recibida_acta_recepcion" && !hasLlegada) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar el *Acta de Recepción* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Llegada**.`;
         }
-        // 3. Transmisión requiere Acta
         if (campoAModificar === "fecha_transmision" && !hasActa) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Transmisión* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada el **Acta de Recepción**.`;
         }
-        // 4. Canal requiere Transmisión
         if (esCanal && !hasTransmision) {
             return `⚠️ *Secuencia Requerida:* No se puede asignar el *Canal* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
         }
-        // 5. Reconocimiento requiere Transmisión (y Canal recomendado)
         if (campoAModificar === "reconocimiento" && !hasTransmision) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar el *Reconocimiento* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
         }
-        // 6. Validación requiere Reconocimiento
         if (campoAModificar === "validacion" && !hasReconocimiento) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar la *Validación* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **Reconocimiento**.`;
         }
-        // 7. Despacho requiere Validación
         if (campoAModificar === "despacho" && !hasValidacion) {
             return `⚠️ *Secuencia Requerida:* No se puede registrar el *Despacho* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Validación**.`;
         }
-        // 8. Funcionario requiere Canal asignado
         if (esFuncionario && !hasCanal) {
             return `⚠️ *Secuencia Requerida:* No se puede asignar el *Funcionario* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene asignado un **Canal** aduanero.`;
         }
@@ -618,9 +604,6 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
         });
 
         if (patchRes.ok) {
-            // ==========================================
-            // ENVÍO AUTOMÁTICO DE CORREO AL CLIENTE
-            // ==========================================
             try {
                 const nombreClienteExp = expedienteEncontrado.cliente;
                 const urlClientesList = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
@@ -641,30 +624,18 @@ if (textoLower.includes('razón social:') || textoLower.includes('razon social:'
 
                         if (correoDestino && permiteAuto) {
                             const statusActualTexto = `Actualización en campo [${nombreCampoLegible}]: ${valorNuevo || 'Modificado'}`;
-                            
-                            // Reutilizamos tu ruta interna de correo para despacharlo de forma limpia
-                            // O llamamos directamente al método que uses para enviar
-                            console.log(`📧 [AUTOMÁTICO] Preparando envío de correo para ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
-                            
-                            if (clienteEncontrado) {
-                        const fieldsCli = clienteEncontrado.fields || {};
-                        const correoDestino = fieldsCli.correo?.stringValue;
-                        const permiteAuto = fieldsCli.enviarAutomatico?.booleanValue ?? true;
-
-                        if (correoDestino && permiteAuto) {
-                            const statusActualTexto = `Actualización en campo [${nombreCampoLegible}]: ${valorNuevo || 'Modificado'}`;
                             const asunto = `Actualización de Expediente N° ${expedienteEncontrado.numExpediente}`;
                             const mensaje = `Estimado/a ${nombreClienteExp},\n\nLe informamos que su expediente N° ${expedienteEncontrado.numExpediente} ha registrado la siguiente actualización:\n\n${statusActualTexto}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
                             console.log(`📧 [AUTOMÁTICO] Enviando correo mediante Google Apps Script a ${correoDestino} (Exp: ${expedienteEncontrado.numExpediente})`);
-                            
-                            // Llamada a tu función dinámica de Google Apps Script
                             await enviarCorreoConGoogleScriptDinamico(correoDestino, asunto, mensaje);
-                            
                             console.log(`✅ [AUTOMÁTICO] Proceso completado para ${correoDestino}`);
                         }
                     }
-            // ==========================================
+                }
+            } catch (autoErr) {
+                console.error("❌ Error en el envío automático de correo:", autoErr);
+            }
 
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
@@ -708,8 +679,6 @@ app.get('/api/whatsapp/estado', (req, res) => {
 // ==========================================
 // GESTIÓN DE CLIENTES EN LA NUBE (FIRESTORE)
 // ==========================================
-
-// Obtener todos los clientes desde la nube
 app.get('/api/clientes', async (req, res) => {
     try {
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
@@ -735,35 +704,12 @@ app.get('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-// Función para verificar si el cliente tiene activo el envío automático en Firestore
-async function clientePermiteAutomatizacion(nombreCliente) {
-    if (!nombreCliente) return false;
-    try {
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
-        const response = await fetch(url);
-        const result = await response.json();
-        if (!result.documents) return true; // Por defecto activo si no se encuentra registrado
 
-        for (const doc of result.documents) {
-            const fields = doc.fields || {};
-            const razonSocial = fields.razonSocial?.stringValue || "";
-            if (razonSocial.trim().toLowerCase() === String(nombreCliente).trim().toLowerCase()) {
-                // Retorna el valor booleano del switch (por defecto true si no está definido)
-                return fields.enviarAutomatico?.booleanValue ?? true;
-            }
-        }
-    } catch (err) {
-        console.error("Error verificando automatización del cliente:", err);
-    }
-    return true;
-}
-
-// Guardar o actualizar un cliente desde la web (con soporte para el interruptor automático)
 app.post('/api/clientes', async (req, res) => {
     try {
         const { id, razonSocial, rif, direccion, telefono, correo, enviarAutomatico } = req.body;
         if (!razonSocial) {
-            return res.status(400).json({ success: false, message: "La razón social es obligatoria." });
+            return res.status(400).json({ success: false, message: "La razón social is obligatoria." });
         }
 
         const isUpdate = Boolean(id);
@@ -808,13 +754,8 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
     try {
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
-
-        // Filtramos clientes con envío automático habilitado
         const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false);
-
-        // Aquí procesas los expedientes que hayan tenido movimientos recientes o pendientes
         console.log(`🚀 [FORZAR DÍA] Procesando actualizaciones recientes para ${clientesActivos.length} clientes...`);
-
         res.json({ success: true, message: "Actualizaciones del día procesadas y enviadas." });
     } catch (error) {
         console.error("Error en ruta forzar actualización:", error);
@@ -822,14 +763,9 @@ app.post('/api/clientes/forzar-actualizacion-dia', async (req, res) => {
     }
 });
 
-
-// Enviar estatus forzado a un cliente específico desde su ficha (Optimizado sin timeout)
-// Enviar estatus forzado a un cliente específico desde su ficha (Usando Resend sin timeout)
 app.post('/api/clientes/enviar-estatus', async (req, res) => {
     try {
         const { clienteId, mensajeForzado } = req.body;
-        console.log(`🚀 [FORZAR ESTATUS CLIENTE] ID: ${clienteId} | Mensaje: ${mensajeForzado}`);
-
         const urlCliente = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes/${clienteId}`;
         const respCliente = await fetch(urlCliente);
         const dataCliente = await respCliente.json();
@@ -841,31 +777,11 @@ app.post('/api/clientes/enviar-estatus', async (req, res) => {
         const correoCliente = dataCliente.fields.correo.stringValue;
         const nombreCliente = dataCliente.fields.razonSocial?.stringValue || "Cliente";
 
-        const resend = await obtenerResendClient();
+        const asunto = `Actualización de Estatus Logístico`;
+        const mensaje = `Estimado/a ${nombreCliente},\n\n${mensajeForzado}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-        // Enviamos el correo usando Resend en segundo plano
-        resend.emails.send({
-            from: 'Logistatus Pro <onboarding@resend.dev>',
-            to: [correoCliente],
-            bcc: ['statusepga@gmail.com'],
-            subject: `Actualización de Estatus Logístico`,
-            html: `
-                <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                    <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Actualización de Estatus Logístico</h2>
-                    <p>Estimado/a <b>${nombreCliente}</b>,</p>
-                    <div style="background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb; margin: 15px 0; border-radius: 4px;">
-                        <p style="margin: 0; font-size: 15px; color: #1e293b;"><b>${mensajeForzado}</b></p>
-                    </div>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 30px;">Este es un mensaje automatizado generado por Logistatus Pro.</p>
-                </div>
-            `
-        }).then(() => {
-            console.log(`📧 [RESEND FORZADO EXITOSO] Enviado a ${correoCliente}`);
-        }).catch(mailErr => {
-            console.error("❌ Error interno al despachar correo con Resend:", mailErr);
-        });
+        await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
 
-        // Respondemos de inmediato al cliente web para evitar el Timeout
         res.json({ success: true, message: "Orden de envío procesada con éxito." });
     } catch (error) {
         console.error("❌ Error en estatus forzado:", error);
@@ -873,7 +789,6 @@ app.post('/api/clientes/enviar-estatus', async (req, res) => {
     }
 });
 
-// Eliminar un cliente desde la web
 app.delete('/api/clientes/:id', async (req, res) => {
     try {
         const clienteId = req.params.id;
@@ -891,42 +806,9 @@ app.delete('/api/clientes/:id', async (req, res) => {
     }
 });
 
-
 // ==========================================
-// RUTA DINÁMICA Y DE ENVÍO DE CORREOS
+// RUTA DE CORREO DINÁMICA (GOOGLE APPS SCRIPT)
 // ==========================================
-
-// Función auxiliar para obtener el transportador dinámico desde Firestore
-async function obtenerTransportadorDinamico() {
-    try {
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/credenciales_correo`;
-        const response = await fetch(url);
-        const result = await response.json();
-        
-        if (result.fields) {
-            const user = result.fields.correoUser?.stringValue || 'statusepga@gmail.com';
-            const pass = result.fields.correoPass?.stringValue || 'ppkijcjkhwxoqmdi';
-            
-            return nodemailer.createTransport({
-                service: 'gmail',
-                auth: { user, pass }
-            });
-        }
-    } catch (err) {
-        console.error("Usando transportador por defecto por error en nube:", err);
-    }
-    
-    // Transportador por defecto si no encuentra registro en la nube
-    return nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: 'statusepga@gmail.com',
-            pass: 'ppkijcjkhwxoqmdi'
-        }
-    });
-}
-
-// Ruta de correo utilizando Resend (API HTTP estándar sin bloqueos SMTP en Render)
 app.post('/api/enviar-correo-cliente', async (req, res) => {
     const { correoCliente, nombreCliente, numExpediente, statusActual } = req.body;
 
@@ -938,9 +820,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const asunto = `Actualización de Expediente N° ${numExpediente}`;
         const mensaje = `Estimado/a ${nombreCliente},\n\nLe informamos que su expediente N° ${numExpediente} ha registrado la siguiente actualización:\n\n${statusActual}\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-        // Llamamos a tu función dinámica que consulta Firestore y dispara el Apps Script hacia statusepga@gmail.com
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
-        
         res.json(resultado);
     } catch (error) {
         console.error("❌ Error al enviar correo con Google Apps Script:", error);
@@ -948,9 +828,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 });
 
-// =========================================================================
-// RUTA DE FORZAR ALERTAS (MULTICANAL)
-// =========================================================================
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
         const { canales } = req.body; 
@@ -966,7 +843,6 @@ app.post('/api/alertas/forzar', async (req, res) => {
 
         await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL (ORDENADO POR ETA)", canalesActivos);
         res.json({ success: true, message: "Alertas forzadas y enviadas con éxito.", canalesUtilizados: canalesActivos });
-
     } catch (error) {
         console.error("❌ Error al forzar alertas:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -1037,7 +913,6 @@ function parseFechaLocalServidor(str) {
     return null;
 }
 
-// Validación cuando un cliente no es encontrado en la base de datos
 function generarPlantillaClienteNuevo(nombreBuscado) {
     return `⚠️ *CLIENTE NO ENCONTRADO EN LA BASE DE DATOS* ⚠️\n\n` +
            `El cliente o expediente "*${nombreBuscado}*" no se encuentra registrado.\n\n` +
@@ -1049,9 +924,6 @@ function generarPlantillaClienteNuevo(nombreBuscado) {
            `• *Teléfono:* [Número de contacto]\n` +
            `• *Correo:* [Correo electrónico]`;
 }
-// ==========================================
-// GESTIÓN DE CLIENTES EN FIRESTORE (NUBE)
-// ==========================================
 
 async function obtenerClientesFirestore() {
     try {
@@ -1103,21 +975,10 @@ async function guardarClienteFirestore(datosCliente) {
         return false;
     }
 }
+
 // ==========================================
 // 3. TAREAS PROGRAMADAS (CRON)
 // ==========================================
-cron.schedule('0 10,18 * * 1-5', async () => {
-    try {
-        console.log("⏰ [CRON CORREO] Ejecutando envío automático de correo...");
-        const correoCliente = process.env.CORREO_DESTINATARIO_AUTOMATICO;
-        if (!correoCliente) return;
-        const records = await obtenerExpedientesFirestore();
-        if (!records || records.length === 0) return;
-    } catch (error) {
-        console.error("❌ [CRON CORREO] Error:", error);
-    }
-}, { timezone: "America/Caracas" });
-
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         console.log("⏰ [CRON MULTICANAL] Ejecutando reporte automático de alertas...");
@@ -1129,13 +990,11 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
         console.error("❌ [CRON MULTICANAL] Error en reporte automático:", error);
     }
 }, { timezone: "America/Caracas" });
-// Función que escanea automáticamente todas las variables de Render y arranca el bot de cada cliente
+
 function iniciarTodosLosBotsAutomaticos() {
     console.log("🤖 [MULTIBOT] Escaneando variables de Render...");
-
     let tokensEncontrados = [];
 
-    // 1. Si tienes las variables generales clásicas, las agregamos de una vez
     if (process.env.TELEGRAM_BOT_TOKEN) {
         tokensEncontrados.push({
             token: process.env.TELEGRAM_BOT_TOKEN,
@@ -1144,7 +1003,6 @@ function iniciarTodosLosBotsAutomaticos() {
         });
     }
 
-    // 2. Escaneamos las demás variables por si tienes de otros clientes (_TOKEN, _BOT_TOKEN)
     for (const [key, value] of Object.entries(process.env)) {
         if ((key.endsWith('_TOKEN') || key.endsWith('_BOT_TOKEN')) && key !== 'TELEGRAM_BOT_TOKEN' && value) {
             const prefijoCliente = key.replace(/(_BOT_TOKEN|_TOKEN)$/, '');
@@ -1156,17 +1014,14 @@ function iniciarTodosLosBotsAutomaticos() {
         }
     }
 
-    // Activamos la vigilancia para cada uno
     tokensEncontrados.forEach(bot => {
         console.log(`🚀 [BOT ACTIVADO] Vigilando para: ${bot.nombre}`);
         ejecutarPollingParaBot(bot.token, bot.chatId, bot.nombre);
     });
 }
 
-// Ciclo de escucha independiente por cada bot encontrado
 function ejecutarPollingParaBot(tokenBot, chatIdEsperado, nombreCliente) {
     let offset = 0;
-
     setInterval(async () => {
         try {
             const url = `https://api.telegram.org/bot${tokenBot}/getUpdates?offset=${offset}&timeout=30`;
@@ -1181,16 +1036,11 @@ function ejecutarPollingParaBot(tokenBot, chatIdEsperado, nombreCliente) {
                     const chatIdRecibido = String(update.message.chat.id);
                     const textoMensaje = update.message.text.trim();
 
-                    // Si se configuró un Chat ID específico para este cliente, validamos que coincida por seguridad
                     if (chatIdEsperado && chatIdRecibido !== String(chatIdEsperado)) {
                         continue; 
                     }
 
-                    console.log(`💬 Mensaje recibido en el bot de [${nombreCliente}] (Chat: ${chatIdRecibido})`);
-
-                    // Procesar el comando de logística
                     const respuestaProcesada = await procesarComandoLogistica(textoMensaje);
-
                     if (respuestaProcesada) {
                         await enviarRespuestaTelegramCliente(tokenBot, chatIdRecibido, respuestaProcesada);
                     }
@@ -1214,7 +1064,6 @@ async function enviarRespuestaTelegramCliente(token, chatIdDestino, mensajeTexto
     }
 }
 
-// Iniciar todos los bots automáticamente al encender el servidor
 iniciarTodosLosBotsAutomaticos();
 
 // ==========================================
