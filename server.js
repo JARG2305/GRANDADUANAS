@@ -114,6 +114,11 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
         console.log(`📧 [APPS SCRIPT CON EXCEL ESTILIZADO] Correo enviado a ${correoDestino}`);
         return resultado;
+	} catch (error) {
+        console.error("❌ Error en enviarCorreoConGoogleScriptDinamico:", error);
+        return { success: false, message: error.toString() };
+    }
+}
 
 // ==========================================
 // 2. CONFIGURACIÓN DE MIDDLEWARES
