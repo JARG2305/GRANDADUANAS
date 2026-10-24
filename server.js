@@ -237,16 +237,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-```[cite: 3]
-
-Guarda tu `server.js`, súbelo a GitHub y realiza una prueba enviando un correo. Al incluir el parámetro `datosAdjuntos`, Apps Script recibirá el archivo Base64 y lo adjuntará correctamente a Gmail.
-
-<FollowUp>
-¿Pudiste aplicar este ajuste en tu ruta de correo en el servidor para realizar una nueva prueba de envío con adjunto?
-</FollowUp>
-
-<ElicitationsGroup>
-</ElicitationsGroup>
 
 app.post('/api/enviar-excel-correo', async (req, res) => {
     try {
