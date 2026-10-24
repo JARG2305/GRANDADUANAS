@@ -9,7 +9,7 @@ const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
 
 // ==========================================
-// ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
+// 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
 // ==========================================
 async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo, expedientesData = []) {
     try {
@@ -44,7 +44,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
             const headerStyle = {
                 font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "2563EB" } },
+                fill: { fgColor: { rgb: "2563EB" } }, // Azul institucional
                 alignment: { horizontal: "center", vertical: "center" },
                 border: {
                     top: { style: "thin", color: { rgb: "CBD5E1" } },
@@ -114,7 +114,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 }
 
 // ==========================================
-// 0. CONFIGURACIÓN DE MIDDLEWARES
+// 2. CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -136,7 +136,290 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// 1. RUTAS ESENCIALES Y DE CONFIGURACIÓN
+// 3. INICIALIZACIÓN DE WHATSAPP CON BAILEYS
+// ==========================================
+let sock = null;
+let whatsappClientReady = false;
+let ultimoQrGenerado = "";
+let estadoConexionWhatsapp = "DESCONECTADO";
+
+async function iniciarBaileysWhatsApp() {
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth_info_baileys'));
+        
+        sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false
+        });
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log('📱 [WHATSAPP] Nuevo código QR generado.');
+                estadoConexionWhatsapp = "ESPERANDO_ESCANEO";
+                try {
+                    ultimoQrGenerado = await qrcode.toDataURL(qr);
+                } catch (err) {
+                    console.error("❌ Error al convertir QR:", err);
+                }
+            }
+
+            if (connection === 'open') {
+                console.log('✅ [WHATSAPP] ¡Conectado y listo!');
+                whatsappClientReady = true;
+                estadoConexionWhatsapp = "CONECTADO";
+                ultimoQrGenerado = "";
+
+                try {
+                    const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
+                    await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: "🟢 *El bot de aduanas se ha conectado y está operativo.*" });
+                } catch (e) { console.error("No se pudo enviar aviso de conexión", e); }
+            }
+
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+                const shouldReconnect = !isLoggedOut;
+                
+                whatsappClientReady = false;
+                estadoConexionWhatsapp = "DESCONECTADO";
+
+                if (shouldReconnect) {
+                    setTimeout(iniciarBaileysWhatsApp, 5000);
+                }
+            }
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('messages.upsert', async (m) => {
+            try {
+                if (m.type !== 'notify') return;
+                const msg = m.messages[0];
+                if (!msg.message || msg.key.fromMe) return;
+
+                const remitente = msg.key.remoteJid;
+                const textoMensaje = (msg.message.conversation || msg.message.extendedTextMessage?.text || "").trim();
+                const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us"; 
+                if (remitente !== GRUPO_AUTORIZADO_JID) return;
+
+                const respuestaProcesada = await procesarComandoLogistica(textoMensaje);
+                if (respuestaProcesada) {
+                    await sock.sendMessage(remitente, { text: respuestaProcesada });
+                }
+            } catch (err) {
+                console.error("❌ Error en Baileys upsert:", err);
+            }
+        });
+    } catch (err) {
+        console.error("❌ Error al iniciar Baileys:", err);
+    }
+}
+iniciarBaileysWhatsApp();
+
+// ==========================================
+// 4. INICIALIZACIÓN DE TELEGRAM (POLLING)
+// ==========================================
+async function iniciarTelegramPolling() {
+    if (!TELEGRAM_BOT_TOKEN) return;
+    let offset = 0;
+    
+    console.log("🤖 [TELEGRAM] Iniciando sondeo (Polling) de comandos...");
+
+    setInterval(async () => {
+        try {
+            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=30`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.ok && data.result.length > 0) {
+                for (const update of data.result) {
+                    offset = update.update_id + 1;
+                    if (!update.message || !update.message.text) continue;
+
+                    const chatId = String(update.message.chat.id);
+                    const textoMensaje = update.message.text.trim();
+
+                    if (TELEGRAM_CHAT_ID && chatId !== String(TELEGRAM_CHAT_ID)) continue;
+
+                    const respuestaProcesada = await procesarComandoLogistica(textoMensaje);
+                    if (respuestaProcesada) {
+                        await enviarAlertaTelegramServidorPersonalizado(chatId, respuestaProcesada);
+                    }
+                }
+            }
+        } catch (err) {}
+    }, 4000);
+}
+iniciarTelegramPolling();
+
+async function enviarAlertaTelegramServidorPersonalizado(chatIdDestino, mensajeTexto) {
+    if (!chatIdDestino) return;
+    try {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatIdDestino, text: mensajeTexto, parse_mode: 'Markdown' })
+        });
+    } catch (err) {
+        console.error("❌ Error enviando respuesta en Telegram:", err);
+    }
+}
+
+// ==========================================
+// 5. MOTOR CENTRAL DE COMANDOS Y ALERTAS (CON ART. 47 Y ART. 177)
+// ==========================================
+function sumarDiasHabiles(fechaInicio, dias) {
+    let d = new Date(fechaInicio);
+    let diasAgregados = 0;
+    while (diasAgregados < dias) {
+        d.setDate(d.getDate() + 1);
+        let diaSemana = d.getDay();
+        if (diaSemana !== 0 && diaSemana !== 6) { // 0 = Domingo, 6 = Sábado
+            diasAgregados++;
+        }
+    }
+    return d;
+}
+
+async function generarListaAlertasSistema() {
+    const records = await obtenerExpedientesFirestore();
+    if (!records || records.length === 0) return [];
+
+    let alertasEta = [], alertasVencimientos = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    for (const rec of records) {
+        if (rec.despacho) continue;
+
+        const expName = rec.num_expediente || 'S/N';
+        const clientName = rec.cliente || 'S/C';
+        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+        const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
+        const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
+        
+        const modoBruto = (rec.modo_transporte || "").toLowerCase().trim();
+        const esBarco = !modoBruto.includes("aéreo") && !modoBruto.includes("aereo");
+        const iconoVia = esBarco ? "🚢" : "✈️";
+        const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
+
+        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+        const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
+        const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
+
+        // 1. Alertas de ETA próximo
+        if (dArriboObj && !hasLlegadaRegistrada) {
+            const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
+            if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
+                const textoDias = diffLlegadaDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffLlegadaDays}d`;
+                
+                let detalleDaiTexto = "";
+                if (hasRegistroDai) {
+                    const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
+                    const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                    if (dVencimientoDai) {
+                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA (Art. 177 Num. 9)` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
+                    } else {
+                        detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
+                    }
+                } else {
+                    detalleDaiTexto = `\n⚠️ *FALTA REGISTRAR DAI*`;
+                }
+
+                alertasEta.push({
+                    texto: `${iconoVia} *${destinoTxt.toUpperCase()}*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoDias}* (${fechaEtaFormatted})${detalleDaiTexto}`,
+                    fechaSort: dArriboObj
+                });
+            }
+        }
+
+        // 2. Control del Art. 47 (5 días hábiles tras la llegada) y Multa Art. 177 Num. 7
+        const dLlegadaObj = parseFechaLocalServidor(rec.fecha_llegada);
+        const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+        
+        if (dLlegadaObj && !hasTransmision) {
+            const fechaLimiteArt47 = sumarDiasHabiles(dLlegadaObj, 5);
+            fechaLimiteArt47.setHours(0,0,0,0);
+            const diffDiasPlazo = Math.round((fechaLimiteArt47 - today) / (1000 * 60 * 60 * 24));
+
+            if (diffDiasPlazo < 0) {
+                const diasRetraso = Math.abs(diffDiasPlazo);
+                alertasVencimientos.push({
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 7 DE LA LOA (ART. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Plazo de 5 días hábiles vencido* (${diasRetraso}d de retraso)`,
+                    fechaSort: fechaLimiteArt47
+                });
+            } else if (diffDiasPlazo <= 2) {
+                const textoPlazo = diffDiasPlazo === 0 ? "¡VENCE HOY EL PLAZO HÁBIL!" : `Vence en ${diffDiasPlazo}d hábil(es)`;
+                alertasEta.push({
+                    texto: `⏰ *PLAZO ART. 47 (5 DÍAS HÁBILES)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoPlazo}* (Límite: ${formatearFechaDDMMYYYY(fechaLimiteArt47)})`,
+                    fechaSort: fechaLimiteArt47
+                });
+            }
+        }
+
+        // 3. Control general de vencimiento de DAI (Art. 177 Num. 9)
+        const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+        if (dVencimientoDai) {
+            const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+            if (diffVencDays < 0) {
+                const diasVencida = Math.abs(diffVencDays);
+                alertasVencimientos.push({
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 9 DE LA LOA (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                    fechaSort: dVencimientoDai
+                });
+            }
+        }
+    }
+
+    alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
+    alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
+
+    return [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
+}
+
+async function procesarComandoLogistica(textoMensaje) {
+    const textoLower = textoMensaje.toLowerCase();
+    const palabrasEnMensaje = textoLower.split(/\s+/);
+
+    if (textoLower.includes('ayuda') || textoLower.includes('comandos')) {
+        return `🤖 *GUÍA DE COMANDOS - LOGISTATUS PRO*\n• "alertas activas"\n• "resumen exp"`;
+    }
+    if (textoLower.includes('alertas')) {
+        const lista = await generarListaAlertasSistema();
+        if (lista.length === 0) return "✅ No hay alertas activas en este momento.";
+        return `🚨 *ALERTAS ACTIVAS (CON ART. 47 Y 177)* 🚨\n\n` + lista.join("\n\n");
+    }
+    return null;
+}
+
+async function enviarAlertaMulticanal(listaAlertas, tituloReporte, canalesForzados = null) {
+    try {
+        let enviarTg = canalesForzados ? canalesForzados.telegram : Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
+        let enviarWa = canalesForzados ? canalesForzados.whatsapp : Boolean(whatsappClientReady && sock);
+
+        if (enviarTg && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
+            let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
+            let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n");
+            await enviarAlertaTelegramServidorPersonalizado(TELEGRAM_CHAT_ID, mensajeConsolidado);
+        }
+
+        if (enviarWa && whatsappClientReady && sock) {
+            const GRUPO_AUTORIZADO_JID = "120363429806769060@g.us";
+            let mensajesEnumerados = listaAlertas.map((item, index) => `${index + 1}️⃣ ${item}`);
+            let mensajeConsolidado = `🚨 *LOGISTATUS PRO - ${tituloReporte}* 🚨\n\n` + mensajesEnumerados.join("\n\n");
+            await sock.sendMessage(GRUPO_AUTORIZADO_JID, { text: mensajeConsolidado });
+        }
+    } catch (err) {
+        console.error("❌ Error en envío multicanal:", err);
+    }
+}
+
+// ==========================================
+// 6. RUTAS DE LA API Y CONFIGURACIÓN
 // ==========================================
 app.get('/api/config', (req, res) => {
     res.json({
@@ -149,6 +432,9 @@ app.get('/api/config', (req, res) => {
 
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/health', (req, res) => { res.status(200).send('LOGISTATUS PRO - Servidor Activo OK'); });
+app.get('/api/whatsapp/estado', (req, res) => {
+    res.json({ success: true, estado: estadoConexionWhatsapp, ready: whatsappClientReady, qrCodeDataUrl: ultimoQrGenerado });
+});
 
 app.get('/api/clientes', async (req, res) => {
     try {
@@ -225,12 +511,10 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         if (observaciones && observaciones.trim() !== "") mensaje += `\n${observaciones}`;
         mensaje += `\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-        // 🔍 Buscamos el expediente para adjuntar su Excel estilizado
         const expedientes = await obtenerExpedientesFirestore();
         const expedienteEncontrado = expedientes.find(e => String(e.num_expediente).trim() === String(numExpediente).trim());
         const datosAdjuntos = expedienteEncontrado ? [expedienteEncontrado] : [];
 
-        // 🚀 Se envía con los datos adjuntos para que se cree el Blob en Apps Script
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje, datosAdjuntos);
         res.json(resultado);
     } catch (error) {
@@ -257,6 +541,29 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
     }
 });
 
+app.post('/api/alertas/forzar', async (req, res) => {
+    try {
+        const { canales } = req.body; 
+        const listaFinalOrdenada = await generarListaAlertasSistema();
+        if (listaFinalOrdenada.length === 0) {
+            return res.json({ success: false, message: "No hay alertas activas." });
+        }
+
+        let canalesActivos = {
+            whatsapp: Boolean(canales?.whatsapp && whatsappClientReady && sock),
+            telegram: Boolean(canales?.telegram && TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID)
+        };
+
+        await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE FORZADO MANUAL (ORDENADO POR ETA)", canalesActivos);
+        res.json({ success: true, message: "Alertas forzadas y enviadas con éxito.", canalesUtilizados: canalesActivos });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ==========================================
+// 7. FUNCIONES AUXILIARES Y TAREAS CRON
+// ==========================================
 async function obtenerExpedientesFirestore() {
     try {
         const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -277,5 +584,80 @@ async function obtenerExpedientesFirestore() {
     } catch (err) { return []; }
 }
 
+async function obtenerClientesFirestore() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.documents) return [];
+
+        return result.documents.map(doc => {
+            let fields = doc.fields || {};
+            return {
+                id: doc.name.split('/').pop(),
+                razonSocial: fields.razonSocial?.stringValue || '',
+                correo: fields.correo?.stringValue || '',
+                enviarAutomatico: fields.enviarAutomatico?.booleanValue ?? true
+            };
+        });
+    } catch (err) { return []; }
+}
+
+function parseFechaLocalServidor(str) {
+    if (!str) return null;
+    str = String(str).trim();
+    if (str.includes('/')) {
+        const p = str.split('/');
+        if (p.length === 3 && p[2].length === 4) return new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`);
+    } else if (str.includes('-')) {
+        const p = str.split('-');
+        if (p.length === 3 && p[0].length === 4) return new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`);
+    }
+    return null;
+}
+
+function formatearFechaDDMMYYYY(str) {
+    const d = parseFechaLocalServidor(str);
+    if (!d || isNaN(d.getTime())) return str || 'S/N';
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+}
+
+// CRON: Alertas automáticas y correos con Excel a las 10:00 AM y 6:00 PM
+cron.schedule('0 10,18 * * *', async () => {
+    try {
+        console.log("⏰ [CRON AUTOMÁTICO] Ejecutando reporte de alertas y correos con Excel...");
+        
+        const alertasGeneradas = await generarListaAlertasSistema();
+        if (alertasGeneradas && alertasGeneradas.length > 0) {
+            await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO PROGRAMADO");
+        }
+
+        const expedientes = await obtenerExpedientesFirestore();
+        const clientes = await obtenerClientesFirestore();
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
+        let enviadosCount = 0;
+
+        for (const cliente of clientesActivos) {
+            const expedientesCliente = expedientes.filter(e => 
+                String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
+            );
+
+            if (expedientesCliente.length > 0) {
+                const asunto = `Reporte Automático de Estatus - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, expedientesCliente);
+                enviadosCount++;
+            }
+        }
+        console.log(`✅ [CRON] Reportes automáticos enviados a ${enviadosCount} clientes.`);
+    } catch (error) {
+        console.error("❌ [CRON AUTOMÁTICO] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
+
+// ==========================================
+// 8. INICIO DEL SERVIDOR
+// ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });
+app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });dai
