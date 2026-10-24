@@ -964,14 +964,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-```[cite: 5]
-
----
-
-#### Paso 2: Limpia los bloques duplicados en tu `index.html`
-En tu archivo `index.html`, dentro de la función `saveExp` (alrededor de la línea 1270), tienes duplicado el código de la notificación automática. Reemplaza toda esa parte dentro de `saveExp` para que quede limpio y sin duplicaciones:
-
-```javascript
+javascript
             try {
                 if (idVal) {
                     await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
