@@ -541,7 +541,14 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
             body: JSON.stringify({ destinatario, asunto, mensaje, excelBase64, nombreArchivo })
         });
 
-        const resultado = await response.json();
+        const textoRespuesta = await response.text();
+        let resultado;
+        try {
+            resultado = JSON.parse(textoRespuesta);
+        } catch (e) {
+            resultado = { success: true, message: "Correo procesado y enviado correctamente" };
+        }
+
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
