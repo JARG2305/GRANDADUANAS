@@ -349,7 +349,7 @@ async function generarListaAlertasSistema() {
             if (diffDiasPlazo < 0) {
                 const diasRetraso = Math.abs(diffDiasPlazo);
                 alertasVencimientos.push({
-                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 7 DE LA LOA (ART. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Plazo de 5 días hábiles vencido* (${diasRetraso}d de retraso)`,
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 7 (ART. 47 LOA)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *Plazo de 5 días hábiles vencido* (${diasRetraso}d de retraso)`,
                     fechaSort: fechaLimiteArt47
                 });
             } else if (diffDiasPlazo <= 2) {
@@ -368,7 +368,7 @@ async function generarListaAlertasSistema() {
             if (diffVencDays < 0) {
                 const diasVencida = Math.abs(diffVencDays);
                 alertasVencimientos.push({
-                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 9 DE LA LOA (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 NUM. 9 (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
                     fechaSort: dVencimientoDai
                 });
             }
