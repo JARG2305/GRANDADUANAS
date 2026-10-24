@@ -355,7 +355,7 @@ async function generarListaAlertasSistema() {
             } else if (diffDiasPlazo <= 2) {
                 const textoPlazo = diffDiasPlazo === 0 ? "¡VENCE HOY EL PLAZO HÁBIL!" : `Vence en ${diffDiasPlazo}d hábil(es)`;
                 alertasEta.push({
-                    texto: `⏰ *PLAZO ART. 47 (5 DÍAS HÁBILES)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoPlazo}* (Límite: ${formatearFechaDDMMYYYY(fechaLimiteArt47)})`,
+                    texto: `⏰ *PLAZO ART. 47 de la LOA *\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ *${textoPlazo}* (Límite: ${formatearFechaDDMMYYYY(fechaLimiteArt47)})`,
                     fechaSort: fechaLimiteArt47
                 });
             }
