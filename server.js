@@ -225,16 +225,28 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         if (observaciones && observaciones.trim() !== "") mensaje += `\n${observaciones}`;
         mensaje += `\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
+        // 🔍 Buscamos el expediente para adjuntar su Excel estilizado
         const expedientes = await obtenerExpedientesFirestore();
         const expedienteEncontrado = expedientes.find(e => String(e.num_expediente).trim() === String(numExpediente).trim());
         const datosAdjuntos = expedienteEncontrado ? [expedienteEncontrado] : [];
 
+        // 🚀 Se envía con los datos adjuntos para que se cree el Blob en Apps Script
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje, datosAdjuntos);
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+```[cite: 3]
+
+Guarda tu `server.js`, súbelo a GitHub y realiza una prueba enviando un correo. Al incluir el parámetro `datosAdjuntos`, Apps Script recibirá el archivo Base64 y lo adjuntará correctamente a Gmail.
+
+<FollowUp>
+¿Pudiste aplicar este ajuste en tu ruta de correo en el servidor para realizar una nueva prueba de envío con adjunto?
+</FollowUp>
+
+<ElicitationsGroup>
+</ElicitationsGroup>
 
 app.post('/api/enviar-excel-correo', async (req, res) => {
     try {
