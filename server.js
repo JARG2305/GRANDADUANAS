@@ -964,7 +964,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-javascript
+	javascript
             try {
                 if (idVal) {
                     await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
@@ -997,12 +997,6 @@ javascript
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
-```[cite: 4]
-
----
-
-### ¿Por qué con esto se soluciona?
-Ahora el servidor en Render tomará la información del expediente modificado, creará el archivo Excel con diseño profesional (`xlsx-js-style`), lo pasará a Base64, y tu Google Apps Script lo recibirá y adjuntará sin problemas a los correos de los clientes.
 
 <FollowUp>
 ¿Pudiste aplicar estos cambios en tu `server.js` y `index.html` para verificar la llegada del correo con su adjunto?
