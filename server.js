@@ -103,7 +103,6 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
             })
         });
 
-        // Aseguramos la lectura segura como texto primero para evitar fallos de formato
         const textoRespuesta = await response.text();
         let resultado;
         try {
@@ -114,7 +113,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
         console.log(`📧 [APPS SCRIPT CON EXCEL ESTILIZADO] Correo enviado a ${correoDestino}`);
         return resultado;
-	} catch (error) {
+    } catch (error) {
         console.error("❌ Error en enviarCorreoConGoogleScriptDinamico:", error);
         return { success: false, message: error.toString() };
     }
@@ -636,16 +635,23 @@ function formatearFechaDDMMYYYY(str) {
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
 
-// CRON: Alertas automáticas y correos con Excel a las 10:00 AM y 6:00 PM
-cron.schedule('0 10,18 * * *', async () => {
+// CRON 1: Alertas automáticas por WhatsApp y Telegram (9, 12, 15, 18, 19, 20 horas)
+cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
-        console.log("⏰ [CRON AUTOMÁTICO] Ejecutando reporte de alertas y correos con Excel...");
-        
+        console.log("⏰ [CRON ALERTAS] Ejecutando reporte de alertas multicanal...");
         const alertasGeneradas = await generarListaAlertasSistema();
         if (alertasGeneradas && alertasGeneradas.length > 0) {
-            await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO PROGRAMADO");
+            await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO DE ALERTAS");
         }
+    } catch (error) {
+        console.error("❌ [CRON ALERTAS] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
 
+// CRON 2: Correos automáticos con Excel a clientes a las 10:00 AM y 6:00 PM
+cron.schedule('0 10,18 * * *', async () => {
+    try {
+        console.log("⏰ [CRON CORREOS] Ejecutando correos con Excel a clientes...");
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
         const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
@@ -664,9 +670,9 @@ cron.schedule('0 10,18 * * *', async () => {
                 enviadosCount++;
             }
         }
-        console.log(`✅ [CRON] Reportes automáticos enviados a ${enviadosCount} clientes.`);
+        console.log(`✅ [CRON CORREOS] Reportes enviados a ${enviadosCount} clientes.`);
     } catch (error) {
-        console.error("❌ [CRON AUTOMÁTICO] Error:", error);
+        console.error("❌ [CRON CORREOS] Error:", error);
     }
 }, { timezone: "America/Caracas" });
 
