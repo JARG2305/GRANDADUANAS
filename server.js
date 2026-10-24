@@ -964,13 +964,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-	javascript
-            try {
-                if (idVal) {
-                    await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
-                } else {
-                    await addDoc(collection(db, COLLECTION_NAME), record);
-                }
+	
 
                 // 🚀 DISPARAR CORREO AUTOMÁTICO DESDE LA WEB (Respetando el switch del cliente)
                 if (nombreCliente) {
