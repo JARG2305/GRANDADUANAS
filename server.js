@@ -541,8 +541,11 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
 
         const urlAppsScript = process.env.googleScriptUrl;
         if (!urlAppsScript) {
-            return res.status(500).json({ success: false, message: "URL de Google Apps Script no configurada en el servidor." });
+            console.error("❌ ERROR: La variable googleScriptUrl no está definida en Render.");
+            return res.status(500).json({ success: false, message: "Falta configurar googleScriptUrl en Render." });
         }
+
+        console.log(`🌐 [DEBUG CORREO] Enviando petición a Google Apps Script para: ${destinatario}`);
 
         const response = await fetch(urlAppsScript, {
             method: 'POST',
@@ -557,16 +560,20 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
         });
 
         const textoRespuesta = await response.text();
+        console.log("📥 [DEBUG CORREO] Respuesta completa de Google:", textoRespuesta);
+
         let resultado;
         try {
             resultado = JSON.parse(textoRespuesta);
         } catch (e) {
-            resultado = { success: true, message: "Correo procesado y enviado correctamente" };
+            console.error("❌ [DEBUG CORREO] Google no devolvió un JSON válido. Respuesta:", textoRespuesta);
+            return res.status(500).json({ success: false, message: "Google Apps Script devolvió HTML o texto plano en vez de JSON. Revisa los permisos de implementación." });
         }
 
         res.json(resultado);
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("❌ [DEBUG CORREO CRÍTICO] Excepción capturada:", error);
+        res.status(500).json({ success: false, message: "Error interno en servidor Node.js: " + error.message });
     }
 });
 
