@@ -660,4 +660,4 @@ cron.schedule('0 10,18 * * *', async () => {
 // 8. INICIO DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });dai
+app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });
