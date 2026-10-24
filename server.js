@@ -509,6 +509,15 @@ async function procesarComandoLogistica(textoMensaje) {
             });
             return res;
         };
+	// Dentro de procesarComandoLogistica, al disparar el correo automático:
+const datosExpedienteUnico = [ {
+    num_expediente: expedienteEncontrado.numExpediente,
+    cliente: expedienteEncontrado.cliente,
+    awb_bl: expedienteEncontrado.bl,
+    observaciones: statusActualTexto
+}];
+
+await enviarCorreoConGoogleScriptDinamico(correoDestino, asunto, mensaje, datosExpedienteUnico);
 
         return `📊 *EXPEDIENTES EN PROCESO (ORDENADOS POR ETA)* 📊\n\n` +
                formatearBloqueSeccion("🚢✈️ 1. POR LLEGAR", porLlegar, false, true) +
@@ -930,7 +939,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     try {
         const asunto = `Actualización de Expediente N° ${numExpediente || 'XXXX'}`;
         
-        // Construimos el mensaje respetando las líneas condicionales
         let mensaje = `Le informamos que su expediente\nN° ${numExpediente || 'XXXX'}\nB/L o Guía: ${bl || 'XXXXX'}`;
         
         if (eventoCambiado) {
@@ -943,7 +951,13 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
 
         mensaje += `\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje);
+        // 🔍 Buscamos los datos de este expediente en Firestore para adjuntar su reporte en Excel
+        const expedientes = await obtenerExpedientesFirestore();
+        const expedienteEncontrado = expedientes.find(e => String(e.num_expediente).trim() === String(numExpediente).trim());
+        const datosAdjuntos = expedienteEncontrado ? [expedienteEncontrado] : [];
+
+        // Pasamos el arreglo con el expediente para que se genere el Excel estilizado
+        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje, datosAdjuntos);
         res.json(resultado);
     } catch (error) {
         console.error("❌ Error al enviar correo con Google Apps Script:", error);
