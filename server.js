@@ -956,7 +956,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const expedienteEncontrado = expedientes.find(e => String(e.num_expediente).trim() === String(numExpediente).trim());
         const datosAdjuntos = expedienteEncontrado ? [expedienteEncontrado] : [];
 
-        // Pasamos el arreglo con el expediente para que se genere el Excel estilizado
+        // 🚀 Pasamos el arreglo con el expediente para que se genere el Excel estilizado y se adjunte
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje, datosAdjuntos);
         res.json(resultado);
     } catch (error) {
@@ -964,6 +964,59 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+```[cite: 5]
+
+---
+
+#### Paso 2: Limpia los bloques duplicados en tu `index.html`
+En tu archivo `index.html`, dentro de la función `saveExp` (alrededor de la línea 1270), tienes duplicado el código de la notificación automática. Reemplaza toda esa parte dentro de `saveExp` para que quede limpio y sin duplicaciones:
+
+```javascript
+            try {
+                if (idVal) {
+                    await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
+                } else {
+                    await addDoc(collection(db, COLLECTION_NAME), record);
+                }
+
+                // 🚀 DISPARAR CORREO AUTOMÁTICO DESDE LA WEB (Respetando el switch del cliente)
+                if (nombreCliente) {
+                    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                    
+                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                        const detalleObservacion = record.observaciones ? `CAMPO OBSERVACION: ${record.observaciones}` : "";
+                        const eventoCambiado = "Actualización de estatus en expediente"; 
+
+                        if (record.observaciones || record.fecha_llegada || record.despacho) {
+                            await notificarCambioAutomatico(
+                                clienteObj.correo,
+                                nombreCliente,
+                                record.num_expediente || "XXXX",
+                                detalleObservacion ? `${eventoCambiado}\n${detalleObservacion}` : eventoCambiado,
+                                record.awb_bl || "XXXXX",
+                                "Actualización del Día"
+                            );
+                        }
+                    }
+                }
+
+                closeModal();
+            } catch (err) { 
+                alert("Error al guardar: " + err.message); 
+            }
+```[cite: 4]
+
+---
+
+### ¿Por qué con esto se soluciona?
+Ahora el servidor en Render tomará la información del expediente modificado, creará el archivo Excel con diseño profesional (`xlsx-js-style`), lo pasará a Base64, y tu Google Apps Script lo recibirá y adjuntará sin problemas a los correos de los clientes.
+
+<FollowUp>
+¿Pudiste aplicar estos cambios en tu `server.js` y `index.html` para verificar la llegada del correo con su adjunto?
+</FollowUp>
+
+<ElicitationsGroup>
+</ElicitationsGroup>
 app.post('/api/enviar-excel-correo', async (req, res) => {
     try {
         const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
