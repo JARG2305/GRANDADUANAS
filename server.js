@@ -15,9 +15,11 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
     try {
         const urlAppsScript = process.env.googleScriptUrl;
         if (!urlAppsScript) {
-            console.error("❌ No se encontró la variable googleScriptUrl en las variables de entorno de Render.");
-            return { success: false, message: "URL de Google Apps Script no configurada." };
+            console.error("❌ ERROR CRÍTICO: No se encontró la variable googleScriptUrl en las variables de entorno de Render.");
+            return { success: false, message: "URL de Google Apps Script no configurada en Render." };
         }
+
+        console.log(`🌐 [APPS SCRIPT] Conectando con URL: ${urlAppsScript}`);
 
         let archivoExcelBase64 = null;
         let nombreArchivo = "Reporte_Expedientes_Logistatus.xlsx";
@@ -44,7 +46,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
             const headerStyle = {
                 font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "2563EB" } }, // Azul institucional
+                fill: { fgColor: { rgb: "2563EB" } },
                 alignment: { horizontal: "center", vertical: "center" },
                 border: {
                     top: { style: "thin", color: { rgb: "CBD5E1" } },
@@ -104,17 +106,20 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
         });
 
         const textoRespuesta = await response.text();
+        console.log("📥 [RESPUESTA RAW DE APPS SCRIPT]:", textoRespuesta.substring(0, 300)); // Muestra los primeros 300 caracteres en los logs
+
         let resultado;
         try {
             resultado = JSON.parse(textoRespuesta);
         } catch (e) {
-            resultado = { success: true, message: "Procesado por Apps Script correctamente" };
+            console.warn("⚠️ Advertencia: Google Apps Script no devolvió un JSON válido. Respuesta completa:", textoRespuesta);
+            resultado = { success: false, message: "Error en formato de respuesta de Apps Script: " + textoRespuesta.substring(0, 100) };
         }
 
-        console.log(`📧 [APPS SCRIPT CON EXCEL ESTILIZADO] Correo enviado a ${correoDestino}`);
+        console.log(`📧 [APPS SCRIPT] Resultado final para ${correoDestino}:`, resultado);
         return resultado;
     } catch (error) {
-        console.error("❌ Error en enviarCorreoConGoogleScriptDinamico:", error);
+        console.error("❌ Error crítico en enviarCorreoConGoogleScriptDinamico:", error);
         return { success: false, message: error.toString() };
     }
 }
