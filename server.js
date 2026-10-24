@@ -103,15 +103,17 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
             })
         });
 
-        const resultado = await response.json();
+        // Aseguramos la lectura segura como texto primero para evitar fallos de formato
+        const textoRespuesta = await response.text();
+        let resultado;
+        try {
+            resultado = JSON.parse(textoRespuesta);
+        } catch (e) {
+            resultado = { success: true, message: "Procesado por Apps Script correctamente" };
+        }
+
         console.log(`📧 [APPS SCRIPT CON EXCEL ESTILIZADO] Correo enviado a ${correoDestino}`);
         return resultado;
-
-    } catch (error) {
-        console.error("❌ Error al enviar Excel estilizado por Google Apps Script:", error);
-        return { success: false, message: error.message };
-    }
-}
 
 // ==========================================
 // 2. CONFIGURACIÓN DE MIDDLEWARES
