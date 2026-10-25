@@ -920,6 +920,41 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+	function enviarExcelPorCorreoWeb(destinatarioCorreo, asuntoCorreo, mensajeCorreo) {
+        try {
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
+
+            const excelBase64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64', cellStyles: true });
+
+            fetch('/api/enviar-excel-correo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    destinatario: destinatarioCorreo,
+                    asunto: asuntoCorreo || "Reporte Consolidado de Estatus - Logistatus Pro",
+                    mensaje: mensajeCorreo || "Adjunto encontrará el reporte consolidado.",
+                    excelBase64: excelBase64,
+                    nombreArchivo: "Reporte_Consolidado_Logistatus.xlsx"
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("¡Correo enviado exitosamente con el Excel estilizado!");
+                } else {
+                    alert("Error al enviar el correo: " + (data.message || "Error desconocido"));
+                }
+            })
+            .catch(err => {
+                alert("Error al conectar con el servidor: " + err.message);
+            });
+
+        } catch (err) {
+            alert("Error al generar el archivo para correo: " + err.message);
+        }
+    }
         const BACKEND_URL = window.location.origin;
 
         let app;
