@@ -297,18 +297,40 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const proveedorFinal = proveedor || "S/N";
 
         let cuerpoCorreo = `
-            <div style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px;">
-                <h2 style="color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">Actualización de Estatus - Logistatus Pro</h2>
-                <p>Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
-                <p>Le informamos que su expediente<br><strong>N° ${numExpediente || 'GENERAL'}</strong><br><strong>Proveedor:</strong> ${proveedorFinal}<br><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</p>
-                <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px; margin: 15px 0;">
-                    <p style="margin: 0;"><strong>${campoLegible || 'Estatus / Evento reciente'}:</strong> ${statusActual || 'N/A'}</p>
-                    <p style="margin: 5px 0 0 0;"><strong>Medio de transporte:</strong> ${modoTransporte || 'Marítimo'}</p>
-                    ${observaciones && observaciones.trim() !== "" ? `<p style="margin: 5px 0 0 0;"><strong>Observaciones:</strong> ${observaciones.trim()}</p>` : ''}
-                </div>
-                <p>Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
-            </div>
-        `;
+    <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px;">
+        
+        <!-- Encabezado con Título y Logo -->
+        <table style="width: 100%; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-bottom: 10px;">
+            <tr>
+                <td>
+                    <h2 style="color: #1e3a8a; margin: 0; font-size: 18px;">Actualización de Estatus - Logistatus Pro</h2>
+                </td>
+                <td style="text-align: right;">
+                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 40px; max-width: 120px; object-fit: contain;">` : ''}
+                </td>
+            </tr>
+        </table>
+
+        <!-- Líneas con márgenes reducidos -->
+        <p style="margin: 3px 0; font-size: 13px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
+        <p style="margin: 3px 0 8px 0; font-size: 13px;">Le informamos que su expediente:</p>
+        
+        <div style="font-size: 13px; line-height: 1.4; margin-bottom: 8px;">
+            <div><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
+            <div><strong>Proveedor:</strong> ${proveedorFinal}</div>
+            <div><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+        </div>
+
+        <!-- Bloque de estatus compacto -->
+        <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 13px;">
+            <div style="margin: 2px 0;"><strong>${campoLegible || 'Estatus / Evento reciente'}:</strong> ${statusActual || 'N/A'}</div>
+            <div style="margin: 2px 0;"><strong>Medio de transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+            ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0;"><strong>Observaciones:</strong> ${observaciones.trim()}</div>` : ''}
+        </div>
+
+        <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+    </div>
+`;
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
         res.json(resultado);
