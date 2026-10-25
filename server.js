@@ -313,6 +313,47 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 });
 
+// Ruta para procesar el envío de correos con Excel adjunto desde la web
+app.post('/api/enviar-excel-correo', async (req, res) => {
+    try {
+        const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
+        if (!destinatario) return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
+
+        const urlAppsScript = process.env.googleScriptUrl;
+        if (!urlAppsScript) {
+            console.error("❌ ERROR: La variable googleScriptUrl no está definida en Render.");
+            return res.status(500).json({ success: false, message: "Falta configurar googleScriptUrl en Render." });
+        }
+
+        console.log(`🌐 [DEBUG CORREO] Enviando petición a Google Apps Script para: ${destinatario}`);
+
+        const response = await fetch(urlAppsScript, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                destinatario, 
+                asunto, 
+                mensaje, 
+                excelBase64: excelBase64 || null, 
+                nombreArchivo: nombreArchivo || "Reporte_Logistatus.xlsx" 
+            })
+        });
+
+        const textoRespuesta = await response.text();
+        let resultado;
+        try {
+            resultado = JSON.parse(textoRespuesta);
+        } catch (e) {
+            return res.status(500).json({ success: false, message: "Google Apps Script devolvió HTML o texto plano en vez de JSON." });
+        }
+
+        res.json(resultado);
+    } catch (error) {
+        console.error("❌ [DEBUG CORREO CRÍTICO] Excepción capturada:", error);
+        res.status(500).json({ success: false, message: "Error interno en servidor Node.js: " + error.message });
+    }
+});
+
 // ==========================================
 // 4. TAREAS CRON Y FUNCIONES AUXILIARES
 // ==========================================
