@@ -736,20 +736,34 @@ cron.schedule('0 10,18 * * *', async () => {
         let enviadosCount = 0;
 
         for (const cliente of clientesActivos) {
-            const expedientesCliente = expedientes.filter(e => 
-                String(e.cliente).trim().toLowerCase() === String(cliente.razonSocial).trim().toLowerCase() && !e.despacho
-            );
+            // Normalizamos os nomes para evitar falhas por espaços ou maiúsculas/minúsculas
+            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
+            
+            const expedientesCliente = expedientes.filter(e => {
+                const clienteExp = String(e.cliente || "").trim().toLowerCase();
+                return clienteExp === clienteNombreBuscado && !e.despacho;
+            });
+
+            console.log(`🔍 [CRON] Cliente: "${cliente.razonSocial}" -> Expedientes válidos encontrados: ${expedientesCliente.length}`);
 
             if (expedientesCliente.length > 0) {
-                const asunto = `Reporte Automático de Estatus - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+                // Ordenamos estrictamente por ETA La Guaira antes de generar el Excel
+                expedientesCliente.sort((a, b) => {
+                    let fechaA = parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31');
+                    let fechaB = parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31');
+                    return fechaA - fechaB;
+                });
+
+                const asunto = `Reporte Automático de Estatus y Expedientes - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus y detalle de sus expedientes vigentes.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
                 await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, expedientesCliente);
                 enviadosCount++;
+            } else {
+                console.log(`⚠️ [CRON] No se envió correo a "${cliente.razonSocial}" porque no tiene expedientes activos pendientes.`);
             }
         }
-        console.log(`✅ [CRON CORREOS] Reportes enviados a ${enviadosCount} clientes.`);
-    } catch (error) {
+        console.log(`✅ [CRON CORREOS] Reportes enviados a ${enviadosCount} clientes.`);    } catch (error) {
         console.error("❌ [CRON CORREOS] Error:", error);
     }
 }, { timezone: "America/Caracas" });
