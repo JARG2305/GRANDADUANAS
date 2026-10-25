@@ -169,9 +169,12 @@
 
             <!-- Botones de Acción -->
             <div class="flex items-center gap-3">
-                <button id="btnNuevoExp" class=" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow whitespace-nowrap">
-                    ➕ Nuevo
-                </button>
+                <button id="btnNuevoExp" class="relative group overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-[0_4px_12px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(34,211,238,0.4)] hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 whitespace-nowrap">
+    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-white font-black text-xs transition-transform group-hover:rotate-90 duration-300">
+        +
+    </span>
+    <span>Nuevo Expediente</span>
+</button>
 		<button onclick="forzarEnvioActualizacionesHoy()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
 		 🚀 Forzar Envío de Estatus del Día
 		</button>
