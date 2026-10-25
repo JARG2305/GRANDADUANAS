@@ -295,7 +295,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         const proveedorFinal = proveedor || "S/N";
-
+	let logoBase64 = typeof logoGuardado !== 'undefined' ? logoGuardado : "";
         let cuerpoCorreo = `
     <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px;">
         
