@@ -909,6 +909,8 @@
 
     <!-- Script de Firebase y Lógica Original Íntegra -->
     <script type="module">
+      <!-- Script de Firebase y Lógica del Sistema Corregida e Íntegra -->
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
@@ -1426,7 +1428,48 @@
             }
         };
 
-        initCloudDB();
+        // DEFINICIÓN GLOBAL DE LA FUNCIÓN DE INICIO
+        window.initCloudDB = async function() {
+            await sincronizarClientesCache();
+
+            const logoRef = doc(db, CONFIG_COLLECTION, LOGO_DOC_ID);
+            getDoc(logoRef).then((docSnap) => {
+                if (docSnap.exists() && docSnap.data().imagenBase64) {
+                    const savedLogo = docSnap.data().imagenBase64;
+                    const logoPreview = document.getElementById("userLogoPreview");
+                    if (logoPreview) {
+                        logoPreview.src = savedLogo;
+                        document.getElementById("userLogoContainer").classList.remove("hidden");
+                        document.getElementById("userLogoUploadBtn").classList.add("hidden");
+                    }
+                }
+            }).catch(err => console.error(err));
+
+            onSnapshot(collection(db, COLLECTION_NAME), (snapshot) => {
+                allRecords = [];
+                if (!snapshot.empty) {
+                    snapshot.forEach((docSnap) => {
+                        let data = docSnap.data();
+                        camposFechas.forEach(f => {
+                            if (data[f]) data[f] = formatearFechaDDMMYYYY(data[f]);
+                        });
+                        allRecords.push({ id: docSnap.id, ...data });
+                    });
+                }
+                
+                allRecords.sort((a, b) => {
+                    let expA = (a.num_expediente || "").toString().trim();
+                    let expB = (b.num_expediente || "").toString().trim();
+                    return expA.localeCompare(expB, undefined, { numeric: true, sensitivity: 'base' });
+                });
+
+                window.actualizarListasDatalists(allRecords);
+                updateTabCounters(allRecords);
+                window.filterData();
+            });
+        };
+
+        window.initCloudDB();
     </script>
 </body>
 </html>
