@@ -24,9 +24,9 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
         let archivoExcelBase64 = null;
         let nombreArchivo = "Reporte_Expedientes_Logistatus.xlsx";
 
-      if (expedientesData && expedientesData.length > 0) {
+     if (expedientesData && expedientesData.length > 0) {
             const excelHeaders = [
-                "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+                "MODO VÍA", "N.º EXP.", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO", "CONTENIDO", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSP.", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
             ];
 
             const fieldsList = [
@@ -41,33 +41,66 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 "observaciones"
             ];
 
-            // ORDENAR EXPLICITAMENTE POR ETA (O FECHA DE LLEGADA) ANTES DE ARMAR EL EXCEL
-            // ORDENAR EXPLICITAMENTE POR ETA LA GUAIRA ANTES DE ARMAR EL EXCEL
-            expedientesData.sort((a, b) => {
+            // 1. Separamos por categorías lógicas
+            const porLlegar = expedientesData.filter(e => !e.fecha_llegada && !e.despacho);
+            const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
+            const despachados = expedientesData.filter(e => Boolean(e.despacho));
+
+            // 2. Ordenamiento específico por categoría según lo solicitado:
+            // - Por Llegar: ordenado por ETA La Guaira
+            porLlegar.sort((a, b) => {
                 let fechaA = parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31');
                 let fechaB = parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31');
                 return fechaA - fechaB;
             });
 
-            const wsData = [excelHeaders];
-
-            expedientesData.forEach(e => {
-                let row = fieldsList.map(f => e[f] !== undefined && e[f] !== null ? e[f] : "");
-                wsData.push(row);
+            // - Trámites: ordenado por Fecha de Transmisión
+            tramites.sort((a, b) => {
+                let fechaA = parseFechaLocalServidor(a.fecha_transmision) || new Date('9999-12-31');
+                let fechaB = parseFechaLocalServidor(b.fecha_transmision) || new Date('9999-12-31');
+                return fechaA - fechaB;
             });
+
+            // - Despachados: ordenado por Fecha de Despacho
+            despachados.sort((a, b) => {
+                let fechaA = parseFechaLocalServidor(a.despacho) || new Date('9999-12-31');
+                let fechaB = parseFechaLocalServidor(b.fecha_transmision) || new Date('9999-12-31');
+                return fechaA - fechaB;
+            });
+
+            let wsData = [];
+            let metaSecciones = [];
+
+            function agregarSeccion(tituloSeccion, listaItems, colorHex) {
+                if (listaItems.length === 0) return;
+                
+                wsData.push([tituloSeccion]);
+                metaSecciones.push({ type: 'title' });
+
+                wsData.push(excelHeaders);
+                metaSecciones.push({ type: 'header', color: colorHex });
+
+                listaItems.forEach(e => {
+                    let row = fieldsList.map(f => e[f] !== undefined && e[f] !== null ? e[f] : "");
+                    wsData.push(row);
+                    metaSecciones.push({ type: 'data' });
+                });
+
+                wsData.push([]);
+                metaSecciones.push({ type: 'empty' });
+            }
+
+            // Construimos las secciones con sus respectivos colores solicitados
+            agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "D97706"); // Amarillo / Ámbar
+            agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul
+            agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo
 
             const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-            const headerStyle = {
-                font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "2563EB" } },
-                alignment: { horizontal: "center", vertical: "center" },
-                border: {
-                    top: { style: "thin", color: { rgb: "CBD5E1" } },
-                    bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-                    left: { style: "thin", color: { rgb: "CBD5E1" } },
-                    right: { style: "thin", color: { rgb: "CBD5E1" } }
-                }
+            const sectionTitleStyle = {
+                font: { name: "Arial", sz: 12, bold: true, color: { rgb: "1E293B" } },
+                fill: { fgColor: { rgb: "F1F5F9" } },
+                alignment: { horizontal: "left", vertical: "center" }
             };
 
             const cellStyle = {
@@ -83,19 +116,33 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
             const range = XLSX.utils.decode_range(ws['!ref']);
             for (let R = range.s.r; R <= range.e.r; ++R) {
+                const meta = metaSecciones[R] || { type: 'empty' };
+
                 for (let C = range.s.c; C <= range.e.c; ++C) {
                     const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
                     if (!ws[cellAddress]) continue;
-                    
-                    if (R === 0) {
-                        ws[cellAddress].s = headerStyle;
-                    } else {
+
+                    if (meta.type === 'title') {
+                        if (C === 0) ws[cellAddress].s = sectionTitleStyle;
+                    } else if (meta.type === 'header') {
+                        ws[cellAddress].s = {
+                            font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                            fill: { fgColor: { rgb: meta.color } }, // Color dinámico (Amarillo, Azul o Rojo)
+                            alignment: { horizontal: "center", vertical: "center" },
+                            border: {
+                                top: { style: "thin", color: { rgb: "CBD5E1" } },
+                                bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                                left: { style: "thin", color: { rgb: "CBD5E1" } },
+                                right: { style: "thin", color: { rgb: "CBD5E1" } }
+                            }
+                        };
+                    } else if (meta.type === 'data') {
                         ws[cellAddress].s = cellStyle;
                     }
                 }
             }
 
-            // AJUSTE REAL DE ANCHO DE COLUMNAS BASADO EN EL CONTENIDO + ENCABEZADO
+            // Ancho dinámico de columnas adaptado al contenido y los encabezados
             const colWidths = [];
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 let maxLen = String(excelHeaders[C] || "").length;
@@ -106,13 +153,12 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                         if (valLen > maxLen) maxLen = valLen;
                     }
                 }
-                // Asignamos un ancho proporcional con un mínimo de 15 y máximo de 45 caracteres
                 colWidths.push({ wch: Math.min(Math.max(maxLen + 4, 15), 45) });
             }
             ws['!cols'] = colWidths;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Reporte Maestro");
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
 
             const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
             archivoExcelBase64 = excelBuffer.toString('base64');
