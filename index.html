@@ -1953,10 +1953,18 @@ window.calcularFechasLlegada = function() {
         };
 
        // EXCEL SEPARADO Y CONSOLIDADO CON TRES SECCIONES, COLORES Y ANCHOS EXACTOS
+        // EXCEL UNIFICADO (MAESTRO) CON TRES SECCIONES, COLORES Y ANCHOS EXACTOS
         window.exportExcelSeparado = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
                 
+                // Función auxiliar segura de fechas para el navegador
+                const parseFechaCliente = (fechaStr) => {
+                    if (!fechaStr) return new Date('9999-12-31');
+                    const d = new Date(fechaStr);
+                    return isNaN(d) ? new Date('9999-12-31') : d;
+                };
+
                 const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
                 const tramites = currentFilteredRecords.filter(r => {
                     const cat = getExpCategory(r);
@@ -1964,10 +1972,10 @@ window.calcularFechasLlegada = function() {
                 });
                 const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
 
-                // Ordenamientos específicos
-                porLlegar.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.eta_la_guaira) : new Date(a.eta_la_guaira || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.eta_la_guaira) : new Date(b.eta_la_guaira || '9999-12-31')));
-                tramites.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.fecha_transmision) : new Date(a.fecha_transmision || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.fecha_transmision) : new Date(b.fecha_transmision || '9999-12-31')));
-                despachados.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.despacho) : new Date(a.despacho || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.despacho) : new Date(b.despacho || '9999-12-31')));
+                // Ordenamientos específicos con la función segura
+                porLlegar.sort((a, b) => parseFechaCliente(a.eta_la_guaira) - parseFechaCliente(b.eta_la_guaira));
+                tramites.sort((a, b) => parseFechaCliente(a.fecha_transmision) - parseFechaCliente(b.fecha_transmision));
+                despachados.sort((a, b) => parseFechaCliente(a.despacho) - parseFechaCliente(b.despacho));
 
                 let wsData = [];
                 let metaSecciones = [];
@@ -1987,9 +1995,9 @@ window.calcularFechasLlegada = function() {
                     metaSecciones.push({ type: 'empty' });
                 }
 
-                agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "D97706");
-                agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB");
-                agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626");
+                agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "D97706"); // Amarillo / Ámbar
+                agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul
+                agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo
 
                 const ws = XLSX.utils.aoa_to_sheet(wsData);
 
@@ -2033,15 +2041,51 @@ window.calcularFechasLlegada = function() {
                 }
 
                 ws['!cols'] = [
-                    { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
-                    { wch: 12 }, { wch: 23 }, { wch: 20 }, { wch: 25 }, { wch: 11 },
-                    { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
-                    { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
-                    { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
-                    { wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 26 }, { wch: 20 },
-                    { wch: 11 }, { wch: 14 }, { wch: 15.5 }, { wch: 12 }, { wch: 12 },
-                    { wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-                    { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 35 }
+                    { wch: 11 },   // A
+                    { wch: 9.5 },  // B
+                    { wch: 24 },   // C
+                    { wch: 24 },   // D
+                    { wch: 15 },   // E
+                    { wch: 12 },   // F
+                    { wch: 23 },   // G
+                    { wch: 20 },   // H
+                    { wch: 25 },   // I
+                    { wch: 11 },   // J
+                    { wch: 25 },   // K
+                    { wch: 12 },   // L
+                    { wch: 21 },   // M
+                    { wch: 17 },   // N
+                    { wch: 18 },   // O
+                    { wch: 22 },   // P
+                    { wch: 14 },   // Q
+                    { wch: 20 },   // R
+                    { wch: 18 },   // S
+                    { wch: 18 },   // T
+                    { wch: 24.5 }, // U
+                    { wch: 24 },   // V
+                    { wch: 18 },   // W
+                    { wch: 24 },   // X
+                    { wch: 25 },   // Y
+                    { wch: 24 },   // Z
+                    { wch: 18 },   // AA
+                    { wch: 13 },   // AB
+                    { wch: 26 },   // AC
+                    { wch: 20 },   // AD
+                    { wch: 11 },   // AE
+                    { wch: 14 },   // AF
+                    { wch: 15.5 }, // AG
+                    { wch: 12 },   // AH
+                    { wch: 12 },   // AI
+                    { wch: 12 },   // AJ
+                    { wch: 25 },   // AK
+                    { wch: 20 },   // AL
+                    { wch: 20 },   // AM
+                    { wch: 20 },   // AN
+                    { wch: 16 },   // AO
+                    { wch: 20 },   // AP
+                    { wch: 20 },   // AQ
+                    { wch: 20 },   // AR
+                    { wch: 35 }    // AS
                 ];
 
                 const wb = XLSX.utils.book_new();
@@ -2051,7 +2095,7 @@ window.calcularFechasLlegada = function() {
                 alert("Error al exportar Excel: " + err.message);
             }
         };
-        window.exportExcelMaestro = window.exportExcelSeparado;        inicializarAppFirebase();
+        window.exportExcelMaestro = window.exportExcelSeparado;        
 // 3. EXCEL SEPARADO POR PESTAÑAS (HOJAS INDEPENDIENTES)
         window.exportExcelPorPestañas = function() {
             try {
