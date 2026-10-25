@@ -2097,90 +2097,97 @@ window.calcularFechasLlegada = function() {
         };
         window.exportExcelMaestro = window.exportExcelSeparado;        
 // 3. EXCEL SEPARADO POR PESTAÑAS (HOJAS INDEPENDIENTES)
-        window.exportExcelPorPestañas = function() {
-            try {
-                const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
-                
-                const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
-                const tramites = currentFilteredRecords.filter(r => {
-                    const cat = getExpCategory(r);
-                    return cat === 'porRegistrar' || cat === 'porReconocer' || cat === 'porValidar' || cat === 'porDespachar';
-                });
-                const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
+        // 3. EXCEL SEPARADO POR PESTAÑAS (HOJAS INDEPENDIENTES)
+window.exportExcelPorPestañas = function() {
+    try {
+        const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
+        
+        // Función auxiliar segura de fechas para el navegador
+        const parseFechaCliente = (fechaStr) => {
+            if (!fechaStr) return new Date('9999-12-31');
+            const d = parseFechaLocal(fechaStr) || new Date(fechaStr);
+            return isNaN(d) ? new Date('9999-12-31') : d;
+        };
 
-                // Ordenamientos específicos
-                porLlegar.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.eta_la_guaira) : new Date(a.eta_la_guaira || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.eta_la_guaira) : new Date(b.eta_la_guaira || '9999-12-31')));
-                tramites.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.fecha_transmision) : new Date(a.fecha_transmision || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.fecha_transmision) : new Date(b.fecha_transmision || '9999-12-31')));
-                despachados.sort((a, b) => (parseFechaLocalServidor ? parseFechaLocalServidor(a.despacho) : new Date(a.despacho || '9999-12-31')) - (parseFechaLocalServidor ? parseFechaLocalServidor(b.despacho) : new Date(b.despacho || '9999-12-31')));
+        const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
+        const tramites = currentFilteredRecords.filter(r => {
+            const cat = getExpCategory(r);
+            return cat === 'porRegistrar' || cat === 'porReconocer' || cat === 'porValidar' || cat === 'porDespachar';
+        });
+        const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
 
-                const wb = XLSX.utils.book_new();
+        // Ordenamientos específicos usando parseFechaCliente
+        porLlegar.sort((a, b) => parseFechaCliente(a.eta_la_guaira) - parseFechaCliente(b.eta_la_guaira));
+        tramites.sort((a, b) => parseFechaCliente(a.fecha_transmision) - parseFechaCliente(b.fecha_transmision));
+        despachados.sort((a, b) => parseFechaCliente(a.despacho) - parseFechaCliente(b.despacho));
 
-                const cellStyle = {
-                    font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
-                    alignment: { horizontal: "left", vertical: "center", wrapText: true },
-                    border: {
-                        top: { style: "thin", color: { rgb: "E2E8F0" } },
-                        bottom: { style: "thin", color: { rgb: "E2E8F0" } },
-                        left: { style: "thin", color: { rgb: "E2E8F0" } },
-                        right: { style: "thin", color: { rgb: "E2E8F0" } }
-                    }
-                };
+        const wb = XLSX.utils.book_new();
 
-                const colsConfig = [
-                    { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
-                    { wch: 12 }, { wch: 23 }, { wch: 20 }, { wch: 25 }, { wch: 11 },
-                    { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
-                    { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
-                    { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
-                    { wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 26 }, { wch: 20 },
-                    { wch: 11 }, { wch: 14 }, { wch: 15.5 }, { wch: 12 }, { wch: 12 },
-                    { wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-                    { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 35 }
-                ];
-
-                function agregarHoja(nombrePestana, listaItems, colorHex) {
-                    if (listaItems.length === 0) return;
-                    let wsData = [excelHeaders];
-                    listaItems.forEach(rec => {
-                        let row = fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
-                        wsData.push(row);
-                    });
-
-                    const ws = XLSX.utils.aoa_to_sheet(wsData);
-                    const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
-
-                    for (let R = range.s.r; R <= range.e.r; ++R) {
-                        for (let C = range.s.c; C <= range.e.c; ++C) {
-                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                            if (!ws[cellAddress]) continue;
-
-                            if (R === 0) {
-                                ws[cellAddress].s = {
-                                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                                    fill: { fgColor: { rgb: colorHex } }, // Color respectivo (Amarillo, Azul o Rojo)
-                                    alignment: { horizontal: "center", vertical: "center", wrapText: true },
-                                    border: { top: { style: "thin", color: { rgb: "CBD5E1" } }, bottom: { style: "thin", color: { rgb: "CBD5E1" } }, left: { style: "thin", color: { rgb: "CBD5E1" } }, right: { style: "thin", color: { rgb: "CBD5E1" } } }
-                                };
-                            } else {
-                                ws[cellAddress].s = cellStyle;
-                            }
-                        }
-                    }
-
-                    ws['!cols'] = colsConfig;
-                    XLSX.utils.book_append_sheet(wb, ws, nombrePestana);
-                }
-
-                // Generamos cada pestaña con su color correspondiente
-                agregarHoja("Por Llegar", porLlegar, "D97706"); // Amarillo / Ámbar
-                agregarHoja("Trámites", tramites, "2563EB");     // Azul
-                agregarHoja("Despachados", despachados, "DC2626"); // Rojo
-
-                XLSX.writeFile(wb, "Reporte_Separado_Por_Pestañas.xlsx");
-            } catch (err) {
-                alert("Error al exportar por pestañas: " + err.message);
+        const cellStyle = {
+            font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+            alignment: { horizontal: "left", vertical: "center", wrapText: true },
+            border: {
+                top: { style: "thin", color: { rgb: "E2E8F0" } },
+                bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                left: { style: "thin", color: { rgb: "E2E8F0" } },
+                right: { style: "thin", color: { rgb: "E2E8F0" } }
             }
         };
+
+        const colsConfig = [
+            { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
+            { wch: 12 }, { wch: 23 }, { wch: 20 }, { wch: 25 }, { wch: 11 },
+            { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
+            { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+            { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
+            { wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 26 }, { wch: 20 },
+            { wch: 11 }, { wch: 14 }, { wch: 15.5 }, { wch: 12 }, { wch: 12 },
+            { wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+            { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 35 }
+        ];
+
+        function agregarHoja(nombrePestana, listaItems, colorHex) {
+            if (listaItems.length === 0) return;
+            let wsData = [excelHeaders];
+            listaItems.forEach(rec => {
+                let row = fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
+                wsData.push(row);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cellAddress]) continue;
+
+                    if (R === 0) {
+                        ws[cellAddress].s = {
+                            font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                            fill: { fgColor: { rgb: colorHex } },
+                            alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                            border: { top: { style: "thin", color: { rgb: "CBD5E1" } }, bottom: { style: "thin", color: { rgb: "CBD5E1" } }, left: { style: "thin", color: { rgb: "CBD5E1" } }, right: { style: "thin", color: { rgb: "CBD5E1" } } }
+                        };
+                    } else {
+                        ws[cellAddress].s = cellStyle;
+                    }
+                }
+            }
+
+            ws['!cols'] = colsConfig;
+            XLSX.utils.book_append_sheet(wb, ws, nombrePestana);
+        }
+
+        agregarHoja("Por Llegar", porLlegar, "D97706");
+        agregarHoja("Trámites", tramites, "2563EB");
+        agregarHoja("Despachados", despachados, "DC2626");
+
+        XLSX.writeFile(wb, "Reporte_Separado_Por_Pestañas.xlsx");
+    } catch (err) {
+        alert("Error al exportar por pestañas: " + err.message);
+    }
+};
     </script>
 </body>
 </html>
