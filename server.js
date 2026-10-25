@@ -572,7 +572,54 @@ app.get('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+app.get('/api/clientes', async (req, res) => {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
+        const response = await fetch(url);
+        const result = await response.json();
+        if (!result.documents) return res.json({ success: true, clientes: [] });
 
+        const clientes = result.documents.map(doc => {
+            let fields = doc.fields || {};
+            return {
+                id: doc.name.split('/').pop(),
+                razonSocial: fields.razonSocial?.stringValue || '',
+                rif: fields.rif?.stringValue || '',
+                direccion: fields.direccion?.stringValue || '',
+                telefono: fields.telefono?.stringValue || '',
+                correo: fields.correo?.stringValue || '',
+                enviarAutomatico: fields.enviarAutomatico?.booleanValue ?? true
+            };
+        });
+        res.json({ success: true, clientes });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ==========================================
+// RUTA PARA EL ENVÍO FORZADO / MANUAL DESDE LA WEB (¡Colócala aquí!)
+// ==========================================
+app.post('/api/forzar-correo-manual', async (req, res) => {
+    try {
+        const { destinatario, razonSocial, expedientesData } = req.body;
+        console.log(`🚀 [MANUAL] Forzando envío de reporte para: ${razonSocial}`);
+
+        // Genera el Excel con el formato unificado y consolidado
+        const excelBuffer = generarExcelConsolidadoBuffer(expedientesData);
+        const base64Data = excelBuffer.toString('base64');
+
+        const asunto = `Reporte Consolidado de Estatus - Logistatus Pro (Manual)`;
+        const mensaje = `Estimado/a ${razonSocial},\n\nAdjunto encontrará el reporte consolidado de estatus solicitado manualmente.\n\nLogistatus Pro`;
+
+        await enviarCorreoConGoogleScriptDinamico(destinatario, asunto, mensaje, base64Data);
+        
+        res.json({ success: true, message: "Correo manual enviado exitosamente." });
+    } catch (err) {
+        console.error("❌ Error en envío manual:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 app.post('/api/clientes', async (req, res) => {
     try {
         const { id, razonSocial, rif, direccion, telefono, correo, enviarAutomatico } = req.body;
@@ -802,45 +849,39 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// CRON 2: Correos automáticos con Excel a clientes a las 10:00 AM y 6:00 PM
+// Lógica separada para el CRON Automático
 cron.schedule('0 10,18 * * *', async () => {
     try {
-        console.log("⏰ [CRON CORREOS] Ejecutando correos con Excel a clientes...");
+        console.log("⏰ [CRON AUTOMÁTICO] Iniciando proceso de correos programados...");
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
         const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
         let enviadosCount = 0;
 
         for (const cliente of clientesActivos) {
-            // Normalizamos os nomes para evitar falhas por espaços ou maiúsculas/minúsculas
             const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
             
+            // Filtra exclusivamente los expedientes de este cliente
             const expedientesCliente = expedientes.filter(e => {
                 const clienteExp = String(e.cliente || "").trim().toLowerCase();
                 return clienteExp === clienteNombreBuscado && !e.despacho;
             });
 
-            console.log(`🔍 [CRON] Cliente: "${cliente.razonSocial}" -> Expedientes válidos encontrados: ${expedientesCliente.length}`);
-
             if (expedientesCliente.length > 0) {
-                // Ordenamos estrictamente por ETA La Guaira antes de generar el Excel
-                expedientesCliente.sort((a, b) => {
-                    let fechaA = parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31');
-                    let fechaB = parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31');
-                    return fechaA - fechaB;
-                });
+                // Genera el Excel específico para este cliente usando la misma función de formato
+                const excelBuffer = generarExcelConsolidadoBuffer(expedientesCliente);
+                const base64Data = excelBuffer.toString('base64');
 
                 const asunto = `Reporte Automático de Estatus y Expedientes - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus y detalle de sus expedientes vigentes.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes vigentes.\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
 
-                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, expedientesCliente);
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, base64Data);
                 enviadosCount++;
-            } else {
-                console.log(`⚠️ [CRON] No se envió correo a "${cliente.razonSocial}" porque no tiene expedientes activos pendientes.`);
             }
         }
-        console.log(`✅ [CRON CORREOS] Reportes enviados a ${enviadosCount} clientes.`);    } catch (error) {
-        console.error("❌ [CRON CORREOS] Error:", error);
+        console.log(`✅ [CRON AUTOMÁTICO] Reportes enviados a ${enviadosCount} clientes.`);
+    } catch (error) {
+        console.error("❌ [CRON AUTOMÁTICO] Error en la ejecución:", error);
     }
 }, { timezone: "America/Caracas" });
 
