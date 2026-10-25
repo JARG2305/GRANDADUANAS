@@ -1803,6 +1803,9 @@
     }
     
     modal.classList.remove("hidden");
+    
+    // 📌 Activamos el autoformato en los inputs de fecha al abrir el modal
+    window.configurarAutoFormatoFechas();
 };
 
 window.closeModal = function() {
@@ -1814,6 +1817,35 @@ document.getElementById("btnNuevoExp").addEventListener("click", () => {
         window.openModal();
     }
 });
+// Función para autocompletar las barras de fecha mientras escribes (ej: 10062026 -> 10/06/2026)
+window.configurarAutoFormatoFechas = function() {
+    const camposFechasIds = [
+        "etd_origen", "eta_transbordo", "etd_transbordo", "eta_la_guaira", "fecha_llegada", 
+        "recibida_acta_recepcion", "fecha_abandono_legal", "fecha_recibido_permisologia", 
+        "fecha_registro_dai", "vencimiento_dai", "fecha_transmision", "reconocimiento", 
+        "validacion", "despacho", "recibida_acta_recepcion_almacen", "inicio_dias_libres", 
+        "culminacion_dias_libres", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera"
+    ];
+
+    camposFechasIds.forEach(id => {
+        const input = document.getElementById(id);
+        if (input && !input.dataset.autoformat) {
+            input.dataset.autoformat = "true";
+            input.addEventListener("input", function(e) {
+                let v = this.value.replace(/\D/g, ""); // Solo números
+                if (v.length > 8) v = v.slice(0, 8); // Máximo 8 dígitos (DDMMAAAA)
+
+                if (v.length > 4) {
+                    this.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+                } else if (v.length > 2) {
+                    this.value = `${v.slice(0, 2)}/${v.slice(2)}`;
+                } else {
+                    this.value = v;
+                }
+            });
+        }
+    });
+};
         inicializarAppFirebase();
     </script>
 </body>
