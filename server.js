@@ -117,7 +117,60 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
     return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
 }
+const ws = XLSX.utils.aoa_to_sheet(wsData);
 
+    const sectionTitleStyle = {
+        font: { name: "Arial", sz: 12, bold: true, color: { rgb: "1E293B" } },
+        fill: { fgColor: { rgb: "F1F5F9" } },
+        alignment: { horizontal: "left", vertical: "center" }
+    };
+
+    const cellStyle = {
+        font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+        alignment: { horizontal: "left", vertical: "center", wrapText: true },
+        border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } }
+        }
+    };
+
+    // 📍 COLÓCALO AQUÍ: Justo con los otros estilos antes de recorrer el rango
+    const headerStyleWithWrap = {
+        font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+        fill: { fgColor: { rgb: meta.color } }, 
+        alignment: { horizontal: "center", vertical: "center", wrapText: true }, 
+        border: {
+            top: { style: "thin", color: { rgb: "CBD5E1" } },
+            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+            left: { style: "thin", color: { rgb: "CBD5E1" } },
+            right: { style: "thin", color: { rgb: "CBD5E1" } }
+        }
+    };
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        const meta = metaSecciones[R] || { type: 'empty' };
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellAddress]) continue;
+
+            if (meta.type === 'title') {
+                if (C === 0) ws[cellAddress].s = sectionTitleStyle;
+            } else if (meta.type === 'header') {
+                // Y aquí usas tu nuevo estilo, asegurando color de texto oscuro si el fondo es amarillo pollito (FEF08A)
+                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
+                ws[cellAddress].s = {
+                    ...headerStyleWithWrap,
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
+                    fill: { fgColor: { rgb: meta.color } }
+                };
+            } else if (meta.type === 'data') {
+                ws[cellAddress].s = cellStyle;
+            }
+        }
+    }
 // ==========================================
 // 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
 // ==========================================
