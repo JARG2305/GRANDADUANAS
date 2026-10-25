@@ -928,6 +928,25 @@
         let sortDirection = 'asc';
         let cacheClientes = [];
 
+        const fieldsList = [
+            "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
+            "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
+            "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
+            "eta_la_guaira", "fecha_registro_dai", "vencimiento_dai", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
+            "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
+            "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
+            "almacen", "recibida_acta_recepcion_almacen", "dias_libres_almacen", "inicio_dias_libres", "culminacion_dias_libres",
+            "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
+            "observaciones"
+        ];
+
+        const camposFechas = [
+            "etd_origen", "eta_transbordo", "etd_transbordo", "eta_la_guaira", "fecha_llegada", "recibida_acta_recepcion", 
+            "fecha_abandono_legal", "fecha_recibido_permisologia", "fecha_registro_dai", "vencimiento_dai", 
+            "fecha_transmision", "reconocimiento", "validacion", "despacho", 
+            "recibida_acta_recepcion_almacen", "inicio_dias_libres", "culminacion_dias_libres", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera"
+        ];
+
         async function sincronizarClientesCache() {
             try {
                 const res = await fetch(`${BACKEND_URL}/api/clientes`);
@@ -1288,6 +1307,33 @@
             const navieraEl = document.getElementById("naviera");
             if (navieraEl) navieraEl.value = lineaVal;
         };
+
+        function updateTabCounters(data) {
+            let counts = { porLlegar: 0, porRegistrar: 0, porReconocer: 0, porValidar: 0, porDespachar: 0, despachados: 0 };
+            data.forEach(r => {
+                const cat = getExpCategory(r);
+                if (counts[cat] !== undefined) counts[cat]++;
+            });
+            for (let k in counts) {
+                const el = document.getElementById(`count_${k}`);
+                if (el) el.innerText = counts[k];
+            }
+        }
+
+        function getExpCategory(rec) {
+            const hasDespacho = Boolean(rec.despacho && rec.despacho.trim() !== "");
+            const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
+            const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+            const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+
+            if (hasDespacho) return 'despachados';
+            if (hasValidacion) return 'porDespachar';
+            if (hasReconocimiento) return 'porValidar';
+            if (hasTransmision) return 'porReconocer';
+            if (hasLlegada) return 'porRegistrar';
+            return 'porLlegar';
+        }
 
         window.saveExp = async function(e) {
             e.preventDefault();
