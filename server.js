@@ -26,7 +26,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
       if (expedientesData && expedientesData.length > 0) {
             const excelHeaders = [
-                "MODO VÍA", "N.º EXP.", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL / AWB", "CONTENIDO", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "RECIBIDA ACTA", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+                "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
             ];
 
             const fieldsList = [
@@ -40,6 +40,14 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
                 "observaciones"
             ];
+
+            // ORDENAR EXPLICITAMENTE POR ETA (O FECHA DE LLEGADA) ANTES DE ARMAR EL EXCEL
+            // ORDENAR EXPLICITAMENTE POR ETA LA GUAIRA ANTES DE ARMAR EL EXCEL
+            expedientesData.sort((a, b) => {
+                let fechaA = parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31');
+                let fechaB = parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31');
+                return fechaA - fechaB;
+            });
 
             const wsData = [excelHeaders];
 
@@ -87,23 +95,19 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 }
             }
 
-            /// Cálculo automático robusto basado en el texto de las celdas y los encabezados
+            // AJUSTE REAL DE ANCHO DE COLUMNAS BASADO EN EL CONTENIDO + ENCABEZADO
             const colWidths = [];
             for (let C = range.s.c; C <= range.e.c; ++C) {
-                // Tomamos como tamaño mínimo inicial el largo del título del encabezado
-                let maxLength = String(excelHeaders[C] || "").length;
-
+                let maxLen = String(excelHeaders[C] || "").length;
                 for (let R = range.s.r; R <= range.e.r; ++R) {
                     const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                    if (ws[cellAddress] && ws[cellAddress].v !== undefined && ws[cellAddress].v !== null) {
-                        const cellLength = String(ws[cellAddress].v).length;
-                        if (cellLength > maxLength) {
-                            maxLength = cellLength;
-                        }
+                    if (ws[cellAddress] && ws[cellAddress].v) {
+                        const valLen = String(ws[cellAddress].v).length;
+                        if (valLen > maxLen) maxLen = valLen;
                     }
                 }
-                // Añadimos margen y limitamos para evitar columnas gigantes o muy pequeñas
-                colWidths.push({ wch: Math.min(Math.max(maxLength + 4, 14), 50) });
+                // Asignamos un ancho proporcional con un mínimo de 15 y máximo de 45 caracteres
+                colWidths.push({ wch: Math.min(Math.max(maxLen + 4, 15), 45) });
             }
             ws['!cols'] = colWidths;
 
