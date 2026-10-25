@@ -34,7 +34,6 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
     const despachados = expedientesData.filter(e => Boolean(e.despacho));
 
-    // Ordenamiento organizado estrictamente por ETA en todas las categorías
     porLlegar.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31')));
     tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
     despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
