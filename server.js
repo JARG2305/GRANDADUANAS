@@ -512,25 +512,22 @@ app.post('/api/clientes', async (req, res) => {
 });
 
 // Ruta para notificar cambios de estatus individuales a clientes con formato dinámico
+// Ruta para notificar cambios de estatus individuales a clientes con formato dinámico
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones } = req.body;
+    // Recibimos 'proveedor' desde el body que manda el frontend
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor } = req.body;
     
     if (!correoCliente) {
         return res.status(400).json({ success: false, message: "El cliente no tiene correo registrado." });
     }
 
     try {
-        // Definir si es B/L (Marítimo) o Guía (Aéreo) según el modo de transporte
         const esAereo = String(modoTransporte || "").toLowerCase().includes("aéreo") || String(modoTransporte || "").toLowerCase().includes("aereo");
         const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
 
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
-        
-       // 1. Capturamos el valor directamente del input 'proveedor' de tu HTML
-        const proveedorInput = document.getElementById("proveedor");
-        const proveedor = proveedorInput ? proveedorInput.value.trim() : "S/N";
+        const proveedorFinal = proveedor || "S/N";
 
-        // Plantilla HTML estructurada con el diseño profesional y el proveedor ordenado de forma segura
         let cuerpoCorreo = `
             <div style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px;">
                 <h2 style="color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">Actualización de Estatus - Logistatus Pro</h2>
@@ -539,7 +536,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 
                 <p>Le informamos que su expediente<br>
                 <strong>N° ${numExpediente || 'GENERAL'}</strong><br>
-                <strong>Proveedor:</strong> ${proveedor || 'S/N'}<br>
+                <strong>Proveedor:</strong> ${proveedorFinal}<br>
                 <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</p>
                 
                 <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px; margin: 15px 0;">
@@ -558,7 +555,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             </div>
         `;
 
-        // Se envía el HTML estructurado mediante la función de envío
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
         res.json(resultado);
     } catch (error) {

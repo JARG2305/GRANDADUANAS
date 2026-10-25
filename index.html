@@ -1539,25 +1539,29 @@
         };
 
         async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones) {
-            try {
-                await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        correoCliente: correoCliente,
-                        nombreCliente: nombreCliente,
-                        numExpediente: numExpediente,
-                        statusActual: statusActual,
-                        bl: bl,
-                        campoLegible: campoLegible,
-                        modoTransporte: modoTransporte,
-                        observaciones: observaciones
-                    })
-                });
-            } catch (error) {
-                console.error("Error al disparar el correo automático:", error);
-            }
-        }
+    try {
+        // 1. Capturamos el valor del input de texto plano del proveedor en tu HTML
+        const proveedorValor = document.getElementById("proveedor") ? document.getElementById("proveedor").value.trim() : "S/N";
+
+        await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                correoCliente: correoCliente,
+                nombreCliente: nombreCliente,
+                numExpediente: numExpediente,
+                statusActual: statusActual,
+                bl: bl,
+                campoLegible: campoLegible,
+                modoTransporte: modoTransporte,
+                observaciones: observaciones,
+                proveedor: proveedorValor // <--- ¡Esta es la línea clave que faltaba!
+            })
+        });
+    } catch (error) {
+        console.error("Error al disparar el correo automático:", error);
+    }
+}
 
         window.editRecord = function(id) { 
             const rec = allRecords.find(r => r.id === id); 
