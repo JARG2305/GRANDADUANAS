@@ -56,9 +56,9 @@ function generarExcelConsolidadoBuffer(expedientesData) {
         metaSecciones.push({ type: 'empty' });
     }
 
-    agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "D97706");
-    agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB");
-    agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626");
+    agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "FEF08A"); // Amarillo Pollito
+    agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul Rey
+    agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
