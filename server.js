@@ -34,7 +34,7 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
     const despachados = expedientesData.filter(e => Boolean(e.despacho));
 
-    // Ordenamiento organizado por ETA en todas las categorías
+    // Ordenamiento organizado estrictamente por ETA en todas las categorías
     porLlegar.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31')));
     tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
     despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
@@ -123,75 +123,8 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
     return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
-} 
+}
 
-const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    const sectionTitleStyle = {
-        font: { name: "Arial", sz: 12, bold: true, color: { rgb: "1E293B" } },
-        fill: { fgColor: { rgb: "F1F5F9" } },
-        alignment: { horizontal: "left", vertical: "center" }
-    };
-
-    const cellStyle = {
-        font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
-        alignment: { horizontal: "left", vertical: "center", wrapText: true },
-        border: {
-            top: { style: "thin", color: { rgb: "E2E8F0" } },
-            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
-            left: { style: "thin", color: { rgb: "E2E8F0" } },
-            right: { style: "thin", color: { rgb: "E2E8F0" } }
-        }
-    };
-
-    // 📍 COLÓCALO AQUÍ: Justo con los otros estilos antes de recorrer el rango
-    const headerStyleWithWrap = {
-        font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: meta.color } }, 
-        alignment: { horizontal: "center", vertical: "center", wrapText: true }, 
-        border: {
-            top: { style: "thin", color: { rgb: "CBD5E1" } },
-            bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-            left: { style: "thin", color: { rgb: "CBD5E1" } },
-            right: { style: "thin", color: { rgb: "CBD5E1" } }
-        }
-    };
-
-    const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-        const meta = metaSecciones[R] || { type: 'empty' };
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-            if (!ws[cellAddress]) continue;
-
-            if (meta.type === 'title') {
-                if (C === 0) ws[cellAddress].s = sectionTitleStyle;
-            } else if (meta.type === 'header') {
-                // Y aquí usas tu nuevo estilo, asegurando color de texto oscuro si el fondo es amarillo pollito (FEF08A)
-                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
-                ws[cellAddress].s = {
-                    ...headerStyleWithWrap,
-                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
-                    fill: { fgColor: { rgb: meta.color } }
-                };
-} else if (meta.type === 'header') {
-                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
-                ws[cellAddress].s = {
-                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
-                    fill: { fgColor: { rgb: meta.color } }, // "FEF08A" (Amarillo), "2563EB" (Azul), "DC2626" (Rojo)
-                    alignment: { horizontal: "center", vertical: "center", wrapText: true }, // 👈 Ajuste de texto activo
-                    border: {
-                        top: { style: "thin", color: { rgb: "CBD5E1" } },
-                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
-                        left: { style: "thin", color: { rgb: "CBD5E1" } },
-                        right: { style: "thin", color: { rgb: "CBD5E1" } }
-                    }
-                };
-            } else if (meta.type === 'data') {
-                ws[cellAddress].s = cellStyle;
-            }
-        }
-    }
 // ==========================================
 // 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
 // ==========================================
@@ -274,7 +207,6 @@ app.get('/api/config', (req, res) => {
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/health', (req, res) => { res.status(200).send('LOGISTATUS PRO - Servidor Activo OK'); });
 
-// Ruta única y limpia para obtener clientes
 app.get('/api/clientes', async (req, res) => {
     try {
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
@@ -300,7 +232,6 @@ app.get('/api/clientes', async (req, res) => {
     }
 });
 
-// Ruta única y limpia para guardar/actualizar clientes
 app.post('/api/clientes', async (req, res) => {
     try {
         const { id, razonSocial, rif, direccion, telefono, correo, enviarAutomatico } = req.body;
@@ -387,7 +318,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 });
 
-// Ruta para procesar el envío de correos con Excel adjunto desde la web
 app.post('/api/enviar-excel-correo', async (req, res) => {
     try {
         const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
@@ -398,8 +328,6 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
             console.error("❌ ERROR: La variable googleScriptUrl no está definida en Render.");
             return res.status(500).json({ success: false, message: "Falta configurar googleScriptUrl en Render." });
         }
-
-        console.log(`🌐 [DEBUG CORREO] Enviando petición a Google Apps Script para: ${destinatario}`);
 
         const response = await fetch(urlAppsScript, {
             method: 'POST',
