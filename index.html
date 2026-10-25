@@ -1664,9 +1664,16 @@
             }
         };
 
-        window.generarExcelBase64ParaCorreo = function() {
+       window.generarExcelBase64ParaCorreo = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
+                
+                const parseFechaCliente = (fechaStr) => {
+                    if (!fechaStr) return new Date('9999-12-31');
+                    const d = parseFechaLocal(fechaStr) || new Date(fechaStr);
+                    return isNaN(d) ? new Date('9999-12-31') : d;
+                };
+
                 const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
                 const tramites = currentFilteredRecords.filter(r => {
                     const cat = getExpCategory(r);
@@ -1674,43 +1681,88 @@
                 });
                 const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
 
-                let masterRows = [];
-                if (porLlegar.length > 0) {
-                    masterRows.push(["▶ 1. EXPEDIENTES POR LLEGAR"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(porLlegar));
-                    masterRows.push([]);
-                }
-                if (tramites.length > 0) {
-                    masterRows.push(["▶ 2. TRÁMITES ADUANALES Y EN PROCESO"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(tramites));
-                    masterRows.push([]);
-                }
-                if (despachados.length > 0) {
-                    masterRows.push(["▶ 3. EXPEDIENTES DESPACHADOS"]);
-                    masterRows.push(excelHeaders);
-                    masterRows.push(...buildRows(despachados));
+                porLlegar.sort((a, b) => parseFechaCliente(a.eta_la_guaira) - parseFechaCliente(b.eta_la_guaira));
+                tramites.sort((a, b) => parseFechaCliente(a.fecha_transmision) - parseFechaCliente(b.fecha_transmision));
+                despachados.sort((a, b) => parseFechaCliente(a.despacho) - parseFechaCliente(b.despacho));
+
+                let wsData = [];
+                let metaSecciones = [];
+
+                function agregarSeccion(tituloSeccion, listaItems, colorHex) {
+                    if (listaItems.length === 0) return;
+                    wsData.push([tituloSeccion]);
+                    metaSecciones.push({ type: 'title' });
+                    wsData.push(excelHeaders);
+                    metaSecciones.push({ type: 'header', color: colorHex });
+                    listaItems.forEach(rec => {
+                        let row = fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
+                        wsData.push(row);
+                        metaSecciones.push({ type: 'data' });
+                    });
+                    wsData.push([]);
+                    metaSecciones.push({ type: 'empty' });
                 }
 
-                const wb = XLSX.utils.book_new();
-                const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
-                
-                const headerStyle = {
-                    fill: { fgColor: { rgb: "334155" } },
-                    font: { color: { rgb: "FFFFFF" }, bold: true },
-                    alignment: { horizontal: "center", vertical: "center" }
+                agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "FEF08A");
+                agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB");
+                agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626");
+
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                const sectionTitleStyle = {
+                    font: { name: "Arial", sz: 12, bold: true, color: { rgb: "1E293B" } },
+                    fill: { fgColor: { rgb: "F1F5F9" } },
+                    alignment: { horizontal: "left", vertical: "center" }
                 };
 
-                for (let cellKey in wsMaster) {
-                    if (cellKey[0] === '!') continue;
-                    let cellVal = wsMaster[cellKey].v;
-                    if (excelHeaders.includes(cellVal)) {
-                        wsMaster[cellKey].s = headerStyle;
+                const cellStyle = {
+                    font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+                    alignment: { horizontal: "left", vertical: "center", wrapText: true },
+                    border: {
+                        top: { style: "thin", color: { rgb: "E2E8F0" } },
+                        bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                        left: { style: "thin", color: { rgb: "E2E8F0" } },
+                        right: { style: "thin", color: { rgb: "E2E8F0" } }
+                    }
+                };
+
+                const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const meta = metaSecciones[R] || { type: 'empty' };
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                        if (!ws[cellAddress]) continue;
+
+                        if (meta.type === 'title') {
+                            if (C === 0) ws[cellAddress].s = sectionTitleStyle;
+                        } else if (meta.type === 'header') {
+                            const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
+                            ws[cellAddress].s = {
+                                font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
+                                fill: { fgColor: { rgb: meta.color } },
+                                alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                                border: { top: { style: "thin", color: { rgb: "CBD5E1" } }, bottom: { style: "thin", color: { rgb: "CBD5E1" } }, left: { style: "thin", color: { rgb: "CBD5E1" } }, right: { style: "thin", color: { rgb: "CBD5E1" } } }
+                            };
+                        } else if (meta.type === 'data') {
+                            ws[cellAddress].s = cellStyle;
+                        }
                     }
                 }
 
-                XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Consolidado");
+                ws['!cols'] = [
+                    { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
+                    { wch: 12 }, { wch: 23 }, { wch: 20 }, { wch: 25 }, { wch: 11 },
+                    { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
+                    { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
+                    { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
+                    { wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 26 }, { wch: 20 },
+                    { wch: 11 }, { wch: 14 }, { wch: 15.5 }, { wch: 12 }, { wch: 12 },
+                    { wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+                    { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 35 }
+                ];
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
                 return XLSX.write(wb, { bookType: 'xlsx', type: 'base64', cellStyles: true });
             } catch (err) {
                 console.error("Error generando Excel con estilos para correo:", err);
