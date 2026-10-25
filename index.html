@@ -1899,6 +1899,124 @@ window.calcularFechasLlegada = function() {
     // o déjala vacía temporalmente si no realiza un cálculo complejo:
     console.log("Calculando fechas...");
 };
+// 1. EXCEL UNIFICADO (MAESTRO) CON COLORES Y LÍNEAS
+        window.exportExcelMaestro = function() {
+            try {
+                const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
+                const wsData = [excelHeaders];
+
+                currentFilteredRecords.forEach(rec => {
+                    let row = fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
+                    wsData.push(row);
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                const headerStyle = {
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "2563EB" } }, // Azul profesional
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
+                };
+
+                const cellStyle = {
+                    font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+                    alignment: { horizontal: "left", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "E2E8F0" } },
+                        bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                        left: { style: "thin", color: { rgb: "E2E8F0" } },
+                        right: { style: "thin", color: { rgb: "E2E8F0" } }
+                    }
+                };
+
+                const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                        if (!ws[cellAddress]) continue;
+                        ws[cellAddress].s = (R === 0) ? headerStyle : cellStyle;
+                    }
+                }
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Maestro Expedientes");
+                XLSX.writeFile(wb, "Reporte_Maestro_Logistatus.xlsx");
+            } catch (err) {
+                alert("Error al exportar Excel Maestro: " + err.message);
+            }
+        };
+
+        // 2. EXCEL SEPARADO (POR PESTAÑAS) CON COLORES Y LÍNEAS
+        window.exportExcelSeparado = function() {
+            try {
+                const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
+                const porLlegar = currentFilteredRecords.filter(r => getExpCategory(r) === 'porLlegar');
+                const tramites = currentFilteredRecords.filter(r => {
+                    const cat = getExpCategory(r);
+                    return cat === 'porRegistrar' || cat === 'porReconocer' || cat === 'porValidar' || cat === 'porDespachar';
+                });
+                const despachados = currentFilteredRecords.filter(r => getExpCategory(r) === 'despachados');
+
+                const wb = XLSX.utils.book_new();
+
+                const headerStyle = {
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "334155" } }, // Gris oscuro / pizarra
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
+                };
+
+                const cellStyle = {
+                    font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+                    alignment: { horizontal: "left", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "E2E8F0" } },
+                        bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                        left: { style: "thin", color: { rgb: "E2E8F0" } },
+                        right: { style: "thin", color: { rgb: "E2E8F0" } }
+                    }
+                };
+
+                function agregarHojaEstilizada(nombrePestana, listaRegistros) {
+                    if (listaRegistros.length === 0) return;
+                    let wsData = [excelHeaders];
+                    listaRegistros.forEach(rec => {
+                        let row = fieldsList.map(f => rec[f] !== undefined && rec[f] !== null ? rec[f] : "");
+                        wsData.push(row);
+                    });
+
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+                    for (let R = range.s.r; R <= range.e.r; ++R) {
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                            if (!ws[cellAddress]) continue;
+                            ws[cellAddress].s = (R === 0) ? headerStyle : cellStyle;
+                        }
+                    }
+                    XLSX.utils.book_append_sheet(wb, ws, nombrePestana);
+                }
+
+                agregarHojaEstilizada("Por Llegar", porLlegar);
+                agregarHojaEstilizada("Trámites", tramites);
+                agregarHojaEstilizada("Despachados", despachados);
+
+                XLSX.writeFile(wb, "Reporte_Separado_Logistatus.xlsx");
+            } catch (err) {
+                alert("Error al exportar Excel Separado: " + err.message);
+            }
+        };
         inicializarAppFirebase();
     </script>
 </body>
