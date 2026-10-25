@@ -1497,7 +1497,7 @@
             }
         };
 
-        // EXPOSICIÓN GLOBAL DE FUNCIONES DE CORREO Y EXCEL
+        // EXPOSICIÓN GLOBAL DE FUNCIONES DE CORREO Y EXCEL CON ESTILOS Y COLORES ORIGINALES
         window.generarExcelBase64ParaCorreo = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
@@ -1529,10 +1529,27 @@
 
                 const wb = XLSX.utils.book_new();
                 const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
+                
+                // Aplicar estilos y colores personalizados a las cabeceras
+                const headerStyle = {
+                    fill: { fgColor: { rgb: "334155" } },
+                    font: { color: { rgb: "FFFFFF" }, bold: true },
+                    alignment: { horizontal: "center", vertical: "center" }
+                };
+
+                // Recorrer y aplicar estilos si la celda es cabecera
+                for (let cellKey in wsMaster) {
+                    if (cellKey[0] === '!') continue;
+                    let cellVal = wsMaster[cellKey].v;
+                    if (excelHeaders.includes(cellVal)) {
+                        wsMaster[cellKey].s = headerStyle;
+                    }
+                }
+
                 XLSX.utils.book_append_sheet(wb, wsMaster, "Reporte Consolidado");
-                return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+                return XLSX.write(wb, { bookType: 'xlsx', type: 'base64', cellStyles: true });
             } catch (err) {
-                console.error("Error generando Excel para correo:", err);
+                console.error("Error generando Excel con estilos para correo:", err);
                 return "";
             }
         };
