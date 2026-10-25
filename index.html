@@ -1466,7 +1466,7 @@
 
             // Listado de navieras con sus enlaces oficiales de rastreo
             if (navieraVal.includes("CMA CGM")) {
-                trackingUrl = `https://www.cmacgm.com/ebusiness/tracking?SearchBy=BL&SearchValue=${encodeURIComponent(blVal)}`;
+                trackingUrl = `https://www.cma-cgm.com/ebusiness/tracking?SearchBy=BL&SearchValue=${encodeURIComponent(blVal)}`;
             } else if (navieraVal.includes("HAPAG") || navieraVal.includes("HAPAG LLOYD")) {
                 trackingUrl = `https://www.hapag-lloyd.com/en/online-business/tracing/tracing-by-booking.html?blno=${encodeURIComponent(blVal)}`;
             } else if (navieraVal.includes("MSC")) {
