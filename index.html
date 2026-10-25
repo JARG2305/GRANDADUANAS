@@ -1155,6 +1155,23 @@
             }
         };
 
+        // FUNCIÓN GLOBAL DE NAVEGACIÓN ENTRE PESTAÑAS DE EVENTOS
+        window.switchTab = function(tabName) {
+            currentTab = tabName;
+            const tabs = ['porLlegar', 'porRegistrar', 'porReconocer', 'porValidar', 'porDespachar', 'despachados'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab_${t}Btn`);
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-white border-t-2 border-x border-slate-300 text-blue-800 shadow-sm transition min-w-[130px]";
+                    } else {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition min-w-[130px]";
+                    }
+                }
+            });
+            window.filterData();
+        };
+
         // FUNCIONES AUXILIARES GLOBALES EXPUESTAS
         window.actualizarListasDatalists = function(data) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
@@ -1530,14 +1547,12 @@
                 const wb = XLSX.utils.book_new();
                 const wsMaster = XLSX.utils.aoa_to_sheet(masterRows);
                 
-                // Aplicar estilos y colores personalizados a las cabeceras
                 const headerStyle = {
                     fill: { fgColor: { rgb: "334155" } },
                     font: { color: { rgb: "FFFFFF" }, bold: true },
                     alignment: { horizontal: "center", vertical: "center" }
                 };
 
-                // Recorrer y aplicar estilos si la celda es cabecera
                 for (let cellKey in wsMaster) {
                     if (cellKey[0] === '!') continue;
                     let cellVal = wsMaster[cellKey].v;
