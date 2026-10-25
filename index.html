@@ -169,7 +169,7 @@
 
             <!-- Botones de Acción -->
             <div class="flex items-center gap-3">
-                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow whitespace-nowrap">
+                <button id="btnNuevoExp" class=" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow whitespace-nowrap">
                     ➕ Nuevo
                 </button>
 		<button onclick="forzarEnvioActualizacionesHoy()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
@@ -1770,7 +1770,42 @@
                 window.filterData();
             });
         };
+	window.openModal = function(record = null) {
+    const modal = document.getElementById("expModal");
+    const form = document.getElementById("expForm");
+    const title = document.getElementById("modalTitle");
+    
+    if (!modal || !form) return;
+    
+    form.reset();
+    document.getElementById("recordId").value = "";
+    
+    if (record) {
+        title.innerText = "Editar Expediente";
+        document.getElementById("recordId").value = record.id;
+        fieldsList.forEach(f => {
+            const input = document.getElementById(f);
+            if (input) {
+                input.value = record[f] || "";
+            }
+        });
+        if (typeof toggleFechaPermisologia === 'function') toggleFechaPermisologia();
+    } else {
+        title.innerText = "Registrar Nuevo Exp";
+    }
+    
+    modal.classList.remove("hidden");
+};
 
+window.closeModal = function() {
+    const modal = document.getElementById("expModal");
+    if (modal) modal.classList.add("hidden");
+};
+document.getElementById("btnNuevoExp").addEventListener("click", () => {
+    if (typeof window.openModal === "function") {
+        window.openModal();
+    }
+});
         inicializarAppFirebase();
     </script>
 </body>
