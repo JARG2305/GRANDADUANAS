@@ -34,9 +34,10 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
     const despachados = expedientesData.filter(e => Boolean(e.despacho));
 
+    // Ordenamiento organizado por ETA en todas las categorías
     porLlegar.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31')));
-    tramites.sort((a, b) => (parseFechaLocalServidor(a.fecha_transmision) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.fecha_transmision) || new Date('9999-12-31')));
-    despachados.sort((a, b) => (parseFechaLocalServidor(a.despacho) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.despacho) || new Date('9999-12-31')));
+    tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
+    despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
 
     let wsData = [];
     let metaSecciones = [];
@@ -86,20 +87,13 @@ function generarExcelConsolidadoBuffer(expedientesData) {
             const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cellAddress]) continue;
 
-            // Asegurarnos de que cada celda sea un objeto válido y tenga el contenedor .s
-            if (typeof ws[cellAddress] !== 'object') {
-                ws[cellAddress] = { v: ws[cellAddress] };
-            }
-
             if (meta.type === 'title') {
-                if (C === 0) {
-                    ws[cellAddress].s = sectionTitleStyle;
-                }
+                if (C === 0) ws[cellAddress].s = sectionTitleStyle;
             } else if (meta.type === 'header') {
                 const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
                 ws[cellAddress].s = {
                     font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
-                    fill: { fgColor: { rgb: meta.color } }, // "FEF08A" (Amarillo Pollito), "2563EB" (Azul Rey), "DC2626" (Rojo)
+                    fill: { fgColor: { rgb: meta.color } },
                     alignment: { horizontal: "center", vertical: "center", wrapText: true },
                     border: {
                         top: { style: "thin", color: { rgb: "CBD5E1" } },
@@ -109,15 +103,15 @@ function generarExcelConsolidadoBuffer(expedientesData) {
                     }
                 };
             } else if (meta.type === 'data') {
-                ws[cellAddress].s = cellStyle; // Contiene wrapText: true y los bordes para Cliente, Proveedor, Contenido, etc.
+                ws[cellAddress].s = cellStyle;
             }
         }
     }
 
     ws['!cols'] = [
-        { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
-        { wch: 12 }, { wch: 23 }, { wch: 23 }, { wch: 25 }, { wch: 11 },
-        { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
+        { wch: 11 }, { wch: 9.5 }, { wch: 28 }, { wch: 28 }, { wch: 15 },
+        { wch: 12 }, { wch: 23 }, { wch: 23 }, { wch: 28 }, { wch: 11 },
+        { wch: 32 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
         { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
         { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
         { wch: 24 }, { wch: 18 }, { wch: 13 }, { wch: 26 }, { wch: 20 },
