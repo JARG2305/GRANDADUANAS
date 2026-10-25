@@ -26,7 +26,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
      if (expedientesData && expedientesData.length > 0) {
             const excelHeaders = [
-                "MODO VÍA", "N.º EXP.", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO", "CONTENIDO", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DAI", "VENCIMIENTO DAI", "FECHA DE LLEGADA", "ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSP.", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
+                "MODO VÍA", "N.º EXP.", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
             ];
 
             const fieldsList = [
@@ -46,25 +46,22 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
             const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
             const despachados = expedientesData.filter(e => Boolean(e.despacho));
 
-            // 2. Ordenamiento específico por categoría según lo solicitado:
-            // - Por Llegar: ordenado por ETA La Guaira
+            // 2. Ordenamiento específico por cada categoría
             porLlegar.sort((a, b) => {
                 let fechaA = parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31');
                 let fechaB = parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31');
                 return fechaA - fechaB;
             });
 
-            // - Trámites: ordenado por Fecha de Transmisión
             tramites.sort((a, b) => {
                 let fechaA = parseFechaLocalServidor(a.fecha_transmision) || new Date('9999-12-31');
                 let fechaB = parseFechaLocalServidor(b.fecha_transmision) || new Date('9999-12-31');
                 return fechaA - fechaB;
             });
 
-            // - Despachados: ordenado por Fecha de Despacho
             despachados.sort((a, b) => {
                 let fechaA = parseFechaLocalServidor(a.despacho) || new Date('9999-12-31');
-                let fechaB = parseFechaLocalServidor(b.fecha_transmision) || new Date('9999-12-31');
+                let fechaB = parseFechaLocalServidor(b.despacho) || new Date('9999-12-31');
                 return fechaA - fechaB;
             });
 
@@ -90,7 +87,6 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 metaSecciones.push({ type: 'empty' });
             }
 
-            // Construimos las secciones con sus respectivos colores solicitados
             agregarSeccion("1. EXPEDIENTES POR LLEGAR", porLlegar, "D97706"); // Amarillo / Ámbar
             agregarSeccion("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul
             agregarSeccion("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo
@@ -105,7 +101,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 
             const cellStyle = {
                 font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
-                alignment: { horizontal: "left", vertical: "center" },
+                alignment: { horizontal: "left", vertical: "center", wrapText: true }, // Ajuste de texto activado
                 border: {
                     top: { style: "thin", color: { rgb: "E2E8F0" } },
                     bottom: { style: "thin", color: { rgb: "E2E8F0" } },
@@ -127,8 +123,8 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                     } else if (meta.type === 'header') {
                         ws[cellAddress].s = {
                             font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                            fill: { fgColor: { rgb: meta.color } }, // Color dinámico (Amarillo, Azul o Rojo)
-                            alignment: { horizontal: "center", vertical: "center" },
+                            fill: { fgColor: { rgb: meta.color } },
+                            alignment: { horizontal: "center", vertical: "center", wrapText: true }, // Encabezados ajustados
                             border: {
                                 top: { style: "thin", color: { rgb: "CBD5E1" } },
                                 bottom: { style: "thin", color: { rgb: "CBD5E1" } },
@@ -142,20 +138,54 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 }
             }
 
-            // Ancho dinámico de columnas adaptado al contenido y los encabezados
-            const colWidths = [];
-            for (let C = range.s.c; C <= range.e.c; ++C) {
-                let maxLen = String(excelHeaders[C] || "").length;
-                for (let R = range.s.r; R <= range.e.r; ++R) {
-                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                    if (ws[cellAddress] && ws[cellAddress].v) {
-                        const valLen = String(ws[cellAddress].v).length;
-                        if (valLen > maxLen) maxLen = valLen;
-                    }
-                }
-                colWidths.push({ wch: Math.min(Math.max(maxLen + 4, 15), 45) });
-            }
-            ws['!cols'] = colWidths;
+            // Aplicación exacta de los anchos de columna solicitados
+            ws['!cols'] = [
+                { wch: 11 },   // A
+                { wch: 9.5 },  // B
+                { wch: 24 },   // C
+                { wch: 24 },   // D
+                { wch: 15 },   // E
+                { wch: 12 },   // F
+                { wch: 23 },   // G
+                { wch: 20 },   // H
+                { wch: 25 },   // I
+                { wch: 11 },   // J
+                { wch: 25 },   // K
+                { wch: 12 },   // L
+                { wch: 21 },   // M
+                { wch: 17 },   // N
+                { wch: 18 },   // O
+                { wch: 22 },   // P
+                { wch: 14 },   // Q
+                { wch: 20 },   // R
+                { wch: 18 },   // S
+                { wch: 18 },   // T
+                { wch: 24.5 }, // U
+                { wch: 24 },   // V
+                { wch: 18 },   // W
+                { wch: 24 },   // X
+                { wch: 25 },   // Y
+                { wch: 24 },   // Z
+                { wch: 18 },   // AA
+                { wch: 13 },   // AB
+                { wch: 26 },   // AC
+                { wch: 20 },   // AD
+                { wch: 11 },   // AE
+                { wch: 14 },   // AF
+                { wch: 15.5 }, // AG
+                { wch: 12 },   // AH
+                { wch: 12 },   // AI
+                { wch: 12 },   // AJ
+                { wch: 25 },   // AK
+                { wch: 20 },   // AL
+                { wch: 20 },   // AM
+                { wch: 20 },   // AN
+                { wch: 16 },   // AO
+                { wch: 20 },   // AP
+                { wch: 20 },   // AQ
+                { wch: 20 },   // AR
+                { wch: 35 }    // AS
+            ];
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
