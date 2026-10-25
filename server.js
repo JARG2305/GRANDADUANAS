@@ -5,7 +5,7 @@ const path = require('path');
 const XLSX = require('xlsx-js-style');
 const cron = require('node-cron');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = qrcode = require('qrcode'); // o como lo tengas definido
+const qrcode = require('qrcode');
 const nodemailer = require('nodemailer');
 
 // ==========================================
