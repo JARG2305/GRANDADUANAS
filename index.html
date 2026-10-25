@@ -2151,6 +2151,31 @@ window.calcularFechasLlegada = function() {
                 alert("Error al exportar por pestañas: " + err.message);
             }
         };
+	// Ejemplo de cómo debes empaquetar el Excel en el cliente antes de enviarlo por correo
+function prepararYEnviarCorreoExcel(destinatario, asunto, mensaje) {
+    // 1. Generar la hoja y el libro con la misma estructura y estilos
+    const wb = generarLibroExcelConEstilosParaWeb(); // Tu función web actual
+    
+    // 2. Obtener el búfer en Base64 incluyendo los estilos (cellStyles: true)
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'base64', cellStyles: true });
+
+    // 3. Enviar al servidor Node.js
+    fetch('/api/enviar-excel-correo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            destinatario: destinatario,
+            asunto: asunto,
+            mensaje: mensaje,
+            excelBase64: excelBuffer,
+            nombreArchivo: "Reporte_Consolidado_Logistatus.xlsx"
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) console.log("Correo enviado con éxito con el Excel estilizado");
+    });
+}
 inicializarAppFirebase();
     </script>
 </body>
