@@ -152,6 +152,7 @@
                 </div>
             </div>
 
+            <!-- Contenedor del Logo -->
             <div class="flex-1 flex justify-center items-center px-2">
                 <div id="userLogoContainer" class="hidden relative group">
                     <img id="userLogoPreview" src="" alt="Logo Cliente" class="h-24 w-auto max-w-[240px] object-contain rounded-2xl bg-white p-1.5 shadow-xl border border-white/20">
@@ -167,23 +168,27 @@
                 </label>
             </div>
 
-            <!-- Botones de Acción -->
-            <div class="flex items-center gap-3">
-                <button id="btnNuevoExp" class="relative group overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-[0_4px_12px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(34,211,238,0.4)] hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 whitespace-nowrap">
-    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-white font-black text-xs transition-transform group-hover:rotate-90 duration-300">
-        +
-    </span>
-    <span>Nuevo Expediente</span>
-</button>
-		<button onclick="forzarEnvioActualizacionesHoy()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
-		 🚀 Forzar Envío de Estatus del Día
-		</button>
+            <!-- Botones de Acción Unificados y Organizados -->
+            <div class="flex items-center gap-3 flex-wrap justify-end">
+                
+                <!-- 1. Botón Nuevo Expediente -->
+                <button id="btnNuevoExp" class="relative group overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-[0_4px_12px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(34,211,238,0.4)] hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 whitespace-nowrap">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-white font-black text-xs transition-transform group-hover:rotate-90 duration-300">+</span>
+                    <span>Nuevo Expediente</span>
+                </button>
 
+                <!-- 2. Botón Forzar Envío de Estatus del Día -->
+                <button onclick="forzarEnvioActualizacionesHoy()" class="relative group overflow-hidden bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow-[0_4px_12px_rgba(99,102,241,0.3)] hover:shadow-[0_6px_20px_rgba(168,85,247,0.4)] hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 whitespace-nowrap">
+                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-white font-black text-xs transition-transform group-hover:scale-110 duration-300">🚀</span>
+                    <span>Forzar Estatus del Día</span>
+                </button>
+
+                <!-- 3. Botón Opciones y Reportes -->
                 <div class="relative group">
-                    <button class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow whitespace-nowrap">
-                        ⚙️ Opciones y Reportes ▾
+                    <button class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 shadow hover:shadow-md flex items-center gap-2 whitespace-nowrap">
+                        <span>⚙️ Opciones y Reportes</span>
+                        <span class="text-[10px] transition-transform group-hover:rotate-180 duration-300">▾</span>
                     </button>
-
                     <div class="absolute right-0 mt-1 w-64 bg-white border border-slate-200 rounded-xl shadow-2xl py-2 hidden group-hover:block z-50 divide-y divide-slate-100 text-slate-800">
                         <div class="px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400">Reportes y Archivo</div>
                         <button onclick="openArchiveModal()" class="w-full text-left px-4 py-2.5 text-sm font-bold hover:bg-slate-100 flex items-center gap-2.5 transition">
