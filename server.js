@@ -511,22 +511,50 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
+a// Ruta para notificar cambios de estatus individuales a clientes con formato dinámico
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, numExpediente, bl, eventoCambiado, observaciones } = req.body;
-    if (!correoCliente) return res.status(400).json({ success: false, message: "El cliente no tiene correo." });
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones } = req.body;
+    
+    if (!correoCliente) {
+        return res.status(400).json({ success: false, message: "El cliente no tiene correo registrado." });
+    }
 
     try {
-        const asunto = `Actualización de Expediente N° ${numExpediente || 'XXXX'}`;
-        let mensaje = `Le informamos que su expediente\nN° ${numExpediente || 'XXXX'}\nB/L o Guía: ${bl || 'XXXXX'}`;
-        if (eventoCambiado) mensaje += `\n${eventoCambiado}`;
-        if (observaciones && observaciones.trim() !== "") mensaje += `\n${observaciones}`;
-        mensaje += `\n\nEste es un mensaje automatizado generado por Logistatus Pro.`;
+        // Definir si es B/L (Marítimo) o Guía (Aéreo) según el modo de transporte
+        const esAereo = String(modoTransporte || "").toLowerCase().includes("aéreo") || String(modoTransporte || "").toLowerCase().includes("aereo");
+        const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
 
-        const expedientes = await obtenerExpedientesFirestore();
-        const expedienteEncontrado = expedientes.find(e => String(e.num_expediente).trim() === String(numExpediente).trim());
-        const datosAdjuntos = expedienteEncontrado ? [expedienteEncontrado] : [];
+        const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
+        
+        // Plantilla HTML estructurada con el diseño profesional
+        let cuerpoCorreo = `
+            <div style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px;">
+                <h2 style="color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">Actualización de Estatus - Logistatus Pro</h2>
+                
+                <p>Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
+                
+                <p>Le informamos que su expediente<br>
+                <strong>N° ${numExpediente || 'GENERAL'}</strong><br>
+                <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</p>
+                
+                <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px; margin: 15px 0;">
+                    <p style="margin: 0;"><strong>${campoLegible || 'Estatus / Evento reciente'}:</strong> ${statusActual || 'N/A'}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Medio de transporte:</strong> ${modoTransporte || 'Marítimo'}</p>
+                    ${observaciones && observaciones.trim() !== "" ? `<p style="margin: 5px 0 0 0;"><strong>Observaciones:</strong> ${observaciones.trim()}</p>` : ''}
+                </div>
+                
+                <p>Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+                
+                <p style="margin-top: 20px; font-size: 12px; color: #64748b;">
+                    Atentamente,<br>
+                    <strong>LOGISTATUS PRO / Grand Aduanas</strong><br>
+                    Control Logístico y Aduanas Automatizado
+                </p>
+            </div>
+        `;
 
-        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, mensaje, datosAdjuntos);
+        // Se envía el HTML estructurado mediante la función de envío
+        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

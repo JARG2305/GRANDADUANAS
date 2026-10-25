@@ -964,6 +964,128 @@
         }
         sincronizarClientesCache();
 
+        // NAVEGACIÓN GLOBAL DE PESTAÑAS PRINCIPALES
+        window.switchTab = function(tabName) {
+            currentTab = tabName;
+            const tabs = ['porLlegar', 'porRegistrar', 'porReconocer', 'porValidar', 'porDespachar', 'despachados'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab_${t}Btn`);
+                if (btn) {
+                    if (t === tabName) {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-white border-t-2 border-x border-slate-300 text-blue-800 shadow-sm transition min-w-[130px]";
+                    } else {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition min-w-[130px]";
+                    }
+                }
+            });
+            window.filterData();
+        };
+
+        // NAVEGACIÓN GLOBAL DE SUBPESTAÑAS DE ALERTAS
+        window.switchSubTabAlertas = function(subTab) {
+            subTabAlertaActual = subTab;
+            const subTabs = ['eta', 'operativas', 'almacen'];
+            subTabs.forEach(s => {
+                const btn = document.getElementById(`tab_alertas${s.charAt(0).toUpperCase() + s.slice(1)}Btn`);
+                if (btn) {
+                    if (s === subTab) {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-white border-t-2 border-x border-slate-300 text-red-700 shadow-sm transition min-w-[140px]";
+                    } else {
+                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition min-w-[140px]";
+                    }
+                }
+            });
+            renderizarAlertasSistema(allRecords);
+        };
+
+        function updateTabCounters(data) {
+            let counts = { porLlegar: 0, porRegistrar: 0, porReconocer: 0, porValidar: 0, porDespachar: 0, despachados: 0 };
+            data.forEach(r => {
+                const cat = getExpCategory(r);
+                if (counts[cat] !== undefined) counts[cat]++;
+            });
+            for (let k in counts) {
+                const el = document.getElementById(`count_${k}`);
+                if (el) el.innerText = counts[k];
+            }
+            renderizarAlertasSistema(data);
+        }
+
+        function renderizarAlertasSistema(data) {
+            const container = document.getElementById("alertsContainer");
+            if (!container) return;
+            container.innerHTML = "";
+
+            let activeData = data.filter(r => !esHistoricoArchivado(r) && !Boolean(r.despacho));
+            let alertasEta = [];
+            let alertasOp = [];
+            let alertasAlm = [];
+
+            activeData.forEach(r => {
+                // Lógica de Alertas ETA
+                if (r.eta_la_guaira) {
+                    let fEta = parseFechaLocal(r.eta_la_guaira);
+                    if (fEta) {
+                        let hoy = new Date();
+                        hoy.setHours(0,0,0,0);
+                        let diffDays = Math.round((fEta - hoy) / (1000 * 60 * 60 * 24));
+                        if (diffDays <= 3 && diffDays >= 0) {
+                            alertasEta.push(`Exp ${r.num_expediente} (${r.cliente}) - ETA próxima en ${diffDays} días (${r.eta_la_guaira})`);
+                        }
+                    }
+                }
+                // Alertas Operativas
+                if (r.permisologia === 'Sí Aplica / Pendiente') {
+                    alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
+                }
+                // Alertas de Almacén / Demoras
+                if (r.culminacion_dias_libres) {
+                    let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
+                    if (fCulminacion) {
+                        let hoy = new Date();
+                        hoy.setHours(0,0,0,0);
+                        let diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
+                        if (diffAlm <= 2) {
+                            alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} días.`);
+                        }
+                    }
+                }
+            });
+
+            document.getElementById("count_alertasEta").innerText = alertasEta.length;
+            document.getElementById("count_alertasOp").innerText = alertasOp.length;
+            document.getElementById("count_alertasAlm").innerText = alertasAlm.length;
+
+            let listaActual = subTabAlertaActual === 'eta' ? alertasEta : (subTabAlertaActual === 'operativas' ? alertasOp : alertasAlm);
+
+            if (listaActual.length === 0) {
+                container.innerHTML = `<p class="text-slate-400 py-2 text-center">No hay alertas activas en esta sección.</p>`;
+                return;
+            }
+
+            listaActual.forEach(alerta => {
+                const div = document.createElement("div");
+                div.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium flex items-center justify-between";
+                div.innerHTML = `<span>⚠️ ${alerta}</span>`;
+                container.appendChild(div);
+            });
+        }
+
+        function getExpCategory(rec) {
+            const hasDespacho = Boolean(rec.despacho && rec.despacho.trim() !== "");
+            const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
+            const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
+            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+            const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+
+            if (hasDespacho) return 'despachados';
+            if (hasValidacion) return 'porDespachar';
+            if (hasReconocimiento) return 'porValidar';
+            if (hasTransmision) return 'porReconocer';
+            if (hasLlegada) return 'porRegistrar';
+            return 'porLlegar';
+        }
+
         window.openClientesModal = function() {
             document.getElementById("clientesModal").classList.remove("hidden");
             renderizarTablaClientesModal();
@@ -1155,24 +1277,6 @@
             }
         };
 
-        // FUNCIÓN GLOBAL DE NAVEGACIÓN ENTRE PESTAÑAS DE EVENTOS
-        window.switchTab = function(tabName) {
-            currentTab = tabName;
-            const tabs = ['porLlegar', 'porRegistrar', 'porReconocer', 'porValidar', 'porDespachar', 'despachados'];
-            tabs.forEach(t => {
-                const btn = document.getElementById(`tab_${t}Btn`);
-                if (btn) {
-                    if (t === tabName) {
-                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-white border-t-2 border-x border-slate-300 text-blue-800 shadow-sm transition min-w-[130px]";
-                    } else {
-                        btn.className = "tab-btn px-4 font-bold rounded-t-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition min-w-[130px]";
-                    }
-                }
-            });
-            window.filterData();
-        };
-
-        // FUNCIONES AUXILIARES GLOBALES EXPUESTAS
         window.actualizarListasDatalists = function(data) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
             campos.forEach(campoId => {
@@ -1350,33 +1454,6 @@
             if (navieraEl) navieraEl.value = lineaVal;
         };
 
-        function updateTabCounters(data) {
-            let counts = { porLlegar: 0, porRegistrar: 0, porReconocer: 0, porValidar: 0, porDespachar: 0, despachados: 0 };
-            data.forEach(r => {
-                const cat = getExpCategory(r);
-                if (counts[cat] !== undefined) counts[cat]++;
-            });
-            for (let k in counts) {
-                const el = document.getElementById(`count_${k}`);
-                if (el) el.innerText = counts[k];
-            }
-        }
-
-        function getExpCategory(rec) {
-            const hasDespacho = Boolean(rec.despacho && rec.despacho.trim() !== "");
-            const hasValidacion = Boolean(rec.validacion && rec.validacion.trim() !== "");
-            const hasReconocimiento = Boolean(rec.reconocimiento && rec.reconocimiento.trim() !== "");
-            const hasTransmision = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
-            const hasLlegada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
-
-            if (hasDespacho) return 'despachados';
-            if (hasValidacion) return 'porDespachar';
-            if (hasReconocimiento) return 'porValidar';
-            if (hasTransmision) return 'porReconocer';
-            if (hasLlegada) return 'porRegistrar';
-            return 'porLlegar';
-        }
-
         window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
@@ -1514,7 +1591,6 @@
             }
         };
 
-        // EXPOSICIÓN GLOBAL DE FUNCIONES DE CORREO Y EXCEL CON ESTILOS Y COLORES ORIGINALES
         window.generarExcelBase64ParaCorreo = function() {
             try {
                 const currentFilteredRecords = allRecords.filter(r => !esHistoricoArchivado(r));
