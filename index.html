@@ -755,6 +755,7 @@
             </div>
         </div>
     </div>
+    
     <div id="multasModal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
         <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[92vh] flex flex-col my-auto">
             <div class="bg-navy-900 text-white p-4 flex justify-between items-center rounded-t-2xl">
@@ -837,7 +838,6 @@
                         </div>
                     </div>
 
-                    <!-- Switch de Notificaciones Automáticas -->
                     <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg sm:col-span-2 mt-3">
                         <div>
                             <span class="text-sm font-medium text-slate-700">Notificaciones automáticas por correo</span>
@@ -849,14 +849,12 @@
                         </label>
                     </div>
 
-                    <!-- Botones de Guardar / Cancelar -->
                     <div class="flex justify-end gap-2 pt-2 mt-3">
                         <button type="button" onclick="limpiarFormularioCliente()" class="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-bold text-slate-700">Cancelar</button>
                         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow">💾 Guardar Cliente</button>
                     </div>
                 </form>
                 
-                <!-- Listado de Clientes -->
                 <div>
                     <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Listado de Clientes</h4>
                     <div class="overflow-x-auto max-h-56 border border-slate-200 rounded-xl bg-white">
@@ -877,7 +875,6 @@
                     </div>
                 </div>
 
-                <!-- Panel Único de Configuración de Correos Internos Automáticos -->
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mt-4">
                     <h4 class="text-xs font-bold text-slate-700 uppercase">⚙️ Configuración de Correos Internos Automáticos</h4>
                     <div>
@@ -889,7 +886,6 @@
                     </div>
                 </div>
 
-                <!-- Panel de Configuración de Correo Remitente -->
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mt-4">
                     <h4 class="text-xs font-bold text-slate-700 uppercase">⚙️ Credenciales de Correo Remitente (Gmail)</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -911,7 +907,7 @@
         </div>
     </div>
 
-    <!-- Script de Firebase y Lógica del Sistema Corregida -->
+    <!-- Script de Firebase y Lógica Original Íntegra -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
@@ -1115,7 +1111,7 @@
             }
         };
 
-        // FUNCIONES AUXILIARES GLOBALES EXPUESTAS CORRECTAMENTE
+        // FUNCIONES AUXILIARES GLOBALES EXPUESTAS
         window.actualizarListasDatalists = function(data) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
             campos.forEach(campoId => {
@@ -1230,7 +1226,7 @@
                 tr.className = (isDespachado ? "bg-red-100 hover:bg-red-200" : (index % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50 hover:bg-slate-100")) + " transition";
                  
                 let htmlActions = `<td class="p-3 sticky-col-0" style="background-color: ${stickyBgColor} !important;"><button onclick="editRecord('${rec.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button><button onclick="deleteRecord('${rec.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button></td>`;
-                let htmlTracking = `<td class="p-3 sticky-col-1" style="background-color: ${stickyBgColor} !important;">🔗 Rastrear</td>`;
+                let htmlTracking = `<td class="p-3 sticky-col-1" style="background-color: ${stickyBgColor} !important;">${generarTrackingLink(rec)}</td>`;
                 let htmlModo = `<td class="p-3 font-bold text-center sticky-col-2 ${rec.modo_transporte === 'Aéreo' ? 'text-sky-600' : 'text-blue-900'}" style="background-color: ${stickyBgColor} !important;">${rec.modo_transporte || 'Marítimo'}</td>`;
                 let htmlExp = `<td class="p-3 font-semibold sticky-col-3" style="background-color: ${stickyBgColor} !important;">${rec.num_expediente || ''}</td>`;
                 let htmlCli = `<td class="p-3 font-semibold sticky-col-4" style="background-color: ${stickyBgColor} !important;">${rec.cliente || ''}</td>`;
@@ -1258,6 +1254,33 @@
             const today = new Date();
             today.setHours(0,0,0,0);
             return Math.round((today - dDespacho) / (1000 * 60 * 60 * 24)) > 30;
+        }
+
+        function parseFechaLocal(str) {
+            if (!str) return null;
+            str = String(str).trim();
+            if (str === "0" || (!str.includes('/') && !str.includes('-'))) return null;
+            if (str.includes('/')) {
+                const p = str.split('/');
+                if (p.length === 3 && p[2].length === 4) {
+                    const dia = parseInt(p[0], 10);
+                    const mes = parseInt(p[1], 10) - 1;
+                    const anio = parseInt(p[2], 10);
+                    const fechaObj = new Date(anio, mes, dia);
+                    if (fechaObj.getFullYear() === anio && fechaObj.getMonth() === mes && fechaObj.getDate() === dia) return fechaObj;
+                }
+            }
+            return null;
+        }
+
+        function formatearFechaDDMMYYYY(str) {
+            if (!str) return "";
+            str = String(str).trim();
+            if (str.includes('-')) {
+                const p = str.split('-');
+                if (p.length === 3 && p[0].length === 4) return `${p[2]}/${p[1]}/${p[0]}`;
+            }
+            return str;
         }
 
         window.sincronizarNaviera = function() {
