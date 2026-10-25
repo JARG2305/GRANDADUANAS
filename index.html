@@ -1846,6 +1846,26 @@ window.configurarAutoFormatoFechas = function() {
         }
     });
 };
+// 1. Función de máscara para fechas (corrige el error maskFecha)
+window.maskFecha = function(input) {
+    let v = input.value.replace(/\D/g, ""); 
+    if (v.length > 8) v = v.slice(0, 8); 
+
+    if (v.length > 4) {
+        input.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
+    } else if (v.length > 2) {
+        input.value = `${v.slice(0, 2)}/${v.slice(2)}`;
+    } else {
+        input.value = v;
+    }
+};
+
+// 2. Función de cálculo de fechas (corrige el error calcularFechasLlegada)
+window.calcularFechasLlegada = function() {
+    // Coloca aquí la lógica que usabas para calcular días libres o ETAs, 
+    // o déjala vacía temporalmente si no realiza un cálculo complejo:
+    console.log("Calculando fechas...");
+};
         inicializarAppFirebase();
     </script>
 </body>
