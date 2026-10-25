@@ -908,7 +908,7 @@
     </div>
 
 
-    <script type="module">
+   <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
@@ -1130,7 +1130,6 @@
             }
         };
 
-        // FUNCIONES AUXILIARES GLOBALES EXPUESTAS
         window.actualizarListasDatalists = function(data) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
             campos.forEach(campoId => {
@@ -1245,7 +1244,7 @@
                 tr.className = (isDespachado ? "bg-red-100 hover:bg-red-200" : (index % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50 hover:bg-slate-100")) + " transition";
                  
                 let htmlActions = `<td class="p-3 sticky-col-0" style="background-color: ${stickyBgColor} !important;"><button onclick="editRecord('${rec.id}')" class="text-blue-600 font-bold mr-2" title="Editar">✏️</button><button onclick="deleteRecord('${rec.id}')" class="text-red-600 font-bold" title="Eliminar">🗑️</button></td>`;
-                let htmlTracking = `<td class="p-3 sticky-col-1" style="background-color: ${stickyBgColor} !important;">${generarTrackingLink(rec)}</td>`;
+                let htmlTracking = `<td class="p-3 sticky-col-1" style="background-color: ${stickyBgColor} !important;">🔗 Rastrear</td>`;
                 let htmlModo = `<td class="p-3 font-bold text-center sticky-col-2 ${rec.modo_transporte === 'Aéreo' ? 'text-sky-600' : 'text-blue-900'}" style="background-color: ${stickyBgColor} !important;">${rec.modo_transporte || 'Marítimo'}</td>`;
                 let htmlExp = `<td class="p-3 font-semibold sticky-col-3" style="background-color: ${stickyBgColor} !important;">${rec.num_expediente || ''}</td>`;
                 let htmlCli = `<td class="p-3 font-semibold sticky-col-4" style="background-color: ${stickyBgColor} !important;">${rec.cliente || ''}</td>`;
