@@ -685,6 +685,12 @@ function formatearFechaDDMMYYYY(str) {
     if (!d || isNaN(d.getTime())) return str || 'S/N';
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
+window.generarTrackingLink = function(rec) {
+            const blVal = rec.awb_bl || "";
+            const expVal = rec.num_expediente || "";
+            if (!blVal && !expVal) return '<span class="text-slate-400">S/N</span>';
+            return `<a href="tracking.html?exp=${encodeURIComponent(expVal)}&bl=${encodeURIComponent(blVal)}" target="_blank" class="text-blue-600 font-bold hover:underline">🔗 Rastrear</a>`;
+        };
 
 // CRON 1: Alertas automáticas por WhatsApp y Telegram (9, 12, 15, 18, 19, 20 horas)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
