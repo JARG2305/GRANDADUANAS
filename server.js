@@ -682,30 +682,7 @@ app.get('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-app.get('/api/clientes', async (req, res) => {
-    try {
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
-        const response = await fetch(url);
-        const result = await response.json();
-        if (!result.documents) return res.json({ success: true, clientes: [] });
 
-        const clientes = result.documents.map(doc => {
-            let fields = doc.fields || {};
-            return {
-                id: doc.name.split('/').pop(),
-                razonSocial: fields.razonSocial?.stringValue || '',
-                rif: fields.rif?.stringValue || '',
-                direccion: fields.direccion?.stringValue || '',
-                telefono: fields.telefono?.stringValue || '',
-                correo: fields.correo?.stringValue || '',
-                enviarAutomatico: fields.enviarAutomatico?.booleanValue ?? true
-            };
-        });
-        res.json({ success: true, clientes });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
 
 // ==========================================
 // RUTA PARA EL ENVÍO FORZADO / MANUAL DESDE LA WEB (¡Colócala aquí!)
