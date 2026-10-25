@@ -86,17 +86,30 @@ function generarExcelConsolidadoBuffer(expedientesData) {
             const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cellAddress]) continue;
 
+            // Asegurarnos de que cada celda sea un objeto válido y tenga el contenedor .s
+            if (typeof ws[cellAddress] !== 'object') {
+                ws[cellAddress] = { v: ws[cellAddress] };
+            }
+
             if (meta.type === 'title') {
-                if (C === 0) ws[cellAddress].s = sectionTitleStyle;
+                if (C === 0) {
+                    ws[cellAddress].s = sectionTitleStyle;
+                }
             } else if (meta.type === 'header') {
+                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
                 ws[cellAddress].s = {
-                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                    fill: { fgColor: { rgb: meta.color } },
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
+                    fill: { fgColor: { rgb: meta.color } }, // "FEF08A" (Amarillo Pollito), "2563EB" (Azul Rey), "DC2626" (Rojo)
                     alignment: { horizontal: "center", vertical: "center", wrapText: true },
-                    border: { top: { style: "thin", color: { rgb: "CBD5E1" } }, bottom: { style: "thin", color: { rgb: "CBD5E1" } }, left: { style: "thin", color: { rgb: "CBD5E1" } }, right: { style: "thin", color: { rgb: "CBD5E1" } } }
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
                 };
             } else if (meta.type === 'data') {
-                ws[cellAddress].s = cellStyle;
+                ws[cellAddress].s = cellStyle; // Contiene wrapText: true y los bordes para Cliente, Proveedor, Contenido, etc.
             }
         }
     }
@@ -165,6 +178,19 @@ const ws = XLSX.utils.aoa_to_sheet(wsData);
                     ...headerStyleWithWrap,
                     font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
                     fill: { fgColor: { rgb: meta.color } }
+                };
+} else if (meta.type === 'header') {
+                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
+                ws[cellAddress].s = {
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
+                    fill: { fgColor: { rgb: meta.color } }, // "FEF08A" (Amarillo), "2563EB" (Azul), "DC2626" (Rojo)
+                    alignment: { horizontal: "center", vertical: "center", wrapText: true }, // 👈 Ajuste de texto activo
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
                 };
             } else if (meta.type === 'data') {
                 ws[cellAddress].s = cellStyle;
