@@ -24,22 +24,28 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
         let archivoExcelBase64 = null;
         let nombreArchivo = "Reporte_Expedientes_Logistatus.xlsx";
 
-        if (expedientesData && expedientesData.length > 0) {
-            const wsData = [
-                ["N° Expediente", "Cliente", "Proveedor", "B/L o Guía", "ETA La Guaira", "Fecha Llegada", "Canal", "Estatus / Observaciones"]
+       if (expedientesData && expedientesData.length > 0) {
+            const excelHeaders = [
+                "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "LÍNEA", "PAÍS ORIGEN", "BUQUE / VUELO ORIGEN", "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", "ETD ORIGEN", "PUERTO TRANSBORDO", "ETA TRANSBORDO", "ETD TRANSBORDO", "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA REGISTRO DUA", "VENCIMIENTO DUA", "FECHA DE LLEGADA", "RECIBIDA ACTA RECEPCIÓN", "FECHA ABANDONO LEGAL", "PERMISOLOGÍA", "FECHA RECIBIDO PERMISOLOGÍA", "PREVALORACIÓN ENVIADA", "DOC. VALORADO EN SISTEMA", "FACTURA RECIBIDA", "MONTO FLETE", "RECIBIDO DOC. TRANSPORTE", "FECHA TRANSMISIÓN", "CANAL", "FUNCIONARIO", "RECONOCIMIENTO", "VALIDACIÓN", "DESPACHO", "ALMACÉN", "RECIBIDA ACTA (ALMACÉN)", "DÍAS LIBRES ALMACÉN", "INICIO DÍAS LIBRES ALMACÉN", "CULMINACIÓN DÍAS LIBRES ALMACÉN", "NAVIERA", "DÍAS LIBRES NAVIERA", "INICIO DÍAS LIBRES NAVIERA", "CULMINACIÓN DÍAS LIBRES NAVIERA", "OBSERVACIONES"
             ];
 
+            const fieldsList = [
+                "modo_transporte", "num_expediente", "cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo",
+                "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "etd_origen",
+                "puerto_transbordo", "eta_transbordo", "etd_transbordo", "buque_vuelo_ve",
+                "eta_la_guaira", "fecha_registro_dai", "vencimiento_dai", "fecha_llegada", "recibida_acta_recepcion", "fecha_abandono_legal", "permisologia", "fecha_recibido_permisologia",
+                "prevaloracion_enviada", "documento_valorado_en_sistema", "factura_recibida", "monto_flete",
+                "recibido_documento_transporte", "fecha_transmision", "canal", "funcionario", "reconocimiento", "validacion", "despacho",
+                "almacen", "recibida_acta_recepcion_almacen", "dias_libres_almacen", "inicio_dias_libres", "culminacion_dias_libres",
+                "naviera", "dias_libres_naviera", "inicio_dias_libres_naviera", "culminacion_dias_libres_naviera",
+                "observaciones"
+            ];
+
+            const wsData = [excelHeaders];
+
             expedientesData.forEach(e => {
-                wsData.push([
-                    e.num_expediente || 'S/N',
-                    e.cliente || 'S/C',
-                    e.proveedor || 'N/A',
-                    e.awb_bl || e.bl || 'S/N',
-                    e.eta_la_guaira || 'S/N',
-                    e.fecha_llegada || 'Pendiente',
-                    e.canal || 'Sin asignar',
-                    e.observaciones || ''
-                ]);
+                let row = fieldsList.map(f => e[f] !== undefined && e[f] !== null ? e[f] : "");
+                wsData.push(row);
             });
 
             const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -81,13 +87,11 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 }
             }
 
-            ws['!cols'] = [
-                { wch: 18 }, { wch: 25 }, { wch: 20 }, { wch: 20 },
-                { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 35 }
-            ];
+            // Asignación de ancho amplio a cada una de las columnas del reporte maestro
+            ws['!cols'] = fieldsList.map(() => ({ wch: 22 }));
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Expedientes");
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte Maestro");
 
             const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
             archivoExcelBase64 = excelBuffer.toString('base64');
