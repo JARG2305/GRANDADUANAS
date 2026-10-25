@@ -1456,10 +1456,39 @@
             return str;
         }
 	window.generarTrackingLink = function(rec) {
-            const blVal = rec.awb_bl || "";
-            const expVal = rec.num_expediente || "";
+            const blVal = (rec.awb_bl || "").trim();
+            const expVal = (rec.num_expediente || "").trim();
+            const navieraVal = (rec.linea || rec.naviera || "").toUpperCase().trim();
+            
             if (!blVal && !expVal) return '<span class="text-slate-400">S/N</span>';
-            return `<a href="tracking.html?exp=${encodeURIComponent(expVal)}&bl=${encodeURIComponent(blVal)}" target="_blank" class="text-blue-600 font-bold hover:underline">🔗 Rastrear</a>`;
+
+            let trackingUrl = "";
+
+            // Listado de navieras con sus enlaces oficiales de rastreo
+            if (navieraVal.includes("CMA CGM")) {
+                trackingUrl = `https://www.cmacgm.com/ebusiness/tracking?SearchBy=BL&SearchValue=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("HAPAG") || navieraVal.includes("HAPAG LLOYD")) {
+                trackingUrl = `https://www.hapag-lloyd.com/en/online-business/tracing/tracing-by-booking.html?blno=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("MSC")) {
+                trackingUrl = `https://www.msc.com/en/track-a-shipment?trackingNumber=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("MAERSK")) {
+                trackingUrl = `https://www.maersk.com/tracking/${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("EVERGREEN")) {
+                trackingUrl = `https://www.evergreen-line.com/tracking/jsp/Trk_CargoTracking.jsp?no=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("ZIM")) {
+                trackingUrl = `https://www.zim.com/tools/track-a-shipment?shipmentNumber=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("ONE") || navieraVal.includes("OCEAN NETWORK")) {
+                trackingUrl = `https://ecomm.one-line.com/ecom/CUP_HOM_3301.do?bkg_no=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("HAMBURG") || navieraVal.includes("HAMBURG SUD")) {
+                trackingUrl = `https://www.hamburgsud-line.com/liner/en/liner-services/e-business/track?bkgNo=${encodeURIComponent(blVal)}`;
+            } else if (navieraVal.includes("KING OCEAN") || navieraVal.includes("KING")) {
+                trackingUrl = `https://www.kingocean.com/tracking?search=${encodeURIComponent(blVal)}`;
+            } else {
+                // Enlace de respaldo a Google si se ingresa otra naviera
+                trackingUrl = `https://www.google.com/search?q=${encodeURIComponent('tracking ' + navieraVal + ' ' + blVal)}`;
+            }
+
+            return `<a href="${trackingUrl}" target="_blank" class="text-blue-600 font-bold hover:underline" title="Rastrear en ${navieraVal || 'la naviera'}">🔗 Rastrear</a>`;
         };
 
         window.sincronizarNaviera = function() {
