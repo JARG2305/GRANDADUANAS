@@ -511,7 +511,7 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
-a// Ruta para notificar cambios de estatus individuales a clientes con formato dinámico
+// Ruta para notificar cambios de estatus individuales a clientes con formato dinámico
 app.post('/api/enviar-correo-cliente', async (req, res) => {
     const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones } = req.body;
     
