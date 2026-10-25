@@ -875,7 +875,8 @@
                     </table>
                 </div>
             </div>
-	    <!-- Panel de Configuración de Correo Interno -->
+
+            <!-- Panel Único de Configuración de Correos Internos Automáticos -->
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mt-4">
                 <h4 class="text-xs font-bold text-slate-700 uppercase">⚙️ Configuración de Correos Internos Automáticos</h4>
                 <div>
@@ -2419,7 +2420,7 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                         if (inputRazon) inputRazon.value = nombreCliente;
                         const inputRif = document.getElementById("web_rif");
                         if (inputRif) inputRif.focus();
-                        return; // Detiene el guardado del expediente para que primero registres al cliente
+                        return; 
                     }
                 }
             }
@@ -2430,49 +2431,54 @@ div.className = `p-2.5 rounded-lg border flex items-center justify-between gap-2
                 } else {
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
-// Dentro de tu función saveExp en el frontend:
-if (nombreCliente) {
-    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
-    
-    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-        // Armamos el texto solo si el campo observación tiene contenido
-        let textoObservacion = record.observaciones ? `CAMPO OBSERVACION: ${record.observaciones}` : "";
-        
-        // Determinamos qué evento o cambio se realizó
-        let eventoCambiado = "Actualización de estatus en expediente"; 
 
-        // Solo enviamos si hay algo relevante que reportar
-        if (record.observaciones || record.fecha_llegada || record.despacho) {
-            await notificarCambioAutomatico(
-                clienteObj.correo,
-                nombreCliente,
-                record.num_expediente || "XXXX",
-                textoObservacion ? `${eventoCambiado}\n${textoObservacion}` : eventoCambiado,
-                record.awb_bl || "XXXXX",
-                "Actualización del Día"
-            );
-        }
-    }
-}
+                // 🚀 DISPARAR UNA SOLA VEZ EL CORREO AL CLIENTE CON EL FORMATO LIMPIO
+                if (nombreCliente) {
+                    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                    
+                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                        // Detectar el evento más relevante actualizado o usar uno genérico
+                        let campoEvento = "Actualización reciente";
+                        let valorEvento = "Estatus de carga modificado";
 
-                // 🚀 DISPARAR CORREO AUTOMÁTICO DESDE LA WEB (Respetando el switch del cliente)
-if (nombreCliente) {
-    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
-    
-    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-        // Obtenemos las observaciones o el campo que tenga texto relevante
-        const detalleObservacion = record.observaciones ? record.observaciones : "Actualización de estatus en expediente";
+                        if (record.fecha_llegada) {
+                            campoEvento = "Fecha de Llegada";
+                            valorEvento = record.fecha_llegada;
+                        } else if (record.eta_la_guaira) {
+                            campoEvento = "ETA La Guaira";
+                            valorEvento = record.eta_la_guaira;
+                        } else if (record.fecha_transmision) {
+                            campoEvento = "Fecha de Transmisión";
+                            valorEvento = record.fecha_transmision;
+                        } else if (record.despacho) {
+                            campoEvento = "Fecha de Despacho";
+                            valorEvento = record.despacho;
+                        }
 
-        await notificarCambioAutomatico(
-            clienteObj.correo,
-            nombreCliente,
-            record.num_expediente || "XXXX",
-            detalleObservacion,
-            record.awb_bl || "XXXXX",
-            "Observación / Estatus general"
-        );
-    }
-}
+                        // Si hay observaciones, las formateamos limpio (sin la palabra "Observación" forzada si ya viene limpia)
+                        let textoObsLimpio = "";
+                        if (record.observaciones && record.observaciones.trim() !== "") {
+                            textoObsLimpio = record.observaciones.trim();
+                        }
+
+                        await notificarCambioAutomatico(
+    clienteObj.correo,
+    nombreCliente,
+    record.num_expediente || "XXXX",
+    "Estatus actualizado", // o el campo que cambió
+    record.awb_bl || "XXXXX",
+    "Fecha de Llegada",    // Nombre del campo que cambió (ej. ETA, Transmitido, etc.)
+    record.modo_transporte,
+    record.observaciones
+);
+                    }
+                }
+
+                closeModal();
+            } catch (err) { 
+                alert("Error al guardar: " + err.message); 
+            }
+        };
 
                 closeModal();
             } catch (err) { 
@@ -2481,7 +2487,8 @@ if (nombreCliente) {
         };
 
         // Función auxiliar para disparar la petición al servidor Node.js
-        async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible) {
+        // Función auxiliar actualizada para enviar los parámetros correctos al servidor
+        async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones) {
             try {
                 const response = await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
                     method: 'POST',
@@ -2492,13 +2499,15 @@ if (nombreCliente) {
                         numExpediente: numExpediente,
                         statusActual: statusActual,
                         bl: bl,
-                        campoLegible: campoLegible
+                        campoLegible: campoLegible,
+                        modoTransporte: modoTransporte,
+                        observaciones: observaciones
                     })
                 });
                 const resultado = await response.json();
                 console.log("Respuesta de envío automático web:", resultado);
             } catch (error) {
-                console.error("Error al disparar el correo automático desde la web:", error);
+                console.error("❌ Error al disparar el correo automático desde la web:", error);
             }
         }
 	
