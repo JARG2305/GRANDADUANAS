@@ -526,7 +526,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
 
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         
-        // Plantilla HTML estructurada con el diseño profesional
+       // Plantilla HTML estructurada con el diseño profesional y el proveedor ordenado
         let cuerpoCorreo = `
             <div style="font-family: Arial, sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px;">
                 <h2 style="color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">Actualización de Estatus - Logistatus Pro</h2>
@@ -535,6 +535,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 
                 <p>Le informamos que su expediente<br>
                 <strong>N° ${numExpediente || 'GENERAL'}</strong><br>
+                <strong>Proveedor:</strong> ${proveedor || 'S/N'}<br>
                 <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</p>
                 
                 <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px; margin: 15px 0;">
