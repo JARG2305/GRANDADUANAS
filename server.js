@@ -103,7 +103,7 @@ function generarExcelConsolidadoBuffer(expedientesData) {
 
     ws['!cols'] = [
         { wch: 11 }, { wch: 9.5 }, { wch: 24 }, { wch: 24 }, { wch: 15 },
-        { wch: 12 }, { wch: 23 }, { wch: 20 }, { wch: 25 }, { wch: 11 },
+        { wch: 12 }, { wch: 23 }, { wch: 23 }, { wch: 25 }, { wch: 11 },
         { wch: 25 }, { wch: 12 }, { wch: 21 }, { wch: 17 }, { wch: 18 },
         { wch: 22 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 },
         { wch: 24.5 }, { wch: 24 }, { wch: 18 }, { wch: 24 }, { wch: 25 },
@@ -257,7 +257,7 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
                 { wch: 15 },   // E
                 { wch: 12 },   // F
                 { wch: 23 },   // G
-                { wch: 20 },   // H
+                { wch: 23 },   // H
                 { wch: 25 },   // I
                 { wch: 11 },   // J
                 { wch: 25 },   // K
