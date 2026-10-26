@@ -300,7 +300,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO en la misma línea, bien pegados arriba -->
-                <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 4px; margin-bottom: 4px;">
+                <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 0px; margin-bottom: 0px;">
                     <tr>
                         <td style="vertical-align: middle;">
                             <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px;">Actualización de Estatus</span>
