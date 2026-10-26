@@ -299,7 +299,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
       let cuerpoCorreo = `
     <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
         
-        <!-- Encabezado con Título más grande y Logo -->
+        <!-- Encabezado con Título y Logo -->
         <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin-bottom: 6px;">
             <tr>
                 <td style="vertical-align: middle;">
@@ -315,18 +315,16 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         <!-- Saludo ultra corto -->
         <p style="margin: 2px 0 6px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
         
-        <!-- Datos del Expediente y Estatus unidos en un bloque compacto -->
-        <div style="font-size: 12px; line-height: 1.35; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
-            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} | 
-	    <strong>Proveedor:</strong> ${proveedorFinal} | 
-	    <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-            <div style="margin: 1px 0 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+        <!-- Datos del Expediente y Estatus unidos en un bloque súper compacto -->
+        <div style="font-size: 13px; line-height: 1.25; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
+            <div style="margin: 0 0 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+            <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
             <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
             ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
         </div>
 
         <!-- Pie de página reducido -->
-        <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+        <p style="margin: 4px 0 0 0; font-size: 11px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
     </div>
 `;
 
