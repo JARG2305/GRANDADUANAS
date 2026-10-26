@@ -335,13 +335,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 });
 
-        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
-        res.json(resultado);
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
+  
 app.post('/api/enviar-excel-correo', async (req, res) => {
     try {
         const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
