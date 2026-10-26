@@ -301,15 +301,15 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 
                 <!-- Título y LOGISTATUS PRO pegados absolutamente al borde superior -->
                 <div style="border-bottom: 0px solid #2563eb; padding-top: 0px; padding-bottom: 0px; margin-bottom: 3px;">
-                    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block; margin: 0;">Actualización de Estatus</span>
-                    <span style="font-size: 12px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -2.3px; line-height: 1; display: inline-block; margin: 0;">Actualización de Estatus</span>
+                    <span style="font-size: 12px; font-weight: 700; color: #64748b; margin-left: 1px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </div>
 
                 <!-- Saludo pegado arriba -->
-                <p style="margin: 0 0 0px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
+                <p style="margin: 0 0 -1px 0; font-size: 14px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
                 
                 <!-- Bloque compacto de datos -->
-                <div style="font-size: 13px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
+                <div style="font-size: 14px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
                     <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
                     <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
                     <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
