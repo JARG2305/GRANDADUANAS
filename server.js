@@ -300,13 +300,13 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 0 8px 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO pegados absolutamente al borde superior -->
-                <div style="border-bottom: 2px solid #2563eb; padding-top: 4px; padding-bottom: 3px; margin-bottom: 3px;">
-                    <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block; margin: 0;">Actualización de Estatus</span>
-                    <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                <div style="border-bottom: 0px solid #2563eb; padding-top: 0px; padding-bottom: 0px; margin-bottom: 3px;">
+                    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block; margin: 0;">Actualización de Estatus</span>
+                    <span style="font-size: 12px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </div>
 
                 <!-- Saludo pegado arriba -->
-                <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
+                <p style="margin: 0 0 0px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
                 
                 <!-- Bloque compacto de datos -->
                 <div style="font-size: 12px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
