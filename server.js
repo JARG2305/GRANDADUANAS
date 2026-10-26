@@ -296,42 +296,35 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         const proveedorFinal = proveedor || "S/N";
 
-        let cuerpoCorreo = `
-    <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 580px; margin: 0 auto; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+      let cuerpoCorreo = `
+    <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
         
-        <!-- Encabezado con Título, Subtítulo y Logo -->
-        <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-bottom: 8px;">
+        <!-- Encabezado con Título más grande y Logo -->
+        <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin-bottom: 6px;">
             <tr>
                 <td style="vertical-align: middle;">
-                    <h2 style="color: #1e3a8a; margin: 0; font-size: 16px; font-weight: 700;">Actualización de Estatus</h2>
-                    <span style="font-size: 11px; color: #64748b; font-weight: 600;">LOGISTATUS PRO</span>
+                    <h2 style="color: #1e3a8a; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;">Actualización de Estatus</h2>
+                    <span style="font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </td>
                 <td style="text-align: right; vertical-align: middle;">
-                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 38px; max-width: 130px; object-fit: contain;">` : ''}
+                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 36px; max-width: 120px; object-fit: contain;">` : ''}
                 </td>
             </tr>
         </table>
 
-        <!-- Saludo y descripción -->
-        <p style="margin: 2px 0; font-size: 12.5px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
-        <p style="margin: 2px 0 6px 0; font-size: 12.5px; color: #475569;">Le informamos la actualización reciente de su carga:</p>
+        <!-- Saludo ultra corto -->
+        <p style="margin: 2px 0 6px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
         
-        <!-- Datos del Expediente -->
-        <div style="font-size: 12.5px; line-height: 1.4; margin-bottom: 6px;">
-            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
-            <div style="margin: 1px 0;"><strong>Proveedor:</strong> ${proveedorFinal}</div>
-            <div style="margin: 1px 0;"><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-        </div>
-
-        <!-- Detalles del Estatus -->
-        <div style="font-size: 12.5px; line-height: 1.4; margin-bottom: 8px;">
-            <div style="margin: 1px 0;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+        <!-- Datos del Expediente y Estatus unidos en un bloque compacto -->
+        <div style="font-size: 12px; line-height: 1.35; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
+            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} | <strong>Proveedor:</strong> ${proveedorFinal} | <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+            <div style="margin: 3px 0 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
             <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-            ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+            ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
         </div>
 
-        <!-- Pie de página -->
-        <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+        <!-- Pie de página reducido -->
+        <p style="margin: 4px 0 0 0; font-size: 10px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
     </div>
 `;
 
