@@ -287,7 +287,7 @@ app.post('/api/forzar-correo-manual', async (req, res) => {
 });
 
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor } = req.body;
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor, logoBase64 } = req.body;
     if (!correoCliente) return res.status(400).json({ success: false, message: "El cliente no tiene correo registrado." });
 
     try {
@@ -295,42 +295,43 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         const proveedorFinal = proveedor || "S/N";
-	let logoBase64 = typeof logoGuardado !== 'undefined' ? logoGuardado : "";
+
         let cuerpoCorreo = `
-    <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 15px; border: 1px solid #cbd5e1; border-radius: 12px;">
-        
-        <!-- Encabezado con Título y Logo -->
-        <table style="width: 100%; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-bottom: 10px;">
-            <tr>
-                <td>
-                    <h2 style="color: #1e3a8a; margin: 0; font-size: 18px;">Actualización de Estatus - Logistatus Pro</h2>
-                </td>
-                <td style="text-align: right;">
-                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="max-height: 40px; max-width: 120px; object-fit: contain;">` : ''}
-                </td>
-            </tr>
-        </table>
+            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 580px; margin: 0 auto; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+                
+                <!-- Encabezado Estilizado con Logo y Título en una sola línea compacta -->
+                <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-bottom: 8px;">
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <h2 style="color: #1e3a8a; margin: 0; font-size: 16px; font-weight: 700;">Actualización de Estatus</h2>
+                            <span style="font-size: 11px; color: #64748b; font-weight: 600;">LOGISTATUS PRO</span>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 38px; max-width: 130px; object-fit: contain;">` : ''}
+                        </td>
+                    </tr>
+                </table>
 
-        <!-- Líneas con márgenes reducidos -->
-        <p style="margin: 3px 0; font-size: 13px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
-        <p style="margin: 3px 0 8px 0; font-size: 13px;">Le informamos que su expediente:</p>
-        
-        <div style="font-size: 13px; line-height: 1.4; margin-bottom: 8px;">
-            <div><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
-            <div><strong>Proveedor:</strong> ${proveedorFinal}</div>
-            <div><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-        </div>
+                <!-- Espacios mínimos entre líneas -->
+                <p style="margin: 2px 0; font-size: 12.5px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
+                <p style="margin: 2px 0 6px 0; font-size: 12.5px; color: #475569;">Le informamos la actualización reciente de su carga:</p>
+                
+                <div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 6px; background-color: #f8fafc; padding: 6px 10px; border-radius: 6px;">
+                    <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
+                    <div style="margin: 1px 0;"><strong>Proveedor:</strong> ${proveedorFinal}</div>
+                    <div style="margin: 1px 0;"><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+                </div>
 
-        <!-- Bloque de estatus compacto -->
-        <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 8px 12px; margin: 8px 0; border-radius: 4px; font-size: 13px;">
-            <div style="margin: 2px 0;"><strong>${campoLegible || 'Estatus / Evento reciente'}:</strong> ${statusActual || 'N/A'}</div>
-            <div style="margin: 2px 0;"><strong>Medio de transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-            ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0;"><strong>Observaciones:</strong> ${observaciones.trim()}</div>` : ''}
-        </div>
+                <!-- Bloque de Estatus Elegante y Compacto -->
+                <div style="background-color: #eff6ff; border-left: 3.5px solid #2563eb; padding: 6px 10px; margin: 6px 0; border-radius: 4px; font-size: 12.5px;">
+                    <div style="margin: 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+                    <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+                </div>
 
-        <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
-    </div>
-`;
+                <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+            </div>
+        `;
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
         res.json(resultado);
