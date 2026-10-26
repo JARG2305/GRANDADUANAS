@@ -300,9 +300,9 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO pegados absolutamente arriba -->
-                <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #2563eb; padding: 0; margin: 0 0 4px 0;">
+                <table style="width: 100%; border-collapse: collapse; border-bottom: 0px solid #2563eb; padding: 0; margin: 0 0 0px 0;">
                     <tr style="margin: 0; padding: 0;">
-                        <td style="vertical-align: middle; padding: 0 0 4px 0; margin: 0;">
+                        <td style="vertical-align: middle; padding: 0 0 0px 0; margin: 0;">
                             <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
                             <span style="font-size: 14px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                         </td>
@@ -322,11 +322,11 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
  		    <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
                     <div style="margin: 0px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
                     <div style="margin: 0px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Observación:</strong> ${observaciones.trim()}</div>` : ''}
                 </div>
 
                 <!-- Pie de página reducido -->
-                <p style="margin: 2px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+                <p style="margin: 2px 0 0 0; font-size: 12px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
             </div>
         `;
 
