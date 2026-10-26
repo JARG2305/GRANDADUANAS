@@ -303,8 +303,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 5px; margin-bottom: 6px;">
             <tr>
                 <td style="vertical-align: middle;">
-                    <h2 style="color: #1e3a8a; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;">Actualización de Estatus</h2>
-                    <span style="font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                    <h2 style="color: #1e3a8a; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;">Actualización de Estatus</h2><span style="font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </td>
                 <td style="text-align: right; vertical-align: middle;">
                     ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 36px; max-width: 120px; object-fit: contain;">` : ''}
@@ -317,11 +316,11 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         
         <!-- Datos del Expediente y Estatus unidos en un bloque súper compacto -->
         <div style="font-size: 13px; line-height: 1.25; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
-            <div style="margin: 0 0 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; 
-	    <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; 
+            <div style="margin: 0 0 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}  
+	    <strong>Proveedor:</strong> ${proveedorFinal}
             <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-            <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
-            <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+            <div style="margin: 0px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+            <div style="margin: 0px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
             ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
         </div>
 
