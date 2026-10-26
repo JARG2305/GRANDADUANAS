@@ -309,11 +309,11 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
                 
                 <!-- Bloque compacto de datos -->
-                <div style="font-size: 12px; line-height: 1.2; background-color: #f8fafc; padding: 4px 8px; border-radius: 6px; margin-bottom: 2px;">
+                <div style="font-size: 12px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
                     <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
                     <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
                     <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Observación:</strong> ${observaciones.trim()}</div>` : ''}
                 </div>
 
                 <!-- Pie de página reducido -->
