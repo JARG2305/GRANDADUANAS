@@ -824,19 +824,58 @@ app.post('/api/clientes', async (req, res) => {
     }
 });
 
+// ==========================================
+// RUTA PARA ENVÍO MANUAL / FORZADO DE CORREO CON EXCEL ESTILIZADO
+// ==========================================
 app.post('/api/forzar-correo-manual', async (req, res) => {
     try {
         const { destinatario, razonSocial, expedientesData } = req.body;
+        
+        if (!destinatario) {
+            return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
+        }
+
+        // Generamos el buffer exactamente con el mismo diseño del descargable
         const excelBuffer = generarExcelConsolidadoBuffer(expedientesData);
         const base64Data = excelBuffer ? excelBuffer.toString('base64') : null;
 
-        const asunto = `Reporte Consolidado de Estatus - Logistatus Pro (Manual)`;
-        const mensaje = `Estimado/a ${razonSocial},\n\nAdjunto encontrará el reporte consolidado de estatus solicitado manualmente.\n\nLogistatus Pro`;
+        const asunto = `Reporte Consolidado de Estatus - Logistatus Pro (Forzado/Manual)`;
+        const mensaje = `Estimado/a ${razonSocial || 'Cliente'},\n\nAdjunto encontrará el reporte consolidado de estatus con el diseño y formato oficial.\n\nLogistatus Pro`;
 
-        await enviarCorreoConGoogleScriptDinamico(destinatario, asunto, mensaje, expedientesData);
-        res.json({ success: true, message: "Correo manual enviado exitosamente." });
+        // Enviamos a través del conector de Google Apps Script pasando el Base64 estilizado
+        const resultado = await enviarCorreoConGoogleScriptDinamico(destinatario, asunto, mensaje, expedientesData);
+        res.json(resultado);
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
+        console.error("❌ Error en /api/forzar-correo-manual:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Ruta unificada para el botón web de Excel
+app.post('/api/enviar-excel-correo', async (req, res) => {
+    try {
+        const { destinatario, asunto, mensaje, expedientesData } = req.body;
+        
+        if (!destinatario) {
+            return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
+        }
+
+        // Si la petición web no trae el buffer hecho, lo generamos aquí con la función centralizada
+        const expedientes = expedientesData && expedientesData.length > 0 ? expedientesData : await obtenerExpedientesFirestore();
+        const excelBuffer = generarExcelConsolidadoBuffer(expedientes);
+        const base64Data = excelBuffer ? excelBuffer.toString('base64') : null;
+
+        const resultado = await enviarCorreoConGoogleScriptDinamico(
+            destinatario, 
+            asunto || "Reporte Consolidado - Logistatus Pro", 
+            mensaje || "Adjunto el reporte consolidado de expedientes.", 
+            expedientes
+        );
+
+        res.json(resultado);
+    } catch (error) {
+        console.error("❌ Error en /api/enviar-excel-correo:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -874,43 +913,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
     }
 });
 
-app.post('/api/enviar-excel-correo', async (req, res) => {
-    try {
-        const { destinatario, asunto, mensaje, excelBase64, nombreArchivo } = req.body;
-        if (!destinatario) return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
 
-        const urlAppsScript = process.env.googleScriptUrl;
-        if (!urlAppsScript) {
-            console.error("❌ ERROR: La variable googleScriptUrl no está definida en Render.");
-            return res.status(500).json({ success: false, message: "Falta configurar googleScriptUrl en Render." });
-        }
-
-        const response = await fetch(urlAppsScript, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                destinatario, 
-                asunto, 
-                mensaje, 
-                excelBase64: excelBase64 || null, 
-                nombreArchivo: nombreArchivo || "Reporte_Logistatus.xlsx" 
-            })
-        });
-
-        const textoRespuesta = await response.text();
-        let resultado;
-        try {
-            resultado = JSON.parse(textoRespuesta);
-        } catch (e) {
-            return res.status(500).json({ success: false, message: "Google Apps Script devolvió HTML o texto plano en vez de JSON." });
-        }
-
-        res.json(resultado);
-    } catch (error) {
-        console.error("❌ [DEBUG CORREO CRÍTICO] Excepción capturada:", error);
-        res.status(500).json({ success: false, message: "Error interno en servidor Node.js: " + error.message });
-    }
-});
 
 app.post('/api/alertas/forzar', async (req, res) => {
     try {
