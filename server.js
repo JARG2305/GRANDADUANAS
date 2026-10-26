@@ -300,9 +300,9 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO pegados al borde superior sin tabla de logo -->
-                <div style="border-bottom: 2px solid #2563eb; padding-bottom: 3px; margin-bottom: 3px;">
-                    <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
-                    <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                <div style="border-bottom: 1px solid #2563eb; padding-bottom: 1px; margin-bottom: 1px;">
+                    <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
+                    <span style="font-size: 14px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </div>
 
                 <!-- Saludo pegado arriba -->
