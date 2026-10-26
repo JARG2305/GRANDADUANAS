@@ -297,7 +297,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const proveedorFinal = proveedor || "S/N";
 
         let cuerpoCorreo = `
-            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 1px 1px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO pegados al borde superior sin tabla de logo -->
                 <div style="border-bottom: 1px solid #2563eb; padding-bottom: 1px; margin-bottom: 1px;">
