@@ -303,8 +303,8 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 4px; margin-bottom: 4px;">
                     <tr>
                         <td style="vertical-align: middle;">
-                            <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px;">Actualización de Estatus</span>
-                            <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                            <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px;">Actualización de Estatus</span>
+                            <span style="font-size: 14px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                         </td>
                         <td style="text-align: right; vertical-align: middle;">
                             ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 32px; max-width: 110px; object-fit: contain;">` : ''}
@@ -317,14 +317,16 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 
                 <!-- Bloque de expediente, estatus y transporte sin espacios dobles -->
                 <div style="font-size: 12.5px; line-height: 1.2; background-color: #f8fafc; padding: 5px 8px; border-radius: 6px; margin-bottom: 4px;">
-                    <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-                    <div style="margin: 0px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
-                    <div style="margin: 0px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+                    <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} 
+		    <strong>Proveedor:</strong> ${proveedorFinal}
+		    <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+                    <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+                    <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Observación:</strong> ${observaciones.trim()}</div>` : ''}
                 </div>
 
                 <!-- Pie de página reducido -->
-                <p style="margin: 3px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+                <p style="margin: 3px 0 0 0; font-size: 12px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
             </div>
         `;
 
