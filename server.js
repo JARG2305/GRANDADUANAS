@@ -317,8 +317,10 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         
         <!-- Datos del Expediente y Estatus unidos en un bloque compacto -->
         <div style="font-size: 12px; line-height: 1.35; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
-            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} | <strong>Proveedor:</strong> ${proveedorFinal} | <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-            <div style="margin: 3px 0 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} | 
+	    <strong>Proveedor:</strong> ${proveedorFinal} | 
+	    <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+            <div style="margin: 1px 0 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
             <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
             ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
         </div>
