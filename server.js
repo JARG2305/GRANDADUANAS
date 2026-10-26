@@ -287,7 +287,7 @@ app.post('/api/forzar-correo-manual', async (req, res) => {
 });
 
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor, logoBase64 } = req.body;
+    const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor } = req.body;
     if (!correoCliente) return res.status(400).json({ success: false, message: "El cliente no tiene correo registrado." });
 
     try {
@@ -299,18 +299,11 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         let cuerpoCorreo = `
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
-                <!-- Título y LOGISTATUS PRO pegados al borde superior -->
-                <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #2563eb; padding: 0; margin: 0 0 2px 0;">
-                    <tr style="margin: 0; padding: 0;">
-                        <td style="vertical-align: middle; padding: 0 0 2px 0; margin: 0;">
-                            <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
-                            <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
-                        </td>
-                        <td style="text-align: right; vertical-align: middle; padding: 0 0 2px 0; margin: 0;">
-                            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 32px; max-width: 110px; object-fit: contain; display: block; margin-left: auto;">` : ''}
-                        </td>
-                    </tr>
-                </table>
+                <!-- Título y LOGISTATUS PRO pegados al borde superior sin tabla de logo -->
+                <div style="border-bottom: 2px solid #2563eb; padding-bottom: 3px; margin-bottom: 3px;">
+                    <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                </div>
 
                 <!-- Saludo pegado arriba -->
                 <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
