@@ -303,8 +303,8 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #2563eb; padding: 0; margin: 0 0 4px 0;">
                     <tr style="margin: 0; padding: 0;">
                         <td style="vertical-align: middle; padding: 0 0 4px 0; margin: 0;">
-                            <span style="font-size: 17px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
-                            <span style="font-size: 11px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
+                            <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.3px; line-height: 1; display: inline-block;">Actualización de Estatus</span>
+                            <span style="font-size: 14px; font-weight: 700; color: #64748b; margin-left: 6px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                         </td>
                         <td style="text-align: right; vertical-align: middle; padding: 0 0 4px 0; margin: 0;">
                             ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 32px; max-width: 110px; object-fit: contain; display: block; margin-left: auto;">` : ''}
@@ -313,11 +313,13 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 </table>
 
                 <!-- Saludo desplazado hacia arriba -->
-                <p style="margin: 1px 0 3px 0; font-size: 18px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
+                <p style="margin: 1px 0 1px 0; font-size: 14px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
                 
                 <!-- Bloque de expediente, estatus y transporte sin espacios dobles -->
                 <div style="font-size: 12.5px; line-height: 1.2; background-color: #f8fafc; padding: 5px 8px; border-radius: 6px; margin-bottom: 4px;">
-                    <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+                    <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} 
+		    <strong>Proveedor:</strong> ${proveedorFinal} 
+ 		    <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
                     <div style="margin: 0px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
                     <div style="margin: 0px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
                     ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
