@@ -297,41 +297,43 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const proveedorFinal = proveedor || "S/N";
 
         let cuerpoCorreo = `
-            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 580px; margin: 0 auto; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
-                
-                <!-- Encabezado Estilizado con Logo y Título en una sola línea compacta -->
-                <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-bottom: 8px;">
-                    <tr>
-                        <td style="vertical-align: middle;">
-                            <h2 style="color: #1e3a8a; margin: 0; font-size: 16px; font-weight: 700;">Actualización de Estatus</h2>
-                            <span style="font-size: 11px; color: #64748b; font-weight: 600;">LOGISTATUS PRO</span>
-                        </td>
-                        <td style="text-align: right; vertical-align: middle;">
-                            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 38px; max-width: 130px; object-fit: contain;">` : ''}
-                        </td>
-                    </tr>
-                </table>
+    <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 580px; margin: 0 auto; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        
+        <!-- Encabezado con Título, Subtítulo y Logo -->
+        <table style="width: 100%; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-bottom: 8px;">
+            <tr>
+                <td style="vertical-align: middle;">
+                    <h2 style="color: #1e3a8a; margin: 0; font-size: 16px; font-weight: 700;">Actualización de Estatus</h2>
+                    <span style="font-size: 11px; color: #64748b; font-weight: 600;">LOGISTATUS PRO</span>
+                </td>
+                <td style="text-align: right; vertical-align: middle;">
+                    ${logoBase64 ? `<img src="${logoBase64}" alt="Logo Cliente" style="max-height: 38px; max-width: 130px; object-fit: contain;">` : ''}
+                </td>
+            </tr>
+        </table>
 
-                <!-- Espacios mínimos entre líneas -->
-                <p style="margin: 2px 0; font-size: 12.5px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
-                <p style="margin: 2px 0 6px 0; font-size: 12.5px; color: #475569;">Le informamos la actualización reciente de su carga:</p>
-                
-                <div style="font-size: 12.5px; line-height: 1.35; margin-bottom: 6px; background-color: #f8fafc; padding: 6px 10px; border-radius: 6px;">
-                    <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
-                    <div style="margin: 1px 0;"><strong>Proveedor:</strong> ${proveedorFinal}</div>
-                    <div style="margin: 1px 0;"><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-                </div>
+        <!-- Saludo y descripción -->
+        <p style="margin: 2px 0; font-size: 12.5px;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>,</p>
+        <p style="margin: 2px 0 6px 0; font-size: 12.5px; color: #475569;">Le informamos la actualización reciente de su carga:</p>
+        
+        <!-- Datos del Expediente -->
+        <div style="font-size: 12.5px; line-height: 1.4; margin-bottom: 6px;">
+            <div style="margin: 1px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'}</div>
+            <div style="margin: 1px 0;"><strong>Proveedor:</strong> ${proveedorFinal}</div>
+            <div style="margin: 1px 0;"><strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+        </div>
 
-                <!-- Bloque de Estatus Elegante y Compacto -->
-                <div style="background-color: #eff6ff; border-left: 3.5px solid #2563eb; padding: 6px 10px; margin: 6px 0; border-radius: 4px; font-size: 12.5px;">
-                    <div style="margin: 1px 0; color: #1e3a8a;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
-                    <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
-                </div>
+        <!-- Detalles del Estatus -->
+        <div style="font-size: 12.5px; line-height: 1.4; margin-bottom: 8px;">
+            <div style="margin: 1px 0;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+            <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+            ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
+        </div>
 
-                <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
-            </div>
-        `;
+        <!-- Pie de página -->
+        <p style="margin: 8px 0 0 0; font-size: 10.5px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+    </div>
+`;
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, []);
         res.json(resultado);
