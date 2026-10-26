@@ -296,7 +296,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         const proveedorFinal = proveedor || "S/N";
 
-        et cuerpoCorreo = `
+        let cuerpoCorreo = `
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 540px; margin: 0 auto; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
                 
                 <!-- Título y LOGISTATUS PRO pegados absolutamente arriba -->
