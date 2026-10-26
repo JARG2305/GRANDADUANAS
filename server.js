@@ -317,7 +317,9 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         
         <!-- Datos del Expediente y Estatus unidos en un bloque súper compacto -->
         <div style="font-size: 13px; line-height: 1.25; background-color: #f8fafc; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px;">
-            <div style="margin: 0 0 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+            <div style="margin: 0 0 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; 
+	    <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; 
+            <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
             <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
             <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
             ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Obs:</strong> ${observaciones.trim()}</div>` : ''}
