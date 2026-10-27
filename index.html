@@ -1588,8 +1588,7 @@
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
-        };
-
+       
             try {
                 if (idVal) {
                     await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
