@@ -239,6 +239,9 @@ function generarExcelClienteBuffer(expedientesData) {
 // ==========================================
 // 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
 // ==========================================
+// ==========================================
+// 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
+// ==========================================
 async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, mensajeCorreo, expedientesData = []) {
     try {
         const urlAppsScript = process.env.googleScriptUrl;
@@ -250,10 +253,18 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
         let archivoExcelBase64 = null;
         let nombreArchivo = "Reporte_Expedientes_Logistatus.xlsx";
 
-        if (expedientesData && expedientesData.length > 0) {
-            const excelBuffer = generarExcelConsolidadoBuffer(expedientesData);
-            if (excelBuffer) {
-                archivoExcelBase64 = excelBuffer.toString('base64');
+        if (expedientesData) {
+            // Si ya es un búfer (como el Excel de 18 columnas del cliente), lo usamos directo
+            if (Buffer.isBuffer(expedientesData)) {
+                archivoExcelBase64 = expedientesData.toString('base64');
+                nombreArchivo = "Reporte_Cliente_Logistatus.xlsx";
+            } 
+            // Si es un arreglo de registros, generamos el consolidado maestro
+            else if (Array.isArray(expedientesData) && expedientesData.length > 0) {
+                const excelBuffer = generarExcelConsolidadoBuffer(expedientesData);
+                if (excelBuffer) {
+                    archivoExcelBase64 = excelBuffer.toString('base64');
+                }
             }
         }
 
