@@ -1743,16 +1743,26 @@
             });
         }
 
-        window.enviarExcelPorCorreo = async function() {
-            let correoGuardado = localStorage.getItem('ultimo_correo_destinatario') || "importacionesepga@gmail.com";
-            let destinatario = prompt("Ingresa el correo electrónico del destinatario:", correoGuardado);
+       window.enviarExcelPorCorreo = async function() {
+            let correosPorDefecto = "valoracionjr@gmail.com"; // Respaldo por defecto
             
-            if (!destinatario || !destinatario.includes("@")) {
-                alert("Operación cancelada o correo inválido.");
-                return;
+            try {
+                // Consultamos directamente los correos internos guardados en Firebase para precargarlos en la ventana
+                const configRef = doc(db, CONFIG_COLLECTION, "config_internos");
+                const configSnap = await getDoc(configRef);
+                if (configSnap.exists() && configSnap.data().correosInternos) {
+                    correosPorDefecto = configSnap.data().correosInternos;
+                }
+            } catch (err) {
+                console.error("Error al obtener los correos internos de Firebase:", err);
             }
 
-            localStorage.setItem('ultimo_correo_destinatario', destinatario.trim());
+            // Ventana emergente con los correos internos listos para usar o editar
+            let destinatario = prompt("Correos destinatarios para este envío (puedes conservar los internos o escribir uno nuevo):", correosPorDefecto);
+            
+            if (!destinatario) {
+                return; // Si cancelas, no se hace nada
+            }
 
             try {
                 let excelBase64 = window.generarExcelBase64ParaCorreo();
@@ -1767,7 +1777,7 @@
                     body: JSON.stringify({
                         destinatario: destinatario.trim(),
                         asunto: "📊 Reporte Oficial Consolidado de Exps - Logistatus Pro",
-                        mensaje: "Adjunto encontrarás el reporte consolidado de operaciones.",
+                        mensaje: "Adjunto encontrará el reporte consolidado de operaciones.",
                         excelBase64: excelBase64,
                         nombreArchivo: "Reporte_Logistatus.xlsx"
                     })
@@ -1775,7 +1785,7 @@
 
                 let resultado = await response.json();
                 if (response.ok && resultado.success) {
-                    alert("✅ ¡Reporte enviado exitosamente por correo!");
+                    alert("✅ ¡Reporte unificado enviado exitosamente!");
                 } else {
                     alert("❌ Error al enviar el correo: " + (resultado.message || "Error desconocido"));
                 }
