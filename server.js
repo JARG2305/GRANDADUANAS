@@ -1019,12 +1019,16 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         // Obtenemos los expedientes generales de Firestore para filtrar los de este cliente y adjuntar su Excel correspondiente
         const todosLosExpedientes = await obtenerExpedientesFirestore();
         const expedientesCliente = todosLosExpedientes.filter(e => 
-    String(e.cliente || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase() ||
-    String(e.num_expediente || "").trim() === String(numExpediente || "").trim()
-);
+            String(e.cliente || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase() ||
+            String(e.num_expediente || "").trim() === String(numExpediente || "").trim()
+        );
 
-        // Llamamos al conector pasando el arreglo de expedientes para que se adjunte el archivo Excel
-        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, expedientesCliente.length > 0 ? expedientesCliente : todosLosExpedientes);
+        // Generamos el Excel exclusivo para el cliente con las 18 columnas
+        const datosParaCliente = expedientesCliente.length > 0 ? expedientesCliente : todosLosExpedientes;
+        const excelBufferCliente = generarExcelClienteBuffer(datosParaCliente);
+
+        // Enviamos usando el conector de búfer personalizado
+        const resultado = await enviarCorreoConGoogleScriptPersonalizado(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
