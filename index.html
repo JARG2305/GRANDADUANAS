@@ -1530,7 +1530,7 @@
             const navieraEl = document.getElementById("naviera");
             if (navieraEl) navieraEl.value = lineaVal;
         };
-window.saveExp = async function(e) {
+	window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
             const record = {};
@@ -1539,58 +1539,64 @@ window.saveExp = async function(e) {
             const nombreCliente = record.cliente;
 
             try {
+                // 1. Guardamos o actualizamos en Firestore primero
                 if (idVal) {
                     await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
                 } else {
                     await addDoc(collection(db, COLLECTION_NAME), record);
                 }
 
-                if (nombreCliente) {
-                    const clienteObj = cacheClientes.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
-                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-                        let campoEvento = "Actualización reciente";
-                        let valorEvento = "Estatus de carga modificado";
+                // 2. Intentamos enviar el correo de manera independiente para que no bloquee si falla
+                if (nombreCliente && typeof cacheClientes !== 'undefined') {
+                    try {
+                        const clienteObj = cacheClientes.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
+                        if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                            let campoEvento = "Actualización reciente";
+                            let valorEvento = "Estatus de carga modificado";
 
-                        if (record.fecha_llegada) {
-                            campoEvento = "Fecha de Llegada";
-                            valorEvento = record.fecha_llegada;
-                        } else if (record.eta_la_guaira) {
-                            campoEvento = "ETA La Guaira";
-                            valorEvento = record.eta_la_guaira;
-                        } else if (record.fecha_transmision) {
-                            campoEvento = "Fecha de Transmisión";
-                            valorEvento = record.fecha_transmision;
-                        } else if (record.reconocimiento) {
-                            campoEvento = "Fecha de Reconocimiento";
-                            valorEvento = record.reconocimiento;
-                        } else if (record.despacho) {
-                            campoEvento = "Fecha de Despacho";
-                            valorEvento = record.despacho;
+                            if (record.fecha_llegada) {
+                                campoEvento = "Fecha de Llegada";
+                                valorEvento = record.fecha_llegada;
+                            } else if (record.eta_la_guaira) {
+                                campoEvento = "ETA La Guaira";
+                                valorEvento = record.eta_la_guaira;
+                            } else if (record.fecha_transmision) {
+                                campoEvento = "Fecha de Transmisión";
+                                valorEvento = record.fecha_transmision;
+                            } else if (record.reconocimiento) {
+                                campoEvento = "Fecha de Reconocimiento";
+                                valorEvento = record.reconocimiento;
+                            } else if (record.despacho) {
+                                campoEvento = "Fecha de Despacho";
+                                valorEvento = record.despacho;
+                            }
+
+                            let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
+
+                            await notificarCambioAutomatico(
+                                clienteObj.correo,
+                                nombreCliente,
+                                record.num_expediente || "XXXX",
+                                valorEvento,
+                                record.awb_bl || "XXXXX",
+                                campoEvento,
+                                record.modo_transporte || "Marítimo",
+                                textoObsLimpio
+                            );
                         }
-
-                        let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
-
-                        await notificarCambioAutomatico(
-                            clienteObj.correo,
-                            nombreCliente,
-                            record.num_expediente || "XXXX",
-                            valorEvento,
-                            record.awb_bl || "XXXXX",
-                            campoEvento,
-                            record.modo_transporte || "Marítimo",
-                            textoObsLimpio
-                        );
+                    } catch (correoErr) {
+                        console.warn("⚠️ No se pudo enviar el correo automático, pero el expediente se guardó con éxito:", correoErr);
                     }
                 }
 
-                // Cierre inmediato y limpieza del modal
+                // 3. Cerramos el modal y reseteamos el formulario obligatoriamente
                 const modal = document.getElementById("expModal");
                 if (modal) modal.classList.add("hidden");
                 const form = document.getElementById("expForm");
                 if (form) form.reset();
 
             } catch (err) { 
-                console.error("Error al guardar expediente:", err);
+                console.error("Error crítico al guardar:", err);
                 alert("Error al guardar: " + err.message); 
             }
         };
