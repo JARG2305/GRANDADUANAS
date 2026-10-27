@@ -849,7 +849,7 @@ async function procesarComandoLogistica(textoMensaje) {
         });
 
         if (patchRes.ok) {
-            // 🚀 DISPARAMOS EL CORREO AUTOMÁTICO DESDE EL BOT SÓLO SI NO ES BORRADO Y HAY UN VALOR VÁLIDO
+            // 🚀 DISPARO DE CORREO SÓLO SI NO ES BORRADO Y HAY UN VALOR VÁLIDO
             if (!esBorrar && valorNuevo && String(valorNuevo).trim() !== "") {
                 try {
                     const nombreCliente = expedienteEncontrado.cliente;
@@ -902,6 +902,7 @@ async function procesarComandoLogistica(textoMensaje) {
         }
 
     return null;
+};
 }
 
 // ==========================================
@@ -1277,19 +1278,6 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
-// 1. CRON para Alertas Multicanal (9, 12, 15, 18, 19, 20 horas)
-cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
-    try {
-        console.log("⏰ [CRON MULTICANAL] Ejecutando reporte automático de alertas...");
-        const alertasGeneradas = await generarListaAlertasSistema();
-        if (alertasGeneradas && alertasGeneradas.length > 0) {
-            await enviarAlertaMulticanal(alertasGeneradas, "REPORTE AUTOMÁTICO PROGRAMADO");
-        }
-    } catch (error) {
-        console.error("❌ [CRON MULTICANAL] Error en reporte automático:", error);
-    }
-}, { timezone: "America/Caracas" });
-
 // CRON EXCLUSIVO PARA REPORTE GLOBAL INTERNO (10:00 AM y 6:00 PM)
 cron.schedule('0 10,18 * * *', async () => {
     try {
@@ -1305,7 +1293,7 @@ cron.schedule('0 10,18 * * *', async () => {
             console.log("✅ [CORREO INTERNO] Reporte global unificado enviado con éxito al equipo.");
         }
     } catch (error) {
-        console.error("❌ [CORREO INTERNOS] Error:", error);
+        console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
     }
 }, { timezone: "America/Caracas" });
 
