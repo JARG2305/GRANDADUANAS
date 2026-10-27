@@ -849,6 +849,39 @@ async function procesarComandoLogistica(textoMensaje) {
         });
 
         if (patchRes.ok) {
+            // 🚀 DISPARAMOS EL CORREO AUTOMÁTICO AL CLIENTE DESDE EL BOT
+            try {
+                const nombreCliente = expedienteEncontrado.cliente;
+                if (nombreCliente) {
+                    const clientesCache = await obtenerClientesFirestore();
+                    const clienteObj = clientesCache.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
+                    
+                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                        let textoObsLimpio = f.observaciones?.stringValue || "";
+                        let proveedorPlano = f.proveedor?.stringValue || "S/N";
+
+                        await fetch(`http://localhost:${PORT}/api/enviar-correo-cliente`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                correoCliente: clienteObj.correo,
+                                nombreCliente: nombreCliente,
+                                numExpediente: expedienteEncontrado.numExpediente || "XXXX",
+                                statusActual: `${nombreCampoLegible}: ${valorNuevo}`,
+                                bl: expedienteEncontrado.bl || "XXXXX",
+                                campoLegible: nombreCampoLegible,
+                                modoTransporte: f.modo_transporte?.stringValue || "Marítimo",
+                                observaciones: textoObsLimpio,
+                                proveedor: proveedorPlano
+                            })
+                        });
+                        console.log("✅ Correo automático disparado desde Telegram/WhatsApp exitosamente.");
+                    }
+                }
+            } catch (errCorreo) {
+                console.error("⚠️ Error al disparar el correo desde el bot:", errCorreo);
+            }
+
             if (esBorrar) {
                 return `🗑️ *¡CAMPO ELIMINADO CON ÉXITO!* ⚠️\n\n📂 Exp: *${expedienteEncontrado.numExpediente}*\n👤 Cliente: *${expedienteEncontrado.cliente}*\n📦 B/L: *${expedienteEncontrado.bl}*\n⚙️ Campo: *${nombreCampoLegible}* (Ha quedado vacío).`;
             } else if (esIndicadorSiNo) {
@@ -863,7 +896,6 @@ async function procesarComandoLogistica(textoMensaje) {
         } else {
             return `❌ Error al actualizar en Firestore.`;
         }
-    }
 
     return null;
 }
