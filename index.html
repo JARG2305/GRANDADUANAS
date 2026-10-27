@@ -1584,54 +1584,12 @@
                     }
                 }
 
-                window.closeModal();
-            } catch (err) { 
-                alert("Error al guardar: " + err.message); 
-            }
-              
-            try {
-                if (idVal) {
-                    await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
-                } else {
-                    await addDoc(collection(db, COLLECTION_NAME), record);
-                }
+                // ⬇️ FORZAMOS EL CIERRE DIRECTO DEL MODAL Y EL RESETEO DEL FORMULARIO ⬇️
+                const modal = document.getElementById("expModal");
+                if (modal) modal.classList.add("hidden");
+                const form = document.getElementById("expForm");
+                if (form) form.reset();
 
-                if (nombreCliente) {
-                    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
-                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-                        let campoEvento = "Actualización reciente";
-                        let valorEvento = "Estatus de carga modificado";
-
-                        if (record.fecha_llegada) {
-                            campoEvento = "Fecha de Llegada";
-                            valorEvento = record.fecha_llegada;
-                        } else if (record.eta_la_guaira) {
-                            campoEvento = "ETA La Guaira";
-                            valorEvento = record.eta_la_guaira;
-                        } else if (record.fecha_transmision) {
-                            campoEvento = "Fecha de Transmisión";
-                            valorEvento = record.fecha_transmision;
-                        } else if (record.despacho) {
-                            campoEvento = "Fecha de Despacho";
-                            valorEvento = record.despacho;
-                        }
-
-                        let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
-
-                        await notificarCambioAutomatico(
-                            clienteObj.correo,
-                            nombreCliente,
-                            record.num_expediente || "XXXX",
-                            valorEvento,
-                            record.awb_bl || "XXXXX",
-                            campoEvento,
-                            record.modo_transporte || "Marítimo",
-                            textoObsLimpio
-                        );
-                    }
-                }
-
-                window.closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
