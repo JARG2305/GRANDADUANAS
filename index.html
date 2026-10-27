@@ -2218,11 +2218,10 @@ function prepararYEnviarCorreoExcel(destinatario, asunto, mensaje) {
 // FUNCIONES DE VALIDACIÓN DE SECUENCIA EN FRONTEND
 // ==========================================
 
-window.validarSecuenciaCampos = function(inputElement, campoDestino, expedienteId) {
-    // Lógica para validar que los campos previos tengan fecha/datos antes de permitir editar el actual
-    const valor = inputElement.value;
-    console.log(`Validando campo ${campoDestino} para el expediente ${expedienteId} con valor: ${valor}`);
-    // Aquí puedes agregar tu lógica de validación visual o de llamadas AJAX si lo requieres
+window.validarSecuenciaCampos = function(inputElement) {
+    if (!inputElement) return;
+    const valor = inputElement.value || "";
+    console.log(`Validando campo con valor: ${valor}`);
 };
 
 window.sincronizarActaAlmacen = function(inputElement, expedienteId) {
