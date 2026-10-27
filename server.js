@@ -1028,7 +1028,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const excelBufferCliente = generarExcelClienteBuffer(datosParaCliente);
 
         // Enviamos usando el conector de búfer personalizado
-        const resultado = await enviarCorreoConGoogleScriptPersonalizado(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
+	const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
