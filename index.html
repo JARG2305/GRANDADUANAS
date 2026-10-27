@@ -1587,9 +1587,11 @@
                 // ⬇️ FORZAMOS EL CIERRE DIRECTO DEL MODAL Y EL RESETEO DEL FORMULARIO ⬇️
                 const modal = document.getElementById("expModal");
                 if (modal) modal.classList.add("hidden");
+                
                 const form = document.getElementById("expForm");
                 if (form) form.reset();
 
+                window.closeModal();
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
