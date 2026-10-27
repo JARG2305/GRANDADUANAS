@@ -1553,51 +1553,53 @@
                 const form = document.getElementById("expForm");
                 if (form) form.reset();
 
-                // 3. Disparamos el correo en segundo plano SIN bloquear la interfaz
+               // 3. Disparamos el correo en segundo plano SÓLO SI hay un evento/valor válido y no está vacío
                 if (nombreCliente && typeof cacheClientes !== 'undefined') {
                     const clienteObj = cacheClientes.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
                     if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-                        let campoEvento = "Actualización reciente";
-                        let valorEvento = "Estatus de carga modificado";
+                        let campoEvento = "";
+                        let valorEvento = "";
 
-                        if (record.fecha_llegada) {
+                        // Verificamos estrictamente qué campo tiene contenido real
+                        if (record.fecha_llegada && record.fecha_llegada.trim() !== "") {
                             campoEvento = "Fecha de Llegada";
                             valorEvento = record.fecha_llegada;
-                        } else if (record.eta_la_guaira) {
+                        } else if (record.eta_la_guaira && record.eta_la_guaira.trim() !== "") {
                             campoEvento = "ETA La Guaira";
                             valorEvento = record.eta_la_guaira;
-                        } else if (record.fecha_transmision) {
+                        } else if (record.fecha_transmision && record.fecha_transmision.trim() !== "") {
                             campoEvento = "Fecha de Transmisión";
                             valorEvento = record.fecha_transmision;
-                        } else if (record.reconocimiento) {
+                        } else if (record.reconocimiento && record.reconocimiento.trim() !== "") {
                             campoEvento = "Fecha de Reconocimiento";
                             valorEvento = record.reconocimiento;
-                        } else if (record.despacho) {
+                        } else if (record.despacho && record.despacho.trim() !== "") {
                             campoEvento = "Fecha de Despacho";
                             valorEvento = record.despacho;
                         }
 
-                        let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
-                        let proveedorInputPlano = document.getElementById("proveedor")?.value.trim() || record.proveedor || "S/N";
+                        // 🛑 VALIDACIÓN CLAVE: Si se detectó una fecha con contenido real, enviamos el correo. Si se borró o está vacía, no se envía nada.
+                        if (campoEvento !== "" && valorEvento !== "") {
+                            let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
+                            let proveedorInputPlano = document.getElementById("proveedor")?.value.trim() || record.proveedor || "S/N";
 
-                        // Notificación en segundo plano con el proveedor correcto
-                        notificarCambioAutomatico(
-                            clienteObj.correo,
-                            nombreCliente,
-                            record.num_expediente || "XXXX",
-                            valorEvento,
-                            record.awb_bl || "XXXXX",
-                            campoEvento,
-                            record.modo_transporte || "Marítimo",
-                            textoObsLimpio,
-                            proveedorInputPlano // <--- Pasamos el proveedor plano aquí
-                        ).catch(err => console.warn("Error en segundo plano con el correo:", err));
-
-                        
+                            // Notificación en segundo plano con el proveedor correcto
+                            notificarCambioAutomatico(
+                                clienteObj.correo,
+                                nombreCliente,
+                                record.num_expediente || "XXXX",
+                                valorEvento,
+                                record.awb_bl || "XXXXX",
+                                campoEvento,
+                                record.modo_transporte || "Marítimo",
+                                textoObsLimpio,
+                                proveedorInputPlano // <--- Pasamos el proveedor plano aquí
+                            ).catch(err => console.warn("Error en segundo plano con el correo:", err));
+                        } else {
+                            console.log("ℹ️ No se dispara correo porque la fecha o campo clave fue borrado o se dejó en blanco.");
+                        }
                     }
-                }
-
-            } catch (err) { 
+                }            } catch (err) { 
                 console.error("Error crítico al guardar:", err);
                 alert("Error al guardar: " + err.message); 
             }
