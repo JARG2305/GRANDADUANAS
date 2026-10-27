@@ -1425,6 +1425,9 @@
                 return;
             }
 
+            const hoy = new Date();
+            hoy.setHours(0,0,0,0);
+
             activeData.forEach((rec, index) => {
                 const tr = document.createElement("tr");
                 const isDespachado = Boolean(rec.despacho);
@@ -1441,12 +1444,35 @@
                 let remainingFields = fieldsList.filter(f => !["modo_transporte", "num_expediente", "cliente"].includes(f));
                 let htmlFields = remainingFields.map(field => {
                     let val = rec[field] || '';
+                    
+                    // Formato numérico para el peso
                     if (field === 'peso_bl' && val !== '') {
                         val = Number(val).toFixed(2);
-                    } else if (camposFechas.includes(field) && val) {
+                    } 
+                    // Formato de fechas normal
+                    else if (camposFechas.includes(field) && val && field !== 'vencimiento_dai') {
                         val = formatearFechaDDMMYYYY(val);
+                    } 
+                    // 📌 LÓGICA VISUAL DE LA DAI Y SU VIGENCIA EN LA TABLA WEB
+                    else if (field === 'vencimiento_dai') {
+                        let fechaDaiReg = rec.fecha_registro_dai ? formatearFechaDDMMYYYY(rec.fecha_registro_dai) : "";
+                        if (fechaDaiReg) {
+                            let dVenc = parseFechaLocal(rec.vencimiento_dai);
+                            if (dVenc) {
+                                if (dVenc < hoy) {
+                                    val = `<span class="px-2 py-0.5 bg-red-100 text-red-700 font-bold rounded" title="DAI Registrada el ${fechaDaiReg} - Vencida">⚠️ ${formatearFechaDDMMYYYY(rec.vencimiento_dai)} (Vencida)</span>`;
+                                } else {
+                                    val = `<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded" title="DAI Registrada el ${fechaDaiReg} - Vigente">✅ ${formatearFechaDDMMYYYY(rec.vencimiento_dai)} (Vigente)</span>`;
+                                }
+                            } else {
+                                val = formatearFechaDDMMYYYY(rec.vencimiento_dai);
+                            }
+                        } else {
+                            val = `<span class="px-2 py-0.5 bg-amber-100 text-amber-800 font-bold rounded">⚠️ FALTA DAI</span>`;
+                        }
                     }
-                    return `<td class="p-3 border-r border-slate-200 snap-col" title="${val}">${val}</td>`;
+
+                    return `<td class="p-3 border-r border-slate-200 snap-col" title="${typeof val === 'string' ? val.replace(/<[^>]*>?/gm, '') : val}">${val}</td>`;
                 }).join('');
 
                 tr.innerHTML = htmlActions + htmlTracking + htmlModo + htmlExp + htmlCli + htmlFields;
