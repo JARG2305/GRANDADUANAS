@@ -1168,10 +1168,6 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
-// ==========================================
-// TAREAS PROGRAMADAS (CRON)
-// ==========================================
-
 // 1. CRON para Alertas Multicanal (9, 12, 15, 18, 19, 20 horas)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
@@ -1204,8 +1200,6 @@ cron.schedule('0 10,18 * * *', async () => {
             console.log("✅ [CORREO INTERNO] Reporte global enviado con éxito.");
         }
 
-       
-}, { timezone: "America/Caracas" });
 // B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
         for (const cliente of clientesActivos) {
             const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
@@ -1228,6 +1222,13 @@ cron.schedule('0 10,18 * * *', async () => {
                 enviadosCount++;
             }
         }
+	console.log(`✅ [CRON CLIENTES] Reportes individuales enviados a ${enviadosCount} clientes.`);
+
+    } catch (error) {
+
+        console.error("❌ [CRON CORREOS EXCEL] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });
