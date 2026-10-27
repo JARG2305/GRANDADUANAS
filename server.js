@@ -849,37 +849,41 @@ async function procesarComandoLogistica(textoMensaje) {
         });
 
         if (patchRes.ok) {
-            // 🚀 DISPARAMOS EL CORREO AUTOMÁTICO AL CLIENTE DESDE EL BOT
-            try {
-                const nombreCliente = expedienteEncontrado.cliente;
-                if (nombreCliente) {
-                    const clientesCache = await obtenerClientesFirestore();
-                    const clienteObj = clientesCache.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
-                    
-                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
-                        let textoObsLimpio = f.observaciones?.stringValue || "";
-                        let proveedorPlano = f.proveedor?.stringValue || "S/N";
+            // 🚀 DISPARAMOS EL CORREO AUTOMÁTICO DESDE EL BOT SÓLO SI NO ES BORRADO Y HAY UN VALOR VÁLIDO
+            if (!esBorrar && valorNuevo && String(valorNuevo).trim() !== "") {
+                try {
+                    const nombreCliente = expedienteEncontrado.cliente;
+                    if (nombreCliente) {
+                        const clientesCache = await obtenerClientesFirestore();
+                        const clienteObj = clientesCache.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
+                        
+                        if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                            let textoObsLimpio = f.observaciones?.stringValue || "";
+                            let proveedorPlano = f.proveedor?.stringValue || "S/N";
 
-                        await fetch(`http://localhost:${PORT}/api/enviar-correo-cliente`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                correoCliente: clienteObj.correo,
-                                nombreCliente: nombreCliente,
-                                numExpediente: expedienteEncontrado.numExpediente || "XXXX",
-                                statusActual: `${nombreCampoLegible}: ${valorNuevo}`,
-                                bl: expedienteEncontrado.bl || "XXXXX",
-                                campoLegible: nombreCampoLegible,
-                                modoTransporte: f.modo_transporte?.stringValue || "Marítimo",
-                                observaciones: textoObsLimpio,
-                                proveedor: proveedorPlano
-                            })
-                        });
-                        console.log("✅ Correo automático disparado desde Telegram/WhatsApp exitosamente.");
+                            await fetch(`http://localhost:${PORT}/api/enviar-correo-cliente`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    correoCliente: clienteObj.correo,
+                                    nombreCliente: nombreCliente,
+                                    numExpediente: expedienteEncontrado.numExpediente || "XXXX",
+                                    statusActual: `${nombreCampoLegible}: ${valorNuevo}`,
+                                    bl: expedienteEncontrado.bl || "XXXXX",
+                                    campoLegible: nombreCampoLegible,
+                                    modoTransporte: f.modo_transporte?.stringValue || "Marítimo",
+                                    observaciones: textoObsLimpio,
+                                    proveedor: proveedorPlano
+                                })
+                            });
+                            console.log("✅ Correo automático disparado desde Telegram/WhatsApp exitosamente.");
+                        }
                     }
+                } catch (errCorreo) {
+                    console.error("⚠️ Error al disparar el correo desde el bot:", errCorreo);
                 }
-            } catch (errCorreo) {
-                console.error("⚠️ Error al disparar el correo desde el bot:", errCorreo);
+            } else {
+                console.log("ℹ️ No se dispara correo desde el bot porque la fecha fue borrada o dejada en blanco.");
             }
 
             if (esBorrar) {
@@ -1286,24 +1290,22 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// 2. CRON ÚNICO PARA REPORTE GLOBAL INTERNO (10:00 AM y 6:00 PM)
+// CRON EXCLUSIVO PARA REPORTE GLOBAL INTERNO (10:00 AM y 6:00 PM)
 cron.schedule('0 10,18 * * *', async () => {
     try {
         console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte consolidado global...");
         const expedientes = await obtenerExpedientesFirestore();
 
-        // Enviar únicamente el reporte global consolidado (con todas las secciones y franja roja) al equipo interno
         const correoInternoEmpresa = process.env.CORREO_INTERNO || "operaciones@logistatus.com"; 
         if (expedientes.length > 0) {
             const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
             const mensajeInterno = `Estimado equipo,\n\nAdjunto el reporte consolidado global con todos los expedientes en curso y despachados de la empresa.\n\nLogistatus Pro`;
             
-            // Usamos explícitamente el consolidado maestro para los internos
             await enviarCorreoConGoogleScriptDinamico(correoInternoEmpresa, asuntoInterno, mensajeInterno, expedientes);
             console.log("✅ [CORREO INTERNO] Reporte global unificado enviado con éxito al equipo.");
         }
     } catch (error) {
-        console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
+        console.error("❌ [CORREO INTERNOS] Error:", error);
     }
 }, { timezone: "America/Caracas" });
 
