@@ -1041,17 +1041,13 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
 });
 
 app.post('/api/enviar-correo-cliente', async (req, res) => {
-    // 1. Añadimos 'proveedor' a la lista de variables que se extraen del cuerpo de la petición
     const { correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedor } = req.body;
-    
     if (!correoCliente) return res.status(400).json({ success: false, message: "El cliente no tiene correo registrado." });
 
     try {
         const esAereo = String(modoTransporte || "").toLowerCase().includes("aéreo") || String(modoTransporte || "").toLowerCase().includes("aereo");
         const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
-        
-        // 2. Si viene el proveedor lo usamos, de lo contrario colocamos "S/N"
         const proveedorFinal = proveedor && proveedor.trim() !== "" ? proveedor.trim() : "S/N";
 
         let cuerpoCorreo = `
@@ -1062,7 +1058,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
                 </div>
                 <p style="margin: 0 0 -1px 0; font-size: 14px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
                 <div style="font-size: 14px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
-                    <!-- 3. Inyectamos la variable proveedorFinal aquí -->
                     <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
                     <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
                     <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
@@ -1079,11 +1074,12 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         );
 
         const datosParaCliente = expedientesCliente.length > 0 ? expedientesCliente : todosLosExpedientes;
-        const excelBufferCliente = jenisExcelClienteBuffer(datosParaCliente); // (o generarExcelClienteBuffer segun tu codigo)
+        const excelBufferCliente = generarExcelClienteBuffer(datosParaCliente);
 
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
         res.json(resultado);
     } catch (error) {
+        console.error("❌ Error en /api/enviar-correo-cliente:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
