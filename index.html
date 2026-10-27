@@ -1535,6 +1535,7 @@
             const idVal = document.getElementById("recordId").value;
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
+	    record.proveedor = document.getElementById("proveedor")?.value.trim() || "S/N";
 
             const nombreCliente = record.cliente;
 
