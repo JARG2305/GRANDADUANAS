@@ -1204,26 +1204,7 @@ cron.schedule('0 10,18 * * *', async () => {
             console.log("✅ [CORREO INTERNO] Reporte global enviado con éxito.");
         }
 
-        // B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
-        for (const cliente of clientesActivos) {
-            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
-            const expedientesCliente = expedientes.filter(e => {
-                const clienteExp = String(e.cliente || "").trim().toLowerCase();
-                return clienteExp === clienteNombreBuscado;
-            });
-
-            if (expedientesCliente.length > 0) {
-                const asuntoCliente = `Reporte Actualizado de Estatus - Logistatus Pro`;
-                const mensajeCliente = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nLogistatus Pro`;
-                // Al pasarle 'expedientesCliente', la función generará el buffer respetando el formato completo de secciones para ese cliente
-                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asuntoCliente, mensajeCliente, expedientesCliente);
-                enviadosCount++;
-            }
-        }
-        console.log(`✅ [CRON CLIENTES] Reportes individuales enviados a ${enviadosCount} clientes.`);
-    } catch (error) {
-        console.error("❌ [CRON CORREOS EXCEL] Error:", error);
-    }
+       
 }, { timezone: "America/Caracas" });
 // B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
         for (const cliente of clientesActivos) {
