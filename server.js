@@ -946,6 +946,49 @@ app.post('/api/clientes', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+// ==========================================
+// RUTA PARA GUARDAR CORREOS INTERNOS AUTOMÁTICOS
+// ==========================================
+app.post('/api/configuracion/destinatarios', async (req, res) => {
+    try {
+        const { emails } = req.body; 
+        
+        let emailsArray = [];
+        if (typeof emails === 'string') {
+            emailsArray = emails.split(',').map(e => e.trim()).filter(e => e !== '');
+        } else if (Array.isArray(emails)) {
+            emailsArray = emails.map(e => String(e).trim()).filter(e => e !== '');
+        }
+
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/destinatarios`;
+        
+        const body = {
+            fields: {
+                emails: {
+                    arrayValue: {
+                        values: emailsArray.map(email => ({ stringValue: email }))
+                    }
+                }
+            }
+        };
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            res.json({ success: true, message: "Correos internos guardados con éxito en la nube." });
+        } else {
+            const errText = await response.text();
+            res.status(500).json({ success: false, message: errText });
+        }
+    } catch (error) {
+        console.error("❌ Error al guardar correos internos:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 // ==========================================
 // RUTA PARA ENVÍO MANUAL / FORZADO DE CORREO CON EXCEL ESTILIZADO
@@ -1008,7 +1051,7 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const esAereo = String(modoTransporte || "").toLowerCase().includes("aéreo") || String(modoTransporte || "").toLowerCase().includes("aereo");
         const etiquetaDocumento = esAereo ? "Guía (AWB)" : "B/L";
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
-        const proveedorFinal = proveedor || "S/N";
+        const proveedorFinal = proveedor && proveedor.trim() !== "" ? proveedor.trim() : "S/N";
 
         let cuerpoCorreo = `
             <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 500px; margin: 0 auto; padding: 0 8px 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
