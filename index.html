@@ -1531,27 +1531,64 @@
             if (navieraEl) navieraEl.value = lineaVal;
         };
 
-        window.saveExp = async function(e) {
+       window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
 
             const nombreCliente = record.cliente;
-            if (nombreCliente) {
-                const existe = cacheClientes.some(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
-                if (!existe) {
-                    const confirmar = confirm(`⚠️ El cliente "${nombreCliente}" no está registrado en el directorio.\n\n¿Desea agregarlo ahora para completar sus datos?`);
-                    if (confirmar) {
-                        window.openClientesModal();
-                        const inputRazon = document.getElementById("web_razonSocial");
-                        if (inputRazon) inputRazon.value = nombreCliente;
-                        const inputRif = document.getElementById("web_rif");
-                        if (inputRif) inputRif.focus();
-                        return; 
+
+            try {
+                if (idVal) {
+                    await updateDoc(doc(db, COLLECTION_NAME, idVal), record);
+                } else {
+                    await addDoc(collection(db, COLLECTION_NAME), record);
+                }
+
+                if (nombreCliente) {
+                    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                    if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
+                        let campoEvento = "Actualización reciente";
+                        let valorEvento = "Estatus de carga modificado";
+
+                        if (record.fecha_llegada) {
+                            campoEvento = "Fecha de Llegada";
+                            valorEvento = record.fecha_llegada;
+                        } else if (record.eta_la_guaira) {
+                            campoEvento = "ETA La Guaira";
+                            valorEvento = record.eta_la_guaira;
+                        } else if (record.fecha_transmision) {
+                            campoEvento = "Fecha de Transmisión";
+                            valorEvento = record.fecha_transmision;
+                        } else if (record.despacho) {
+                            campoEvento = "Fecha de Despacho";
+                            valorEvento = record.despacho;
+                  	} else if (record.reconocimiento) {
+                            campoEvento = "Fecha de Reconocimiento";
+                            valorEvento = record.reconocimiento;
+                        }
+
+                        let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
+
+                        await notificarCambioAutomatico(
+                            clienteObj.correo,
+                            nombreCliente,
+                            record.num_expediente || "XXXX",
+                            valorEvento,
+                            record.awb_bl || "XXXXX",
+                            campoEvento,
+                            record.modo_transporte || "Marítimo",
+                            textoObsLimpio
+                        );
                     }
                 }
+
+                window.closeModal();
+            } catch (err) { 
+                alert("Error al guardar: " + err.message); 
             }
+        };
 
             try {
                 if (idVal) {
