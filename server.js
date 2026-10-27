@@ -1050,20 +1050,26 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const asunto = `Actualización de Estatus - Expediente N° ${numExpediente || 'GENERAL'}`;
         const proveedorFinal = proveedor && proveedor.trim() !== "" ? proveedor.trim() : "S/N";
 
+        // 1. Obtenemos el logo en Base64 desde Firestore
+        const logoBase64 = await obtenerLogoFirestore();
+        const htmlLogo = logoBase64 ? `<div style="margin-bottom: 12px;"><img src="${logoBase64}" style="max-height: 45px; width: auto; display: block;" /></div>` : '';
+
+        // 2. Incorporamos el logo en la cabecera del diseño del correo
         let cuerpoCorreo = `
-            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 500px; margin: 0 auto; padding: 0 8px 4px 8px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+            <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 500px; margin: 0 auto; padding: 14px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+                ${htmlLogo}
                 <div style="border-bottom: 0px solid #2563eb; padding-top: 0px; padding-bottom: 0px; margin-bottom: 3px;">
                     <span style="font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -2.3px; line-height: 1; display: inline-block; margin: 0;">Actualización de Estatus</span>
                     <span style="font-size: 12px; font-weight: 700; color: #64748b; margin-left: 1px; letter-spacing: 0.5px;">LOGISTATUS PRO</span>
                 </div>
-                <p style="margin: 0 0 -1px 0; font-size: 14px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
-                <div style="font-size: 14px; line-height: 1.0; background-color: #f8fafc; padding: 0px 0px; border-radius: 6px; margin-bottom: 2px;">
-                    <div style="margin: 0px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
-                    <div style="margin: 1px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
-                    <div style="margin: 1px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
-                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 1px 0; color: #475569;"><strong>Observación:</strong> ${observaciones.trim()}</div>` : ''}
+                <p style="margin: 8px 0 10px 0; font-size: 14px; color: #334155;">Apreciado cliente <strong>${nombreCliente || 'Estimado'}</strong>, le informamos la actualización reciente de su carga:</p>
+                <div style="font-size: 14px; line-height: 1.3; background-color: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 8px;">
+                    <div style="margin: 2px 0;"><strong>N° Exp:</strong> ${numExpediente || 'GENERAL'} &nbsp;|&nbsp; <strong>Proveedor:</strong> ${proveedorFinal} &nbsp;|&nbsp; <strong>${etiquetaDocumento}:</strong> ${bl || 'S/N'}</div>
+                    <div style="margin: 2px 0; color: #EF4444;"><strong>${campoLegible || 'Estatus'}:</strong> ${statusActual || 'N/A'}</div>
+                    <div style="margin: 2px 0;"><strong>Transporte:</strong> ${modoTransporte || 'Marítimo'}</div>
+                    ${observaciones && observaciones.trim() !== "" ? `<div style="margin: 2px 0; color: #475569;"><strong>Observación:</strong> ${observaciones.trim()}</div>` : ''}
                 </div>
-                <p style="margin: 1px 0 0 0; font-size: 12px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #94a3b8; text-align: center;">Seguimos trabajando para garantizar una gestión eficiente y transparente.</p>
             </div>
         `;
 
@@ -1079,7 +1085,6 @@ app.post('/api/enviar-correo-cliente', async (req, res) => {
         const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
         res.json(resultado);
     } catch (error) {
-        console.error("❌ Error en /api/enviar-correo-cliente:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
