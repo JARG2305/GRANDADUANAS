@@ -1286,52 +1286,24 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// 2. CRON para Correos Automáticos (10:00 AM y 6:00 PM)
+// 2. CRON ÚNICO PARA REPORTE GLOBAL INTERNO (10:00 AM y 6:00 PM)
 cron.schedule('0 10,18 * * *', async () => {
     try {
-        console.log("⏰ [CRON CORREOS EXCEL] Ejecutando envíos automáticos...");
+        console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte consolidado global...");
         const expedientes = await obtenerExpedientesFirestore();
-        const clientes = await obtenerClientesFirestore();
-        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
-        let enviadosCount = 0;
 
-        // A. ENVIAR REPORTE GLOBAL INTERNO (Con todas las secciones y franja roja)
-        // Coloca aquí el correo interno de la empresa al que debe llegar el consolidado total
+        // Enviar únicamente el reporte global consolidado (con todas las secciones y franja roja) al equipo interno
         const correoInternoEmpresa = process.env.CORREO_INTERNO || "operaciones@logistatus.com"; 
         if (expedientes.length > 0) {
             const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
             const mensajeInterno = `Estimado equipo,\n\nAdjunto el reporte consolidado global con todos los expedientes en curso y despachados de la empresa.\n\nLogistatus Pro`;
+            
+            // Usamos explícitamente el consolidado maestro para los internos
             await enviarCorreoConGoogleScriptDinamico(correoInternoEmpresa, asuntoInterno, mensajeInterno, expedientes);
-            console.log("✅ [CORREO INTERNO] Reporte global enviado con éxito.");
+            console.log("✅ [CORREO INTERNO] Reporte global unificado enviado con éxito al equipo.");
         }
-
-// B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
-        for (const cliente of clientesActivos) {
-            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
-            const expedientesCliente = expedientes.filter(e => {
-                const clienteExp = String(e.cliente || "").trim().toLowerCase();
-                return clienteExp === clienteNombreBuscado;
-            });
-
-            if (expedientesCliente.length > 0) {
-                const asuntoCliente = `Reporte Actualizado de Estatus - Logistatus Pro`;
-                const mensajeCliente = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nLogistatus Pro`;
-                
-                // ⬇️ AQUÍ ES DONDE VA EL CÓDIGO NUEVO (USANDO LA FUNCIÓN DE 18 COLUMNAS) ⬇️
-                const excelBuffer = generarExcelClienteBuffer(expedientesCliente);
-                const archivoExcelBase64 = excelBuffer ? excelBuffer.toString('base64') : null;
-
-                // Llamas a tu conector pasando este búfer de 18 columnas
-                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asuntoCliente, mensajeCliente, expedientesCliente);
-                
-                enviadosCount++;
-            }
-        }
-	console.log(`✅ [CRON CLIENTES] Reportes individuales enviados a ${enviadosCount} clientes.`);
-
     } catch (error) {
-
-        console.error("❌ [CRON CORREOS EXCEL] Error:", error);
+        console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
     }
 }, { timezone: "America/Caracas" });
 
