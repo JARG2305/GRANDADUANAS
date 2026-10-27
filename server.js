@@ -955,7 +955,7 @@ app.post('/api/forzar-correo-manual', async (req, res) => {
         const mensaje = `Estimado/a ${razonSocial || 'Cliente'},\n\nAdjunto encontrará el reporte consolidado de estatus con el diseño y formato oficial.\n\nLogistatus Pro`;
 
         // Enviamos a través del conector de Google Apps Script pasando el Base64 estilizado
-        const resultado = await enviarCorreoConGoogleScriptDinamico(destinatario, asunto, mensaje, expedientesData);
+        const resultado = await enviarCorreoConGoogleScriptDinamico(correoCliente, asunto, cuerpoCorreo, excelBufferCliente);
         res.json(resultado);
     } catch (err) {
         console.error("❌ Error en /api/forzar-correo-manual:", err);

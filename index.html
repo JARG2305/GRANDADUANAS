@@ -1530,8 +1530,7 @@
             const navieraEl = document.getElementById("naviera");
             if (navieraEl) navieraEl.value = lineaVal;
         };
-
-      window.saveExp = async function(e) {
+window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
             const record = {};
@@ -1547,7 +1546,7 @@
                 }
 
                 if (nombreCliente) {
-                    const clienteObj = cacheClientes.find(c => String(c.razonSocial).trim().toLowerCase() === String(nombreCliente).toLowerCase());
+                    const clienteObj = cacheClientes.find(c => String(c.razonSocial || "").trim().toLowerCase() === String(nombreCliente || "").trim().toLowerCase());
                     if (clienteObj && clienteObj.correo && clienteObj.enviarAutomatico !== false) {
                         let campoEvento = "Actualización reciente";
                         let valorEvento = "Estatus de carga modificado";
@@ -1584,15 +1583,14 @@
                     }
                 }
 
-                // ⬇️ FORZAMOS EL CIERRE DIRECTO DEL MODAL Y EL RESETEO DEL FORMULARIO ⬇️
+                // Cierre inmediato y limpieza del modal
                 const modal = document.getElementById("expModal");
                 if (modal) modal.classList.add("hidden");
-                
                 const form = document.getElementById("expForm");
                 if (form) form.reset();
 
-                window.closeModal();
             } catch (err) { 
+                console.error("Error al guardar expediente:", err);
                 alert("Error al guardar: " + err.message); 
             }
         };
