@@ -953,22 +953,19 @@ app.post('/api/configuracion/destinatarios', async (req, res) => {
     try {
         const { emails } = req.body; 
         
-        let emailsArray = [];
+        // Limpiamos y unimos los correos en un solo string separado por comas
+        let emailsString = "";
         if (typeof emails === 'string') {
-            emailsArray = emails.split(',').map(e => e.trim()).filter(e => e !== '');
+            emailsString = emails.trim();
         } else if (Array.isArray(emails)) {
-            emailsArray = emails.map(e => String(e).trim()).filter(e => e !== '');
+            emailsString = emails.map(e => String(e).trim()).filter(e => e !== '').join(', ');
         }
 
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/destinatarios`;
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/config_internos`;
         
         const body = {
             fields: {
-                emails: {
-                    arrayValue: {
-                        values: emailsArray.map(email => ({ stringValue: email }))
-                    }
-                }
+                correosInternos: { stringValue: emailsString }
             }
         };
 
