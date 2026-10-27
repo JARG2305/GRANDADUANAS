@@ -1531,7 +1531,7 @@
             if (navieraEl) navieraEl.value = lineaVal;
         };
 
-       window.saveExp = async function(e) {
+      window.saveExp = async function(e) {
             e.preventDefault();
             const idVal = document.getElementById("recordId").value;
             const record = {};
@@ -1588,6 +1588,7 @@
             } catch (err) { 
                 alert("Error al guardar: " + err.message); 
             }
+        };
        
             try {
                 if (idVal) {
