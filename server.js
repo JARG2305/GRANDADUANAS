@@ -1137,7 +1137,7 @@ async function guardarClienteFirestore(datosCliente) {
                 rif: { stringValue: datosCliente.rif || '' },
                 direccion: { stringValue: datosCliente.direccion || '' },
                 telefono: { stringValue: datosCliente.telefono || '' },
-                correo: { stringValue: datosClientee.correo || '' },
+                correo: { stringValue: datosCliente.correo || '' },
                 fechaCreacion: { stringValue: new Date().toISOString() }
             }
         };
