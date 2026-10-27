@@ -1561,12 +1561,12 @@
                         } else if (record.fecha_transmision) {
                             campoEvento = "Fecha de Transmisión";
                             valorEvento = record.fecha_transmision;
+                        } else if (record.reconocimiento) {
+                            campoEvento = "Fecha de Reconocimiento";
+                            valorEvento = record.reconocimiento;
                         } else if (record.despacho) {
                             campoEvento = "Fecha de Despacho";
                             valorEvento = record.despacho;
-                  	} else if (record.reconocimiento) {
-                            campoEvento = "Fecha de Reconocimiento";
-                            valorEvento = record.reconocimiento;
                         }
 
                         let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
