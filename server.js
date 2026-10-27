@@ -1163,6 +1163,21 @@ async function obtenerExpedientesFirestore() {
     } catch (err) { return []; }
 }
 
+async function obtenerLogoFirestore() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/logo_cliente`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const result = await response.json();
+        if (result.fields && result.fields.imagenBase64) {
+            return result.fields.imagenBase64.stringValue;
+        }
+        return null;
+    } catch (err) {
+        console.warn("Aviso: No se pudo cargar el logo de Firestore, continuando sin logo:", err.message);
+        return null;
+    }
+}
 async function obtenerClientesFirestore() {
     try {
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
