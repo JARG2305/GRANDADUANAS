@@ -1577,8 +1577,9 @@
                         }
 
                         let textoObsLimpio = record.observaciones ? record.observaciones.trim() : "";
+                        let proveedorInputPlano = document.getElementById("proveedor")?.value.trim() || record.proveedor || "S/N";
 
-                        // Notificación en segundo plano (sin await para que no detenga el cierre)
+                        // Notificación en segundo plano con el proveedor correcto
                         notificarCambioAutomatico(
                             clienteObj.correo,
                             nombreCliente,
@@ -1587,8 +1588,11 @@
                             record.awb_bl || "XXXXX",
                             campoEvento,
                             record.modo_transporte || "Marítimo",
-                            textoObsLimpio
+                            textoObsLimpio,
+                            proveedorInputPlano // <--- Pasamos el proveedor plano aquí
                         ).catch(err => console.warn("Error en segundo plano con el correo:", err));
+
+                        
                     }
                 }
 
@@ -1598,11 +1602,8 @@
             }
         };
         
-        async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones) {
+       async function notificarCambioAutomatico(correoCliente, nombreCliente, numExpediente, statusActual, bl, campoLegible, modoTransporte, observaciones, proveedorPlano) {
     try {
-        // 1. Capturamos el valor del input de texto plano del proveedor en tu HTML
-        const proveedorValor = document.getElementById("proveedor") ? document.getElementById("proveedor").value.trim() : "S/N";
-
         await fetch(`${BACKEND_URL}/api/enviar-correo-cliente`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1615,7 +1616,7 @@
                 campoLegible: campoLegible,
                 modoTransporte: modoTransporte,
                 observaciones: observaciones,
-                proveedor: proveedorValor // <--- ¡Esta es la línea clave que faltaba!
+                proveedor: proveedorPlano || "S/N" // <--- Viaja directo al backend y al HTML del correo
             })
         });
     } catch (error) {
@@ -1747,7 +1748,7 @@
             let correosPorDefecto = "valoracionjr@gmail.com"; // Respaldo por defecto
             
             try {
-                // Consultamos directamente los correos internos guardados en Firebase para precargarlos en la ventana
+                // Consultamos directamente los correos internos guardados en Firebase
                 const configRef = doc(db, CONFIG_COLLECTION, "config_internos");
                 const configSnap = await getDoc(configRef);
                 if (configSnap.exists() && configSnap.data().correosInternos) {
@@ -1757,11 +1758,11 @@
                 console.error("Error al obtener los correos internos de Firebase:", err);
             }
 
-            // Ventana emergente con los correos internos listos para usar o editar
-            let destinatario = prompt("Correos destinatarios para este envío (puedes conservar los internos o escribir uno nuevo):", correosPorDefecto);
+            // Mostramos el cuadro de diálogo con los correos internos pre-cargados
+            let destinatario = prompt("Correos destinatarios (puedes dejar los internos o cambiarlos por el de tu preferencia, separados por comas):", correosPorDefecto);
             
             if (!destinatario) {
-                return; // Si cancelas, no se hace nada
+                return; // Si el usuario cancela, no hacemos nada
             }
 
             try {
@@ -1785,7 +1786,7 @@
 
                 let resultado = await response.json();
                 if (response.ok && resultado.success) {
-                    alert("✅ ¡Reporte unificado enviado exitosamente!");
+                    alert("✅ ¡Reporte unificado enviado exitosamente a los destinatarios!");
                 } else {
                     alert("❌ Error al enviar el correo: " + (resultado.message || "Error desconocido"));
                 }
