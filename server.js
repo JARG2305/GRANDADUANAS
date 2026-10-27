@@ -123,6 +123,118 @@ function generarExcelConsolidadoBuffer(expedientesData) {
     XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
     return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
 }
+// ==========================================
+// FUNCIÓN PARA EL EXCEL REDUCIDO DE CLIENTES
+// ==========================================
+function generarExcelClienteBuffer(expedientesData) {
+    if (!expedientesData || expedientesData.length === 0) return null;
+
+    // Encabezados exactos solicitados para el cliente
+    const excelHeaders = [
+        "MODO VÍA", "N.º EXPEDIENTE", "CLIENTE", "PROVEEDOR", "PAÍS ORIGEN", 
+        "AWB / BL", "N.º CONTENEDOR(ES)", "PESO BL", "CONTENIDO SEGÚN BL", 
+        "BUQUE / VUELO A VE", "ETA LA GUAIRA", "FECHA DE LLEGADA", 
+        "RECIBIDA ACTA RECEPCIÓN", "FECHA TRANSMISIÓN", "RECONOCIMIENTO", 
+        "VALIDACIÓN", "DESPACHO", "OBSERVACIONES"
+    ];
+
+    // Campos correspondientes en Firestore
+    const fieldsList = [
+        "modo_transporte", "num_expediente", "cliente", "proveedor", "pais_origen",
+        "awb_bl", "numero_contenedor", "peso_bl", "contenido_segun_bl", "buque_vuelo_ve",
+        "eta_la_guaira", "fecha_llegada", "recibida_acta_recepcion", "fecha_transmision",
+        "reconocimiento", "validacion", "despacho", "observaciones"
+    ];
+
+    const porLlegar = expedientesData.filter(e => !e.fecha_llegada && !e.despacho);
+    const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
+    const despachados = expedientesData.filter(e => Boolean(e.despacho));
+
+    porLlegar.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31')));
+    tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')));
+    despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')));
+
+    let wsData = [];
+    let metaSecciones = [];
+
+    function agregarSeccionCliente(tituloSeccion, listaItems, colorHex) {
+        if (listaItems.length === 0) return;
+        wsData.push([tituloSeccion]);
+        metaSecciones.push({ type: 'title' });
+        wsData.push(excelHeaders);
+        metaSecciones.push({ type: 'header', color: colorHex });
+        listaItems.forEach(e => {
+            let row = fieldsList.map(f => e[f] !== undefined && e[f] !== null ? e[f] : "");
+            wsData.push(row);
+            metaSecciones.push({ type: 'data' });
+        });
+        wsData.push([]);
+        metaSecciones.push({ type: 'empty' });
+    }
+
+    agregarSeccionCliente("1. EXPEDIENTES POR LLEGAR", porLlegar, "FEF08A"); // Amarillo Pollito
+    agregarSeccionCliente("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul Rey
+    agregarSeccionCliente("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo (Franja Roja)
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const sectionTitleStyle = {
+        font: { name: "Arial", sz: 12, bold: true, color: { rgb: "1E293B" } },
+        fill: { fgColor: { rgb: "F1F5F9" } },
+        alignment: { horizontal: "left", vertical: "center" }
+    };
+
+    const cellStyle = {
+        font: { name: "Arial", sz: 10, color: { rgb: "1E293B" } },
+        alignment: { horizontal: "left", vertical: "center", wrapText: true },
+        border: {
+            top: { style: "thin", color: { rgb: "E2E8F0" } },
+            bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+            left: { style: "thin", color: { rgb: "E2E8F0" } },
+            right: { style: "thin", color: { rgb: "E2E8F0" } }
+        }
+    };
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1");
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        const meta = metaSecciones[R] || { type: 'empty' };
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellAddress]) continue;
+
+            if (meta.type === 'title') {
+                if (C === 0) ws[cellAddress].s = sectionTitleStyle;
+            } else if (meta.type === 'header') {
+                const textColor = meta.color === "FEF08A" ? "1E293B" : "FFFFFF";
+                ws[cellAddress].s = {
+                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: textColor } },
+                    fill: { fgColor: { rgb: meta.color } },
+                    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
+                };
+            } else if (meta.type === 'data') {
+                ws[cellAddress].s = cellStyle;
+            }
+        }
+    }
+
+    // Anchos de columna optimizados para las 18 columnas seleccionadas
+    ws['!cols'] = [
+        { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 28 }, { wch: 12 },
+        { wch: 23 }, { wch: 28 }, { wch: 11 }, { wch: 32 }, { wch: 22 },
+        { wch: 14 }, { wch: 18 }, { wch: 24.5 }, { wch: 20 }, { wch: 15.5 },
+        { wch: 12 }, { wch: 12 }, { wch: 35 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte Cliente");
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'buffer', cellStyles: true });
+}
 
 // ==========================================
 // 1. ENVÍO DINÁMICO CON EXCEL ESTILIZADO (VÍA GOOGLE APPS SCRIPT)
@@ -860,11 +972,9 @@ app.post('/api/enviar-excel-correo', async (req, res) => {
             return res.status(400).json({ success: false, message: "El destinatario es obligatorio." });
         }
 
-        // Si la petición web no trae el buffer hecho, lo generamos aquí con la función centralizada
+        // Si se pasan expedientes específicos se usan; de lo contrario se consultan todos
         const expedientes = expedientesData && expedientesData.length > 0 ? expedientesData : await obtenerExpedientesFirestore();
-        const excelBuffer = generarExcelConsolidadoBuffer(expedientes);
-        const base64Data = excelBuffer ? excelBuffer.toString('base64') : null;
-
+        
         const resultado = await enviarCorreoConGoogleScriptDinamico(
             destinatario, 
             asunto || "Reporte Consolidado - Logistatus Pro", 
@@ -1058,6 +1168,10 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
+// ==========================================
+// TAREAS PROGRAMADAS (CRON)
+// ==========================================
+
 // 1. CRON para Alertas Multicanal (9, 12, 15, 18, 19, 20 horas)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
@@ -1071,34 +1185,68 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// 2. CRON para Correos Automáticos con Excel (10:00 AM y 6:00 PM)
+// 2. CRON para Correos Automáticos (10:00 AM y 6:00 PM)
 cron.schedule('0 10,18 * * *', async () => {
     try {
-        console.log("⏰ [CRON CORREOS EXCEL] Ejecutando envío automático de reportes con Excel...");
+        console.log("⏰ [CRON CORREOS EXCEL] Ejecutando envíos automáticos...");
         const expedientes = await obtenerExpedientesFirestore();
         const clientes = await obtenerClientesFirestore();
         const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
         let enviadosCount = 0;
 
+        // A. ENVIAR REPORTE GLOBAL INTERNO (Con todas las secciones y franja roja)
+        // Coloca aquí el correo interno de la empresa al que debe llegar el consolidado total
+        const correoInternoEmpresa = process.env.CORREO_INTERNO || "operaciones@logistatus.com"; 
+        if (expedientes.length > 0) {
+            const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
+            const mensajeInterno = `Estimado equipo,\n\nAdjunto el reporte consolidado global con todos los expedientes en curso y despachados de la empresa.\n\nLogistatus Pro`;
+            await enviarCorreoConGoogleScriptDinamico(correoInternoEmpresa, asuntoInterno, mensajeInterno, expedientes);
+            console.log("✅ [CORREO INTERNO] Reporte global enviado con éxito.");
+        }
+
+        // B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
         for (const cliente of clientesActivos) {
             const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
             const expedientesCliente = expedientes.filter(e => {
                 const clienteExp = String(e.cliente || "").trim().toLowerCase();
-                return clienteExp === clienteNombreBuscado && !e.despacho;
+                return clienteExp === clienteNombreBuscado;
             });
 
             if (expedientesCliente.length > 0) {
-                const asunto = `Reporte Automático de Estatus y Expedientes - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes vigentes.\n\nLogistatus Pro`;
-                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, expedientesCliente);
+                const asuntoCliente = `Reporte Actualizado de Estatus - Logistatus Pro`;
+                const mensajeCliente = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nLogistatus Pro`;
+                // Al pasarle 'expedientesCliente', la función generará el buffer respetando el formato completo de secciones para ese cliente
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asuntoCliente, mensajeCliente, expedientesCliente);
                 enviadosCount++;
             }
         }
-        console.log(`✅ [CRON CORREOS EXCEL] Reportes automáticos con Excel enviados a ${enviadosCount} clientes.`);
+        console.log(`✅ [CRON CLIENTES] Reportes individuales enviados a ${enviadosCount} clientes.`);
     } catch (error) {
         console.error("❌ [CRON CORREOS EXCEL] Error:", error);
     }
 }, { timezone: "America/Caracas" });
+// B. ENVIAR REPORTE INDIVIDUAL A CADA CLIENTE
+        for (const cliente of clientesActivos) {
+            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
+            const expedientesCliente = expedientes.filter(e => {
+                const clienteExp = String(e.cliente || "").trim().toLowerCase();
+                return clienteExp === clienteNombreBuscado;
+            });
+
+            if (expedientesCliente.length > 0) {
+                const asuntoCliente = `Reporte Actualizado de Estatus - Logistatus Pro`;
+                const mensajeCliente = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes.\n\nLogistatus Pro`;
+                
+                // ⬇️ AQUÍ ES DONDE VA EL CÓDIGO NUEVO (USANDO LA FUNCIÓN DE 18 COLUMNAS) ⬇️
+                const excelBuffer = generarExcelClienteBuffer(expedientesCliente);
+                const archivoExcelBase64 = excelBuffer ? excelBuffer.toString('base64') : null;
+
+                // Llamas a tu conector pasando este búfer de 18 columnas
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asuntoCliente, mensajeCliente, expedientesCliente);
+                
+                enviadosCount++;
+            }
+        }
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => { console.log(`🚀 LOGISTATUS PRO corriendo en http://localhost:${PORT}`); });

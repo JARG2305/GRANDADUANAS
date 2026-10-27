@@ -314,10 +314,10 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-slate-300 gap-2 pb-2">
                 <!-- Pestañas Superiores -->
                 <div class="flex gap-1 overflow-x-auto items-end w-full sm:w-auto">
-                    <button id="tab_alertasEtaBtn" onclick="switchSubTabAlertas('eta')" class="tab-btn px-4 font-bold rounded-t-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition min-w-[140px]">
-                        <span class="text-xs font-bold flex items-center gap-1">✈🚢 Alertas ETA</span>
-                        <span id="count_alertasEta" class="text-xl font-black mt-0.5 text-blue-700">0</span>
-                    </button>
+                    <button id="tab_alertasEtaBtn" onclick="switchSubTabAlertas('eta')" class="tab-btn px-4 font-bold rounded-t-lg bg-gradient-to-r from-sky-50 to-blue-100 border-t-2 border-blue-600 text-blue-900 shadow-sm transition min-w-[140px]">
+    <span class="text-xs font-bold flex items-center gap-1">✈🚢 Alertas ETA</span>
+    <span id="count_alertasEta" class="text-xl font-black mt-0.5 text-blue-600">0</span>
+</button>
                     <button id="tab_alertasOpBtn" onclick="switchSubTabAlertas('operativas')" class="tab-btn px-4 font-bold rounded-t-lg bg-white border-t-2 border-x border-slate-300 text-red-700 shadow-sm transition min-w-[140px]">
                         <span class="text-xs font-bold flex items-center gap-1">🚨 Alertas Operativas</span>
                         <span id="count_alertasOp" class="text-xl font-black mt-0.5 text-red-600">0</span>
@@ -2210,6 +2210,22 @@ function prepararYEnviarCorreoExcel(destinatario, asunto, mensaje) {
         if(data.success) console.log("Correo enviado con éxito con el Excel estilizado");
     });
 }
+// ==========================================
+// FUNCIONES DE VALIDACIÓN DE SECUENCIA EN FRONTEND
+// ==========================================
+
+window.validarSecuenciaCampos = function(inputElement, campoDestino, expedienteId) {
+    // Lógica para validar que los campos previos tengan fecha/datos antes de permitir editar el actual
+    const valor = inputElement.value;
+    console.log(`Validando campo ${campoDestino} para el expediente ${expedienteId} con valor: ${valor}`);
+    // Aquí puedes agregar tu lógica de validación visual o de llamadas AJAX si lo requieres
+};
+
+window.sincronizarActaAlmacen = function(inputElement, expedienteId) {
+    // Lógica para sincronizar el acta de recepción de almacén
+    const valor = inputElement.value;
+    console.log(`Sincronizando acta de almacén para el expediente ${expedienteId}: ${valor}`);
+};
 inicializarAppFirebase();
     </script>
 </body>
