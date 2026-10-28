@@ -1293,7 +1293,7 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
-// CRON EXCLUSIVO PARA REPORTE GLOBAL INTERNO (10:00 AM y 6:00 PM)
+// 1. CRON PARA REPORTE GLOBAL INTERNO POR CORREO (10:00 AM y 6:00 PM)
 cron.schedule('0 10,18 * * *', async () => {
     try {
         console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte consolidado global...");
@@ -1309,6 +1309,22 @@ cron.schedule('0 10,18 * * *', async () => {
         }
     } catch (error) {
         console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
+
+// 2. CRON PARA ALERTAS AUTOMÁTICAS EN TELEGRAM Y WHATSAPP (9, 12, 15, 18, 19 y 20 horas)
+cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
+    try {
+        console.log("⏰ [CRON BOTS] Generando alertas automáticas para Telegram y WhatsApp...");
+        const listaFinalOrdenada = await generarListaAlertasSistema();
+        if (listaFinalOrdenada.length > 0) {
+            await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE PROGRAMADO AUTOMÁTICO");
+            console.log("✅ [CRON BOTS] Alertas multicanal enviadas con éxito.");
+        } else {
+            console.log("ℹ️ [CRON BOTS] No hay alertas activas en este horario.");
+        }
+    } catch (error) {
+        console.error("❌ [CRON BOTS] Error en la ejecución programada de alertas:", error);
     }
 }, { timezone: "America/Caracas" });
 
