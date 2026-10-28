@@ -490,14 +490,15 @@ async function generarListaAlertasSistema() {
                         const diffVencHoy = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                         
                         if (diffVencHoy < 0) {
-                            // Caso 1: Ya venció hoy
+                            // Caso: Ya venció en la vida real
                             detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - 🚨 VIGENCIA VENCIDA`;
                         } else {
-                            // Caso 2: Está vigente hoy, pero evaluamos si vence ANTES del ETA
+                            // Caso: Está vigente hoy, PERO se pasa de la fecha de llegada (ETA)
                             if (dArriboObj && dVencimientoDai < dArriboObj) {
-                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DEL ETA (¡Verificar para transmitir!)`;
+                                let diasExceso = Math.round((dArriboObj - dVencimientoDai) / (1000 * 60 * 60 * 24));
+                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${rec.vencimiento_dai} / Llega ${rec.eta_la_guaira} - ¡Rehacer o transmitir urgentemente!)`;
                             } else {
-                                // Caso 3: Vigente y cubre la llegada sin problemas
+                                // Caso: Vigente y cubre perfectamente la llegada
                                 detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente (Cubre ETA)`;
                             }
                         }
