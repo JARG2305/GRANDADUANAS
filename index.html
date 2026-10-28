@@ -1023,6 +1023,38 @@
             window.filterData();
         };
 
+        // 📌 FUNCIÓN PARA CALCULAR EL VENCIMIENTO DE LA DAI (+15 DÍAS)
+        window.calcularVencimientoDAI = function() {
+            const inputRegistro = document.getElementById("fecha_registro_dai");
+            const inputVencimiento = document.getElementById("vencimiento_dai");
+            
+            if (!inputRegistro || !inputVencimiento) return;
+            
+            let val = inputRegistro.value.trim();
+            if (val.length === 10 && val.includes('/')) {
+                const p = val.split('/');
+                let dia = parseInt(p[0], 10);
+                let mes = parseInt(p[1], 10) - 1;
+                let anio = parseInt(p[2], 10);
+                
+                let fechaDai = new Date(anio, mes, dia);
+                if (!isNaN(fechaDai.getTime())) {
+                    // Sumamos exactamente 15 días reglamentarios
+                    fechaDai.setDate(fechaDai.getDate() + 15);
+                    
+                    let d = String(fechaDai.getDate()).padStart(2, '0');
+                    let m = String(fechaDai.getMonth() + 1).padStart(2, '0');
+                    let a = fechaDai.getFullYear();
+                    
+                    inputVencimiento.value = `${d}/${m}/${a}`;
+                } else {
+                    inputVencimiento.value = "";
+                }
+            } else {
+                inputVencimiento.value = "";
+            }
+        };
+
         // NAVEGACIÓN GLOBAL DE SUBPESTAÑAS DE ALERTAS
         window.switchSubTabAlertas = function(subTab) {
             subTabAlertaActual = subTab;
@@ -1360,18 +1392,33 @@
                 }
                 valoresUnicos.sort();
 
+                let currentIndex = -1;
+
                 function cerrarDropdown() {
                     dropdown.style.display = "none";
                     dropdown.innerHTML = "";
+                    currentIndex = -1;
+                }
+
+                function resaltarItem(items) {
+                    items.forEach((el, idx) => {
+                        if (idx === currentIndex) {
+                            el.classList.add("bg-blue-100", "font-bold", "text-blue-900");
+                            el.scrollIntoView({ block: "nearest" });
+                        } else {
+                            el.classList.remove("bg-blue-100", "font-bold", "text-blue-900");
+                        }
+                    });
                 }
 
                 function renderizarOpciones(filtrados) {
                     dropdown.innerHTML = "";
+                    currentIndex = -1;
                     if (filtrados.length === 0) {
                         cerrarDropdown();
                         return;
                     }
-                    filtrados.forEach((val) => {
+                    filtrados.forEach((val, idx) => {
                         const item = document.createElement("div");
                         item.className = "custom-dropdown-item";
                         item.innerText = val;
@@ -1386,11 +1433,39 @@
                     dropdown.style.display = "block";
                 }
 
-                input.onfocus = function() { renderizarOpciones(valoresUnicos); };
+                input.onfocus = function() {
+                    const filtrados = valoresUnicos.filter(v => String(v).toLowerCase().includes(this.value.toLowerCase()));
+                    renderizarOpciones(filtrados);
+                };
+
                 input.oninput = function() {
                     const filtrados = valoresUnicos.filter(v => String(v).toLowerCase().includes(this.value.toLowerCase()));
                     renderizarOpciones(filtrados);
                 };
+
+                // 📌 SOPORTE PARA NAVEGAR CON FLECHAS Y SELECCIONAR CON ENTER/TAB
+                input.onkeydown = function(e) {
+                    const items = dropdown.querySelectorAll(".custom-dropdown-item");
+                    if (dropdown.style.display === "block" && items.length > 0) {
+                        if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            currentIndex = (currentIndex + 1) % items.length;
+                            resaltarItem(items);
+                        } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            currentIndex = (currentIndex - 1 + items.length) % items.length;
+                            resaltarItem(items);
+                        } else if (e.key === "Enter" || e.key === "Tab") {
+                            if (currentIndex >= 0 && items[currentIndex]) {
+                                e.preventDefault();
+                                input.value = items[currentIndex].innerText;
+                                cerrarDropdown();
+                                if (campoId === 'linea') window.sincronizarNaviera();
+                            }
+                        }
+                    }
+                };
+
                 input.onblur = function() { setTimeout(cerrarDropdown, 200); };
             });
         };

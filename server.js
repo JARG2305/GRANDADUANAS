@@ -485,9 +485,22 @@ async function generarListaAlertasSistema() {
                 if (hasRegistroDai) {
                     const fechaDaiFormatted = formatearFechaDDMMYYYY(rec.fecha_registro_dai);
                     const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
+                    
                     if (dVencimientoDai) {
-                        const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
-                        detalleDaiTexto = diffVencDays < 0 ? `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENCIA VENCIDA` : `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente`;
+                        const diffVencHoy = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
+                        
+                        if (diffVencHoy < 0) {
+                            // Caso 1: Ya venció hoy
+                            detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - 🚨 VIGENCIA VENCIDA`;
+                        } else {
+                            // Caso 2: Está vigente hoy, pero evaluamos si vence ANTES del ETA
+                            if (dArriboObj && dVencimientoDai < dArriboObj) {
+                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DEL ETA (¡Verificar para transmitir!)`;
+                            } else {
+                                // Caso 3: Vigente y cubre la llegada sin problemas
+                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente (Cubre ETA)`;
+                            }
+                        }
                     } else {
                         detalleDaiTexto = `\n📄 DAI Registrada (${fechaDaiFormatted})`;
                     }
