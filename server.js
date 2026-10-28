@@ -1266,6 +1266,23 @@ async function obtenerClientesFirestore() {
     } catch (err) { return []; }
 }
 
+async function obtenerCorreosInternosFirestore() {
+    try {
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/config_internos`;
+        const response = await fetch(url);
+        if (!response.ok) return [];
+        const result = await response.json();
+        
+        if (result.fields && result.fields.correosInternos) {
+            const correosStr = result.fields.correosInternos.stringValue || "";
+            return correosStr.split(',').map(e => e.trim()).filter(e => e !== "");
+        }
+        return [];
+    } catch (err) {
+        console.error("❌ Error obteniendo correos internos:", err);
+        return [];
+    }
+}
 async function guardarClienteFirestore(datosCliente) {
     try {
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/clientes`;
@@ -1316,16 +1333,13 @@ cron.schedule('0 10,18 * * *', async () => {
         console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte maestro global a equipo interno...");
         const expedientes = await obtenerExpedientesFirestore();
         
-        // Obtenemos la lista de correos internos guardados en la base de datos
         const correosInternos = await obtenerCorreosInternosFirestore();
-        // Si no hay ninguno configurado, usamos operaciones@logistatus.com como respaldo
         const listaDestinatarios = correosInternos.length > 0 ? correosInternos : ["operaciones@logistatus.com"];
 
         if (expedientes.length > 0) {
             const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
             const mensajeInterno = `Estimado equipo,\n\nAdjunto el reporte consolidado global con todos los expedientes en curso y despachados de la empresa.\n\nLogistatus Pro`;
             
-            // Recorremos cada correo interno registrado y le enviamos el Excel maestro consolidado
             for (const correoDestino of listaDestinatarios) {
                 await enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoInterno, mensajeInterno, expedientes);
             }
@@ -1370,41 +1384,8 @@ cron.schedule('30 16 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
-// 2. CRON PARA ENVÍO AUTOMÁTICO A CLIENTES (A las 4:30 PM a cada cliente del modal con su Excel propio)
-cron.schedule('30 16 * * *', async () => {
-    try {
-        console.log("⏰ [CRON AUTOMÁTICO CLIENTES] Generando y enviando reportes personalizados a las 4:30 PM...");
-        const expedientes = await obtenerExpedientesFirestore();
-        const clientes = await obtenerClientesFirestore();
-        
-        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
-        let enviadosCount = 0;
 
-        for (const cliente of clientesActivos) {
-            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
-            const expedientesCliente = expedientes.filter(e => {
-                const clienteExp = String(e.cliente || "").trim().toLowerCase();
-                return clienteExp === clienteNombreBuscado && !e.despacho;
-            });
-
-            if (expedientesCliente.length > 0) {
-                const asunto = `Reporte Diario de Estatus y Expedientes - Logistatus Pro`;
-                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes vigentes correspondiente a la jornada de hoy.\n\nLogistatus Pro`;
-                
-                // Generamos el Excel específico y limpio para este cliente
-                const excelBufferCliente = generarExcelClienteBuffer(expedientesCliente);
-
-                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, excelBufferCliente);
-                enviadosCount++;
-            }
-        }
-        console.log(`✅ [CRON AUTOMÁTICO CLIENTES] Reportes de las 4:30 PM enviados a ${enviadosCount} clientes.`);
-    } catch (error) {
-        console.error("❌ [CRON AUTOMÁTICO CLIENTES] Error:", error);
-    }
-}, { timezone: "America/Caracas" });
-
-// 2. CRON PARA ALERTAS AUTOMÁTICAS EN TELEGRAM Y WHATSAPP (9, 12, 15, 18, 19 y 20 horas)
+// 3. CRON PARA ALERTAS AUTOMÁTICAS EN TELEGRAM Y WHATSAPP (9, 12, 15, 18, 19 y 20 horas)
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
         console.log("⏰ [CRON BOTS] Generando alertas automáticas para Telegram y WhatsApp...");
