@@ -1099,12 +1099,11 @@
             hoy.setHours(0,0,0,0);
 
             activeData.forEach(r => {
-                // 📌 Alertas ETA enfocadas en la vigencia y estatus de la DAI
+                // Alertas ETA y validación inteligente del vencimiento de la DAI frente al ETA
                 if (r.eta_la_guaira) {
                     let fEta = parseFechaLocal(r.eta_la_guaira);
                     if (fEta) {
                         let diffDays = Math.round((fEta - hoy) / (1000 * 60 * 60 * 24));
-                        // Evaluamos los expedientes próximos a llegar o recién llegados
                         if (diffDays <= 5 && diffDays >= 0) {
                             let textoDias = diffDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffDays}d`;
                             
@@ -1114,12 +1113,18 @@
                             if (hasRegistroDai) {
                                 let fechaDaiFmt = formatearFechaDDMMYYYY(r.fecha_registro_dai);
                                 let dVencimientoDai = parseFechaLocal(r.vencimiento_dai);
+                                
                                 if (dVencimientoDai) {
-                                    let diffVencDays = Math.round((dVencimientoDai - hoy) / (1000 * 60 * 60 * 24));
-                                    if (diffVencDays < 0) {
-                                        detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (⚠️ VENCIDA)`;
+                                    let diffVencHoy = Math.round((dVencimientoDai - hoy) / (1000 * 60 * 60 * 24));
+                                    if (diffVencHoy < 0) {
+                                        detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (🚨 VIGENCIA VENCIDA)`;
                                     } else {
-                                        detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (✅ Vigente)`;
+                                        // Cruce de fecha: Si vence antes de que llegue el barco (ETA)
+                                        if (fEta && dVencimientoDai < fEta) {
+                                            detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA - ¡Rehacer!)`;
+                                        } else {
+                                            detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (✅ Vigente)`;
+                                        }
                                     }
                                 } else {
                                     detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt}`;
@@ -1138,13 +1143,13 @@
                     alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
                 }
                 
-                // Alertas de Almacén / Demorajes
+                // Alertas de Almacén / Demoras
                 if (r.culminacion_dias_libres) {
                     let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
                     if (fCulminacion) {
                         let diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
                         if (diffAlm <= 2) {
-                            alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} días.`);
+                            alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} days.`);
                         }
                     }
                 }
