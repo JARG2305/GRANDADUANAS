@@ -126,6 +126,9 @@ function generarExcelConsolidadoBuffer(expedientesData) {
 // ==========================================
 // FUNCIÓN PARA EL EXCEL REDUCIDO DE CLIENTES
 // ==========================================
+// ==========================================
+// FUNCIÓN PARA EL EXCEL REDUCIDO DE CLIENTES (CON FILTRO DE DESPACHADOS <= 2 DÍAS)
+// ==========================================
 function generarExcelClienteBuffer(expedientesData) {
     if (!expedientesData || expedientesData.length === 0) return null;
 
@@ -146,13 +149,28 @@ function generarExcelClienteBuffer(expedientesData) {
         "reconocimiento", "validacion", "despacho", "observaciones"
     ];
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const porLlegar = expedientesData.filter(e => !e.fecha_llegada && !e.despacho);
     const tramites = expedientesData.filter(e => e.fecha_llegada && !e.despacho);
-    const despachados = expedientesData.filter(e => Boolean(e.despacho));
+    
+    // Filtro estricto para despachados: Solo se muestran hasta 2 días después de su despacho
+    const despachados = expedientesData.filter(e => {
+        if (!e.despacho) return false;
+        const fechaDespachoObj = parseFechaLocalServidor(e.despacho);
+        if (!fechaDespachoObj) return false;
+        
+        const diffTime = today - fechaDespachoObj;
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Permite 0 (hoy), 1 (ayer) y 2 días posteriores al despacho
+        return diffDays >= 0 && diffDays <= 2;
+    });
 
     porLlegar.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira) || new Date('9999-12-31')));
-    tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')));
-    despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')));
+    tramites.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
+    despachados.sort((a, b) => (parseFechaLocalServidor(a.eta_la_guaira || a.fecha_llegada) || new Date('9999-12-31')) - (parseFechaLocalServidor(b.eta_la_guaira || b.fecha_llegada) || new Date('9999-12-31')));
 
     let wsData = [];
     let metaSecciones = [];
@@ -174,7 +192,7 @@ function generarExcelClienteBuffer(expedientesData) {
 
     agregarSeccionCliente("1. EXPEDIENTES POR LLEGAR", porLlegar, "FEF08A"); // Amarillo Pollito
     agregarSeccionCliente("2. TRÁMITES ADUANALES Y EN PROCESO", tramites, "2563EB"); // Azul Rey
-    agregarSeccionCliente("3. EXPEDIENTES DESPACHADOS", despachados, "DC2626"); // Rojo (Franja Roja)
+    agregarSeccionCliente("3. EXPEDIENTES DESPACHADOS RECIENTEMENTE", despachados, "DC2626"); // Rojo
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
@@ -223,7 +241,6 @@ function generarExcelClienteBuffer(expedientesData) {
         }
     }
 
-    // Anchos de columna optimizados para las 18 columnas seleccionadas
     ws['!cols'] = [
         { wch: 11 }, { wch: 14 }, { wch: 28 }, { wch: 28 }, { wch: 12 },
         { wch: 23 }, { wch: 28 }, { wch: 11 }, { wch: 32 }, { wch: 22 },
@@ -1293,22 +1310,97 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
-// 1. CRON PARA REPORTE GLOBAL INTERNO POR CORREO (10:00 AM y 6:00 PM)
+// 1. CRON PARA REPORTE GLOBAL INTERNO (Se envía a los correos internos configurados abajo en la web)
 cron.schedule('0 10,18 * * *', async () => {
     try {
-        console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte consolidado global...");
+        console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte maestro global a equipo interno...");
         const expedientes = await obtenerExpedientesFirestore();
+        
+        // Obtenemos la lista de correos internos guardados en la base de datos
+        const correosInternos = await obtenerCorreosInternosFirestore();
+        // Si no hay ninguno configurado, usamos operaciones@logistatus.com como respaldo
+        const listaDestinatarios = correosInternos.length > 0 ? correosInternos : ["operaciones@logistatus.com"];
 
-        const correoInternoEmpresa = process.env.CORREO_INTERNO || "operaciones@logistatus.com"; 
         if (expedientes.length > 0) {
             const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
             const mensajeInterno = `Estimado equipo,\n\nAdjunto el reporte consolidado global con todos los expedientes en curso y despachados de la empresa.\n\nLogistatus Pro`;
             
-            await enviarCorreoConGoogleScriptDinamico(correoInternoEmpresa, asuntoInterno, mensajeInterno, expedientes);
-            console.log("✅ [CORREO INTERNO] Reporte global unificado enviado con éxito al equipo.");
+            // Recorremos cada correo interno registrado y le enviamos el Excel maestro consolidado
+            for (const correoDestino of listaDestinatarios) {
+                await enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoInterno, mensajeInterno, expedientes);
+            }
+            console.log(`✅ [CORREOS INTERNOS] Reporte maestro global enviado con éxito a: ${listaDestinatarios.join(', ')}`);
         }
     } catch (error) {
         console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
+
+// 2. CRON PARA ENVÍO AUTOMÁTICO A CLIENTES (A las 4:30 PM a cada cliente del modal con su Excel propio)
+cron.schedule('30 16 * * *', async () => {
+    try {
+        console.log("⏰ [CRON AUTOMÁTICO CLIENTES] Generando y enviando reportes personalizados a las 4:30 PM...");
+        const expedientes = await obtenerExpedientesFirestore();
+        const clientes = await obtenerClientesFirestore();
+        
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
+        let enviadosCount = 0;
+
+        for (const cliente of clientesActivos) {
+            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
+            const expedientesCliente = expedientes.filter(e => {
+                const clienteExp = String(e.cliente || "").trim().toLowerCase();
+                return clienteExp === clienteNombreBuscado && !e.despacho;
+            });
+
+            if (expedientesCliente.length > 0) {
+                const asunto = `Reporte Diario de Estatus y Expedientes - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes vigentes correspondiente a la jornada de hoy.\n\nLogistatus Pro`;
+                
+                // Generamos el Excel específico y limpio para este cliente
+                const excelBufferCliente = generarExcelClienteBuffer(expedientesCliente);
+
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, excelBufferCliente);
+                enviadosCount++;
+            }
+        }
+        console.log(`✅ [CRON AUTOMÁTICO CLIENTES] Reportes de las 4:30 PM enviados a ${enviadosCount} clientes.`);
+    } catch (error) {
+        console.error("❌ [CRON AUTOMÁTICO CLIENTES] Error:", error);
+    }
+}, { timezone: "America/Caracas" });
+
+// 2. CRON PARA ENVÍO AUTOMÁTICO A CLIENTES (A las 4:30 PM a cada cliente del modal con su Excel propio)
+cron.schedule('30 16 * * *', async () => {
+    try {
+        console.log("⏰ [CRON AUTOMÁTICO CLIENTES] Generando y enviando reportes personalizados a las 4:30 PM...");
+        const expedientes = await obtenerExpedientesFirestore();
+        const clientes = await obtenerClientesFirestore();
+        
+        const clientesActivos = clientes.filter(c => c.enviarAutomatico !== false && c.correo);
+        let enviadosCount = 0;
+
+        for (const cliente of clientesActivos) {
+            const clienteNombreBuscado = String(cliente.razonSocial || "").trim().toLowerCase();
+            const expedientesCliente = expedientes.filter(e => {
+                const clienteExp = String(e.cliente || "").trim().toLowerCase();
+                return clienteExp === clienteNombreBuscado && !e.despacho;
+            });
+
+            if (expedientesCliente.length > 0) {
+                const asunto = `Reporte Diario de Estatus y Expedientes - Logistatus Pro`;
+                const mensaje = `Estimado/a ${cliente.razonSocial},\n\nAdjunto encontrará el reporte actualizado con el estatus de sus expedientes vigentes correspondiente a la jornada de hoy.\n\nLogistatus Pro`;
+                
+                // Generamos el Excel específico y limpio para este cliente
+                const excelBufferCliente = generarExcelClienteBuffer(expedientesCliente);
+
+                await enviarCorreoConGoogleScriptDinamico(cliente.correo, asunto, mensaje, excelBufferCliente);
+                enviadosCount++;
+            }
+        }
+        console.log(`✅ [CRON AUTOMÁTICO CLIENTES] Reportes de las 4:30 PM enviados a ${enviadosCount} clientes.`);
+    } catch (error) {
+        console.error("❌ [CRON AUTOMÁTICO CLIENTES] Error:", error);
     }
 }, { timezone: "America/Caracas" });
 
