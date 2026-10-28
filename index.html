@@ -1110,7 +1110,7 @@
                             let detalleDaiHtml = "";
                             const hasRegistroDai = Boolean(r.fecha_registro_dai && r.fecha_registro_dai.trim() !== "");
                             
-                            if (hasRegistroDai) {
+                           if (hasRegistroDai) {
                                 let fechaDaiFmt = formatearFechaDDMMYYYY(r.fecha_registro_dai);
                                 let dVencimientoDai = parseFechaLocal(r.vencimiento_dai);
                                 
@@ -1119,9 +1119,12 @@
                                     if (diffVencHoy < 0) {
                                         detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (🚨 VIGENCIA VENCIDA)`;
                                     } else {
+                                        let fechaVencimientoFmt = formatearFechaDDMMYYYY(r.vencimiento_dai);
+                                        let fechaEtaFmt = formatearFechaDDMMYYYY(r.eta_la_guaira);
+
                                         // Cruce de fecha: Si vence antes de que llegue el barco (ETA)
                                         if (fEta && dVencimientoDai < fEta) {
-                                            detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA - ¡Rehacer!)`;
+                                            detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA - Vence ${fechaVencimientoFmt} / Llega ${fechaEtaFmt} - ¡Rehacer o transmitir urgentemente!)`;
                                         } else {
                                             detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (✅ Vigente)`;
                                         }
