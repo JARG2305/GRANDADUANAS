@@ -493,16 +493,11 @@ async function generarListaAlertasSistema() {
                             // Caso: Ya venció en la vida real
                             detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - 🚨 VIGENCIA VENCIDA`;
                         } else {
-                           let fechaVencimientoFmt = formatearFechaDDMMYYYY(rec.vencimiento_dai);
-			   let fechaEtaFmt = formatearFechaDDMMYYYY(rec.eta_la_guaira || rec.fecha_llegada);
-
-			   if (dArriboObj && dVencimientoDai < dArriboObj) {
-			    detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${fechaVencimientoFmt} / Llega ${fechaEtaFmt} - ¡Rehacer o transmitir urgentemente!)`;
-			} 
-			   // Caso: Está vigente hoy, PERO se pasa de la fecha de llegada (ETA)
+                            // Caso: Está vigente hoy, pero evaluamos si vence antes de la llegada (ETA)
                             if (dArriboObj && dVencimientoDai < dArriboObj) {
-                                let diasExceso = Math.round((dArriboObj - dVencimientoDai) / (1000 * 60 * 60 * 24));
-                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${rec.vencimiento_dai} / Llega ${rec.eta_la_guaira} - ¡Rehacer o transmitir urgentemente!)`;
+                                let fechaVencimientoFmt = formatearFechaDDMMYYYY(rec.vencimiento_dai);
+                                let fechaEtaFmt = formatearFechaDDMMYYYY(rec.eta_la_guaira || rec.fecha_llegada);
+                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${fechaVencimientoFmt} / Llega ${fechaEtaFmt} - ¡Rehacer o transmitir urgentemente!)`;
                             } else {
                                 // Caso: Vigente y cubre perfectamente la llegada
                                 detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente (Cubre ETA)`;
