@@ -1063,29 +1063,53 @@
             let alertasOp = [];
             let alertasAlm = [];
 
+            let hoy = new Date();
+            hoy.setHours(0,0,0,0);
+
             activeData.forEach(r => {
-                // Lógica de Alertas ETA
+                // 📌 Alertas ETA enfocadas en la vigencia y estatus de la DAI
                 if (r.eta_la_guaira) {
                     let fEta = parseFechaLocal(r.eta_la_guaira);
                     if (fEta) {
-                        let hoy = new Date();
-                        hoy.setHours(0,0,0,0);
                         let diffDays = Math.round((fEta - hoy) / (1000 * 60 * 60 * 24));
-                        if (diffDays <= 3 && diffDays >= 0) {
-                            alertasEta.push(`Exp ${r.num_expediente} (${r.cliente}) - ETA próxima en ${diffDays} días (${r.eta_la_guaira})`);
+                        // Evaluamos los expedientes próximos a llegar o recién llegados
+                        if (diffDays <= 5 && diffDays >= 0) {
+                            let textoDias = diffDays === 0 ? "¡LLEGA HOY!" : `Faltan ${diffDays}d`;
+                            
+                            let detalleDaiHtml = "";
+                            const hasRegistroDai = Boolean(r.fecha_registro_dai && r.fecha_registro_dai.trim() !== "");
+                            
+                            if (hasRegistroDai) {
+                                let fechaDaiFmt = formatearFechaDDMMYYYY(r.fecha_registro_dai);
+                                let dVencimientoDai = parseFechaLocal(r.vencimiento_dai);
+                                if (dVencimientoDai) {
+                                    let diffVencDays = Math.round((dVencimientoDai - hoy) / (1000 * 60 * 60 * 24));
+                                    if (diffVencDays < 0) {
+                                        detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (⚠️ VENCIDA)`;
+                                    } else {
+                                        detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt} (✅ Vigente)`;
+                                    }
+                                } else {
+                                    detalleDaiHtml = ` | 📄 DAI: ${fechaDaiFmt}`;
+                                }
+                            } else {
+                                detalleDaiHtml = ` | ⚠️ FALTA REGISTRAR DAI`;
+                            }
+
+                            alertasEta.push(`Exp ${r.num_expediente} (${r.cliente}) - ETA: ${r.eta_la_guaira} (${textoDias})${detalleDaiHtml}`);
                         }
                     }
                 }
-                // Alertas Operativas
+                
+                // Alertas Operativas (Permisología)
                 if (r.permisologia === 'Sí Aplica / Pendiente') {
                     alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
                 }
-                // Alertas de Almacén / Demoras
+                
+                // Alertas de Almacén / Demorajes
                 if (r.culminacion_dias_libres) {
                     let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
                     if (fCulminacion) {
-                        let hoy = new Date();
-                        hoy.setHours(0,0,0,0);
                         let diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
                         if (diffAlm <= 2) {
                             alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} días.`);
