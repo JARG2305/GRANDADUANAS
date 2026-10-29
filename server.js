@@ -467,9 +467,6 @@ async function enviarAlertaTelegramServidorPersonalizado(chatIdDestino, mensajeT
 // ==========================================
 // 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
 // ==========================================
-// ==========================================
-// 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
-// ==========================================
 async function generarListaAlertasSistema() {
     const records = await obtenerExpedientesFirestore();
     if (!records || records.length === 0) return [];
@@ -478,8 +475,47 @@ async function generarListaAlertasSistema() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    for (const rec of records) {
+   for (const rec of records) {
         if (rec.despacho) continue;
+
+        // 1. Declaración previa de variables y metadatos del expediente
+        const expName = rec.num_expediente || 'S/N';
+        const clientName = rec.cliente || 'S/C';
+        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
+        const hasTransmisionRegistrada = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+
+        // 2. 📌 EVALUACIÓN DE PLAZO DE 5 DÍAS HÁBILES (Vía Aérea o Marítima)
+        const modoBrutoAlerta = (rec.modo_transporte || "").toLowerCase().trim();
+        const esAereoAlerta = modoBrutoAlerta.includes("aéreo") || modoBrutoAlerta.includes("aereo");
+        
+        // Fecha base: Aéreo usa fecha_llegada, Marítimo usa recibida_acta_recepcion
+        const fechaBasePlazoRaw = esAereoAlerta ? rec.fecha_llegada : rec.recibida_acta_recepcion;
+        const dBasePlazoObj = parseFechaLocalServidor(fechaBasePlazoRaw);
+        
+        if (dBasePlazoObj && !rec.despacho && !hasTransmisionRegistrada) {
+            let fechaLimitePlazo = sumarDiasHabiles(dBasePlazoObj, 5); // Suma 5 días hábiles
+            const diffPlazoDays = Math.round((fechaLimitePlazo - today) / (1000 * 60 * 60 * 24));
+            
+            // Notifica al menos 2 días antes del vencimiento (<= 2), el día exacto o si está vencido, hasta la transmisión
+            if (diffPlazoDays <= 2) {
+                let textoPlazo = "";
+                const tipoViaTexto = esAereoAlerta ? "Vía Aérea (5 días hábiles desde Llegada)" : "Vía Marítima (5 días hábiles desde Acta)";
+                
+                if (diffPlazoDays < 0) {
+                    const diasVencidos = Math.abs(diffPlazoDays);
+                    textoPlazo = `🚨 *¡PLAZO DE 5 DÍAS HÁBILES VENCIDO!* ⚠️\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n📌 *${tipoViaTexto}*\n🛑 *Venció hace ${diasVencidos}d* (Límite hábil: ${formatearFechaDDMMYYYY(fechaLimitePlazo)})`;
+                } else if (diffPlazoDays === 0) {
+                    textoPlazo = `⚠️ *¡EL PLAZO DE 5 DÍAS HÁBILES VENCE HOY!* 🕒\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n📌 *${tipoViaTexto}*\n⏳ Límite hoy: *${formatearFechaDDMMYYYY(fechaLimitePlazo)}*`;
+                } else {
+                    textoPlazo = `⚠️ *PRÓXIMO A VENCER PLAZO HÁBIL (5 DÍAS)* ⏳\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n📌 *${tipoViaTexto}*\n⏳ Faltan *${diffPlazoDays} días* (Vence el ${formatearFechaDDMMYYYY(fechaLimitePlazo)})`;
+                }
+
+                alertasVencimientos.push({
+                    texto: textoPlazo,
+                    fechaSort: fechaLimitePlazo
+                });
+            }
+        }
 
         const expName = rec.num_expediente || 'S/N';
         const clientName = rec.cliente || 'S/C';
@@ -535,13 +571,14 @@ async function generarListaAlertasSistema() {
             }
         }
 
+        // 📌 REGLA: La alerta de DAI vencida (Art. 177) SOLO sale si NO se ha registrado la fecha de llegada
         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-        if (dVencimientoDai) {
+        if (dVencimientoDai && !hasLlegadaRegistrada) {
             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
             if (diffVencDays < 0) {
                 const diasVencida = Math.abs(diffVencDays);
                 alertasVencimientos.push({
-                    texto: `🚨 *VENCIDO / MULTA ART. 177 (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 Num 9 de la LOA (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
                     fechaSort: dVencimientoDai
                 });
             }
@@ -1397,6 +1434,24 @@ function parseFechaLocalServidor(str) {
     }
     return null;
 }
+
+// 📌 COLÓCALA AQUÍ JUNTO A LAS FUNCIONES AUXILIARES:
+function sumarDiasHabiles(fechaObj, dias) {
+    let d = new Date(fechaObj);
+    let count = 0;
+    while (count < dias) {
+        d.setDate(d.getDate() + 1);
+        let dayOfWeek = d.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Excluye sábados (6) y domingos (0)
+            count++;
+        }
+    }
+    return d;
+}
+
+// ==========================================
+// TAREAS PROGRAMADAS (CRON)
+// ==========================================
 
 // ==========================================
 // TAREAS PROGRAMADAS (CRON)
