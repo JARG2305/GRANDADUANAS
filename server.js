@@ -573,12 +573,12 @@ async function generarListaAlertasSistema() {
 
         // 📌 REGLA: La alerta de DAI vencida (Art. 177) SOLO sale si NO se ha registrado la fecha de llegada
         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-        if (dVencimientoDai && !hasLlegadaRegistrada) {
+        if (dVencimientoDai && !hasLlegadaRegistrada) { // <--- Añadido aquí para que se detenga si ya llegó
             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
             if (diffVencDays < 0) {
                 const diasVencida = Math.abs(diffVencDays);
                 alertasVencimientos.push({
-                    texto: `🚨 *VENCIDO / MULTA ART. 177 Num 9 de la LOA (DAI)*\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
+                    texto: `🚨 *VENCIDO / MULTA ART. 177 de la LOA *\nExp: *${expName}*\nCliente: *${clientName}*\nB/L o AWB: *${blInfo}*\n⚠️ *La DAI venció el ${rec.vencimiento_dai}* (${diasVencida}d atrás)`,
                     fechaSort: dVencimientoDai
                 });
             }
