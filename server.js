@@ -1289,7 +1289,8 @@ async function obtenerCorreosInternosFirestore() {
         
         if (result.fields && result.fields.correosInternos) {
             const correosStr = result.fields.correosInternos.stringValue || "";
-            return correosStr.split(',').map(e => e.trim()).filter(e => e !== "");
+            // Divide tanto por comas como por saltos de línea y limpia espacios de cada uno
+            return correosStr.split(/[\n,]+/).map(e => e.trim()).filter(e => e !== "");
         }
         return [];
     } catch (err) {
