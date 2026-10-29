@@ -489,10 +489,11 @@ async function generarListaAlertasSistema() {
         const iconoVia = esBarco ? "🚢" : "✈️";
         const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
 
-        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+       const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
         const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
         const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
+        // 📌 REGLA: Las alertas de ETA/DAI se paran por completo si ya tiene Fecha de Llegada registrada
         if (dArriboObj && !hasLlegadaRegistrada) {
             const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
             if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -507,16 +508,13 @@ async function generarListaAlertasSistema() {
                         const diffVencHoy = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
                         
                         if (diffVencHoy < 0) {
-                            // Caso: Ya venció en la vida real
                             detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - 🚨 VIGENCIA VENCIDA`;
                         } else {
-                            // Caso: Está vigente hoy, pero evaluamos si vence antes de la llegada (ETA)
                             if (dArriboObj && dVencimientoDai < dArriboObj) {
                                 let fechaVencimientoFmt = formatearFechaDDMMYYYY(rec.vencimiento_dai);
                                 let fechaEtaFmt = formatearFechaDDMMYYYY(rec.eta_la_guaira || rec.fecha_llegada);
-                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${fechaVencimientoFmt} / Llega ${fechaEtaFmt} - ¡Rehacer o transmitir urgentemente!)`;
+                                detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ⚠️ VIGENTE HOY, PERO VENCE ANTES DE LA ETA (Vence ${fechaVencimientoFmt} / Llega ${fechaEtaFmt})`;
                             } else {
-                                // Caso: Vigente y cubre perfectamente la llegada
                                 detalleDaiTexto = `\n📄 DAI (${fechaDaiFormatted}) - ✅ Vigente (Cubre ETA)`;
                             }
                         }
@@ -546,12 +544,40 @@ async function generarListaAlertasSistema() {
             }
         }
     }
+	
+        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión
+        const fechaAbandonoRaw = rec.fecha_abandono_legal;
+        const dAbandonoObj = parseFechaLocalServidor(fechaAbandonoRaw);
+        const hasTransmisionRegistrada = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
+        
+        // La alerta sale si hay abandono Y TAMPOCO tiene fecha de transmisión registrada
+        if (dAbandonoObj && !hasTransmisionRegistrada) {
+            const diffAbandonoDays = Math.round((dAbandonoObj - today) / (1000 * 60 * 60 * 24));
+            
+            // Alerta preventiva cuando falten 5 días o menos para los 31 días (a partir del día 30 en adelante)
+            if (diffAbandonoDays <= 5) {
+                let textoAbandono = "";
+                if (diffAbandonoDays < 0) {
+                    const diasPasados = Math.abs(diffAbandonoDays);
+                    textoAbandono = `🚨 *¡EXPEDIENTE EN ABANDONO LEGAL!* ⚠️\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n🛑 *El abandono legal ocurrió el ${formatearFechaDDMMYYYY(fechaAbandonoRaw)}* (${diasPasados}d atrás)`;
+                } else if (diffAbandonoDays === 0) {
+                    textoAbandono = `⚠️ *¡EL ABANDONO LEGAL ES HOY!* 🕒\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n⏳ Fecha límite: *${formatearFechaDDMMYYYY(fechaAbandonoRaw)}*`;
+                } else {
+                    textoAbandono = `⚠️ *PRÓXIMO A ABANDONO LEGAL* ⏳\nExp: *${expName}*\nCliente: *${clientName}*\nB/L: *${blInfo}*\n📌 Faltan *${diffAbandonoDays} días* (Vence el ${formatearFechaDDMMYYYY(fechaAbandonoRaw)})`;
+                }
+
+                alertasVencimientos.push({
+                    texto: textoAbandono,
+                    fechaSort: dAbandonoObj
+                });
+            }
+        }
 
     alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
     alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
 
     return [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
-}
+
 
 async function procesarComandoLogistica(textoMensaje) {
     const textoLower = textoMensaje.toLowerCase();
@@ -887,6 +913,38 @@ async function procesarComandoLogistica(textoMensaje) {
                 }
             }
         }
+
+        // 📌 Cálculo automático de los 31 días de Abandono Legal si se actualiza la Fecha de Llegada
+        if (campoAModificar === "fecha_llegada") {
+            const p = valorNuevo.split('/');
+            if (p.length === 3) {
+                let fechaLlegadaObj = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+                if (!isNaN(fechaLlegadaObj.getTime())) {
+                    fechaLlegadaObj.setDate(fechaLlegadaObj.getDate() + 31);
+                    let d = String(fechaLlegadaObj.getDate()).padStart(2, '0');
+                    let m = String(fechaLlegadaObj.getMonth() + 1).padStart(2, '0');
+                    let a = fechaLlegadaObj.getFullYear();
+                    let abandonoCalculado = `${d}/${m}/${a}`;
+                    
+                    camposActualizados["fecha_abandono_legal"] = { stringValue: abandonoCalculado };
+                }
+            }
+        }
+
+        // 📌 DEFINICIÓN DINÁMICA DE LA URL Y EL PATCH PARA FIRESTORE
+        // Esto actualiza tanto el campo principal que modificaste como los calculados (vencimiento_dai o fecha_abandono_legal)
+        let fieldPathsQuery = `updateMask.fieldPaths=${campoAModificar}`;
+        if (campoAModificar === "fecha_llegada") {
+            fieldPathsQuery += `&updateMask.fieldPaths=fecha_abandono_legal`;
+        } else if (campoAModificar === "fecha_registro_dai") {
+            fieldPathsQuery += `&updateMask.fieldPaths=vencimiento_dai`;
+        }
+
+        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?${fieldPathsQuery}`;
+        
+        const patchBody = {
+            fields: camposActualizados
+        };
 
         const patchRes = await fetch(updateUrl, {
             method: 'PATCH',
@@ -1342,14 +1400,19 @@ function parseFechaLocalServidor(str) {
 // TAREAS PROGRAMADAS (CRON)
 // ==========================================
 
-// 1. CRON PARA REPORTE GLOBAL INTERNO (Se envía a los correos internos configurados abajo en la web)
+// 1. CRON PARA REPORTE GLOBAL INTERNO (Se envía estrictamente a los correos internos configurados en Firestore)
 cron.schedule('0 10,18 * * *', async () => {
     try {
         console.log("⏰ [CRON CORREOS INTERNOS] Generando y enviando reporte maestro global a equipo interno...");
         const expedientes = await obtenerExpedientesFirestore();
         
-        const correosInternos = await obtenerCorreosInternosFirestore();
-        const listaDestinatarios = correosInternos.length > 0 ? correosInternos : ["operaciones@logistatus.com"];
+        // Obtenemos los correos directamente de Firestore sin respaldos ocultos
+        const listaDestinatarios = await obtenerCorreosInternosFirestore();
+
+        if (!listaDestinatarios || listaDestinatarios.length === 0) {
+            console.log("ℹ️ [CRON CORREOS INTERNOS] No hay correos internos configurados en el sistema. Omitiendo envío.");
+            return;
+        }
 
         if (expedientes.length > 0) {
             const asuntoInterno = `[INTERNO] Reporte Consolidado Global de Expedientes - Logistatus Pro`;
@@ -1358,7 +1421,7 @@ cron.schedule('0 10,18 * * *', async () => {
             for (const correoDestino of listaDestinatarios) {
                 await enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoInterno, mensajeInterno, expedientes);
             }
-            console.log(`✅ [CORREOS INTERNOS] Reporte maestro global enviado con éxito a: ${listaDestinatarios.join(', ')}`);
+            console.log(`✅ [CORREOS INTERNOS] Reporte maestro global enviado con éxito exclusivamente a: ${listaDestinatarios.join(', ')}`);
         }
     } catch (error) {
         console.error("❌ [CRON CORREOS INTERNOS] Error:", error);
