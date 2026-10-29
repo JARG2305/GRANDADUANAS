@@ -467,6 +467,9 @@ async function enviarAlertaTelegramServidorPersonalizado(chatIdDestino, mensajeT
 // ==========================================
 // 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
 // ==========================================
+// ==========================================
+// 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
+// ==========================================
 async function generarListaAlertasSistema() {
     const records = await obtenerExpedientesFirestore();
     if (!records || records.length === 0) return [];
@@ -489,7 +492,7 @@ async function generarListaAlertasSistema() {
         const iconoVia = esBarco ? "🚢" : "✈️";
         const destinoTxt = esBarco ? "ETA La Guaira" : "ETA Maiquetía";
 
-       const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
+        const hasLlegadaRegistrada = Boolean(rec.fecha_llegada && rec.fecha_llegada.trim() !== "");
         const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
         const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
@@ -543,18 +546,15 @@ async function generarListaAlertasSistema() {
                 });
             }
         }
-    }
 	
-        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión
+        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión (Dentro del bucle for)
         const fechaAbandonoRaw = rec.fecha_abandono_legal;
         const dAbandonoObj = parseFechaLocalServidor(fechaAbandonoRaw);
         const hasTransmisionRegistrada = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
         
-        // La alerta sale si hay abandono Y TAMPOCO tiene fecha de transmisión registrada
         if (dAbandonoObj && !hasTransmisionRegistrada) {
             const diffAbandonoDays = Math.round((dAbandonoObj - today) / (1000 * 60 * 60 * 24));
             
-            // Alerta preventiva cuando falten 5 días o menos para los 31 días (a partir del día 30 en adelante)
             if (diffAbandonoDays <= 5) {
                 let textoAbandono = "";
                 if (diffAbandonoDays < 0) {
@@ -572,11 +572,13 @@ async function generarListaAlertasSistema() {
                 });
             }
         }
+    } // <--- Aquí cierra correctamente el bucle for (const rec of records)
 
     alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
     alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
 
     return [...alertasVencimientos.map(i => i.texto), ...alertasEta.map(i => i.texto)];
+}
 
 
 async function procesarComandoLogistica(textoMensaje) {
