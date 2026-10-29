@@ -758,7 +758,7 @@ async function procesarComandoLogistica(textoMensaje) {
     } else if (textoLower.includes('llegada')) {
         campoAModificar = "fecha_llegada";
         nombreCampoLegible = "Fecha de Llegada";
-    } else if (textoLower.includes('dai')) {
+    } else if (textoLower.includes('dai') || textoLower.includes('registro dai')) {
         campoAModificar = "fecha_registro_dai";
         nombreCampoLegible = "Registro DAI";
     } else if (textoLower.includes('transmitido') || textoLower.includes('transmisión') || textoLower.includes('transmision')) {
@@ -773,7 +773,7 @@ async function procesarComandoLogistica(textoMensaje) {
     } else if (textoLower.includes('despachado') || textoLower.includes('despacho')) {
         campoAModificar = "despacho";
         nombreCampoLegible = "Despacho";
-    } else if (textoLower.includes('acta')) {
+    } else if (textoLower.includes('acta') || textoLower.includes('recepción')) {
         campoAModificar = "recibida_acta_recepcion";
         nombreCampoLegible = "Recibida Acta de Recepción";
     }
@@ -871,8 +871,22 @@ async function procesarComandoLogistica(textoMensaje) {
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
 
-        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}`;
-        const patchBody = { fields: camposActualizados };
+        // 📌 Cálculo automático de los 15 días de la DAI si se actualiza por comando
+        if (campoAModificar === "fecha_registro_dai") {
+            const p = valorNuevo.split('/');
+            if (p.length === 3) {
+                let fechaDaiObj = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+                if (!isNaN(fechaDaiObj.getTime())) {
+                    fechaDaiObj.setDate(fechaDaiObj.getDate() + 15);
+                    let d = String(fechaDaiObj.getDate()).padStart(2, '0');
+                    let m = String(fechaDaiObj.getMonth() + 1).padStart(2, '0');
+                    let a = fechaDaiObj.getFullYear();
+                    let vencimientoCalculado = `${d}/${m}/${a}`;
+                    
+                    camposActualizados["vencimiento_dai"] = { stringValue: vencimientoCalculado };
+                }
+            }
+        }
 
         const patchRes = await fetch(updateUrl, {
             method: 'PATCH',
