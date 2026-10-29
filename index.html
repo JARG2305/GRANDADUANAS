@@ -2086,9 +2086,34 @@ window.maskFecha = function(input) {
 
 // 2. Función de cálculo de fechas (corrige el error calcularFechasLlegada)
 window.calcularFechasLlegada = function() {
-    // Coloca aquí la lógica que usabas para calcular días libres o ETAs, 
-    // o déjala vacía temporalmente si no realiza un cálculo complejo:
-    console.log("Calculando fechas...");
+    const inputLlegada = document.getElementById("fecha_llegada");
+    const inputAbandono = document.getElementById("fecha_abandono_legal");
+    
+    if (!inputLlegada || !inputAbandono) return;
+    
+    let val = inputLlegada.value.trim();
+    if (val.length === 10 && val.includes('/')) {
+        const p = val.split('/');
+        let dia = parseInt(p[0], 10);
+        let mes = parseInt(p[1], 10) - 1;
+        let anio = parseInt(p[2], 10);
+        
+        let fechaLlegadaObj = new Date(anio, mes, dia);
+        if (!isNaN(fechaLlegadaObj.getTime())) {
+            // Sumamos exactamente 31 días continuos para el Abandono Legal
+            fechaLlegadaObj.setDate(fechaLlegadaObj.getDate() + 31);
+            
+            let d = String(fechaLlegadaObj.getDate()).padStart(2, '0');
+            let m = String(fechaLlegadaObj.getMonth() + 1).padStart(2, '0');
+            let a = fechaLlegadaObj.getFullYear();
+            
+            inputAbandono.value = `${d}/${m}/${a}`;
+        } else {
+            inputAbandono.value = "";
+        }
+    } else {
+        inputAbandono.value = "";
+    }
 };
 // 1. EXCEL UNIFICADO (MAESTRO) CON COLORES Y LÍNEAS
         window.exportExcelMaestro = function() {
