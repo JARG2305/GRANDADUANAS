@@ -1114,89 +1114,87 @@
         }
 
         function renderizarAlertasSistema(data) {
-            const container = document.getElementById("alertsContainer");
-            if (!container) return;
-            container.innerHTML = "";
+    const container = document.getElementById("alertsContainer");
+    if (!container) return;
+    container.innerHTML = "";
 
-            let activeData = data.filter(r => !esHistoricoArchivado(r) && !Boolean(r.despacho));
-            let alertasEta = [];
-            let alertasOp = [];
-            let alertasAlm = [];
+    let activeData = data.filter(r => !esHistoricoArchivado(r) && !Boolean(r.despacho));
+    let alertasEta = [];
+    let alertasOp = [];
+    let alertasAlm = [];
 
-            let hoy = new Date();
-            hoy.setHours(0,0,0,0);
+    let hoy = new Date();
+    hoy.setHours(0,0,0,0);
 
-            activeData.forEach(r => {
-    // 1. Alertas de Plazo de 5 Días Hábiles (Aéreo: Fecha de Llegada | Marítimo: Acta de Recepción)
-    const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
-    const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
-    const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
-    let dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
-    const hasTransmisionWeb = Boolean(r.fecha_transmision && r.fecha_transmision.trim() !== "");
+    activeData.forEach(r => {
+        // Alertas de Plazo de 5 Días Hábiles en la Web
+        const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
+        const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
+        const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
+        let dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
+        const hasTransmisionWeb = Boolean(r.fecha_transmision && r.fecha_transmision.trim() !== "");
 
-    if (dBaseWebObj && !hasTransmisionWeb) {
-        // Función local para sumar días hábiles en la web
-        let fechaLimiteWeb = (function(fecha, dias) {
-            let d = new Date(fecha);
-            let count = 0;
-            while (count < dias) {
-                d.setDate(d.getDate() + 1);
-                let day = d.getDay();
-                if (day !== 0 && day !== 6) count++;
+        if (dBaseWebObj && !hasTransmisionWeb) {
+            let fechaLimiteWeb = (function(fecha, dias) {
+                let d = new Date(fecha);
+                let count = 0;
+                while (count < dias) {
+                    d.setDate(d.getDate() + 1);
+                    let day = d.getDay();
+                    if (day !== 0 && day !== 6) count++;
+                }
+                return d;
+            })(dBaseWebObj, 5);
+
+            let diffWeb = Math.round((fechaLimiteWeb - hoy) / (1000 * 60 * 60 * 24));
+
+            if (diffWeb <= 2) {
+                let estadoTxt = diffWeb < 0 ? `Vencido hace ${Math.abs(diffWeb)}d` : (diffWeb === 0 ? "Vence HOY" : `Vence en ${diffWeb}d`);
+                let viaTxt = esAereoWeb ? "Aéreo (Llegada)" : "Marítimo (Acta)";
+                alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Plazo 5 días hábiles [${viaTxt}]: ${estadoTxt} (Límite: ${formatearFechaDDMMYYYY(fechaLimiteWeb)})`);
             }
-            return d;
-        })(dBaseWebObj, 5);
-
-        let diffWeb = Math.round((fechaLimiteWeb - hoy) / (1000 * 60 * 60 * 24));
-
-        if (diffWeb <= 2) {
-            let estadoTxt = diffWeb < 0 ? `Vencido hace ${Math.abs(diffWeb)}d` : (diffWeb === 0 ? "Vence HOY" : `Vence en ${diffWeb}d`);
-            let viaTxt = esAereoWeb ? "Aéreo (Llegada)" : "Marítimo (Acta)";
-            alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Plazo 5 días hábiles [${viaTxt}]: ${estadoTxt} (Límite: ${formatearFechaDDMMYYYY(fechaLimiteWeb)})`);
         }
+        
+        // Alertas Operativas (Permisología)
+        if (r.permisologia === 'Sí Aplica / Pendiente') {
+            alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
+        }
+        
+        // Alertas de Almacén / Demoras
+        if (r.culminacion_dias_libres) {
+            let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
+            if (fCulminacion) {
+                let diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
+                if (diffAlm <= 2) {
+                    alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} days.`);
+                }
+            }
+        }
+    });
+
+    document.getElementById("count_alertasEta").innerText = alertasEta.length;
+    document.getElementById("count_alertasOp").innerText = alertasOp.length;
+    document.getElementById("count_alertasAlm").innerText = alertasAlm.length;
+
+    let listaActual = subTabAlertaActual === 'eta' ? alertasEta : (subTabAlertaActual === 'operativas' ? alertasOp : alertasAlm);
+
+    if (listaActual.length === 0) {
+        container.innerHTML = `<p class="text-slate-400 py-2 text-center">No hay alertas activas en esta sección.</p>`;
+        return;
     }
-});
-                
-                // Alertas Operativas (Permisología)
-                if (r.permisologia === 'Sí Aplica / Pendiente') {
-                    alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
-                }
-                
-                // Alertas de Almacén / Demoras
-                if (r.culminacion_dias_libres) {
-                    let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
-                    if (fCulminacion) {
-                        let diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
-                        if (diffAlm <= 2) {
-                            alertasAlm.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} days.`);
-                        }
-                    }
-                }
-            });
 
-            document.getElementById("count_alertasEta").innerText = alertasEta.length;
-            document.getElementById("count_alertasOp").innerText = alertasOp.length;
-            document.getElementById("count_alertasAlm").innerText = alertasAlm.length;
-
-            let listaActual = subTabAlertaActual === 'eta' ? alertasEta : (subTabAlertaActual === 'operativas' ? alertasOp : alertasAlm);
-
-            if (listaActual.length === 0) {
-                container.innerHTML = `<p class="text-slate-400 py-2 text-center">No hay alertas activas en esta sección.</p>`;
-                return;
-            }
-
-            listaActual.forEach(alerta => {
-                const div = document.createElement("div");
-		div.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium flex items-center justify-between shadow-xs";
-                div.innerHTML = `
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="text-base">⚠️</span> 
-                        <span class="text-slate-700">${alerta}</span>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
+    listaActual.forEach(alerta => {
+        const div = document.createElement("div");
+        div.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-medium flex items-center justify-between shadow-xs";
+        div.innerHTML = `
+            <div class="flex items-center gap-2 text-xs">
+                <span class="text-base">⚠️</span> 
+                <span class="text-slate-700">${alerta}</span>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
 
         function getExpCategory(rec) {
             const hasDespacho = Boolean(rec.despacho && rec.despacho.trim() !== "");

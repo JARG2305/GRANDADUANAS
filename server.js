@@ -491,12 +491,11 @@ async function generarListaAlertasSistema() {
         const modoBrutoAlerta = (rec.modo_transporte || "").toLowerCase().trim();
         const esAereoAlerta = modoBrutoAlerta.includes("aéreo") || modoBrutoAlerta.includes("aereo");
         
-        // Fecha base: Aéreo usa fecha_llegada, Marítimo usa recibida_acta_recepcion
         const fechaBasePlazoRaw = esAereoAlerta ? rec.fecha_llegada : rec.recibida_acta_recepcion;
         const dBasePlazoObj = parseFechaLocalServidor(fechaBasePlazoRaw);
         
         if (dBasePlazoObj && !rec.despacho && !hasTransmisionRegistrada) {
-            let fechaLimitePlazo = sumarDiasHabiles(dBasePlazoObj, 5); // Suma 5 días hábiles
+            let fechaLimitePlazo = sumarDiasHabiles(dBasePlazoObj, 5);
             const diffPlazoDays = Math.round((fechaLimitePlazo - today) / (1000 * 60 * 60 * 24));
             
             if (diffPlazoDays <= 2) {
@@ -531,7 +530,6 @@ async function generarListaAlertasSistema() {
         const hasRegistroDai = Boolean(rec.fecha_registro_dai && rec.fecha_registro_dai.trim() !== "");
         const dArriboObj = parseFechaLocalServidor(fechaEtaRaw);
 
-        // 📌 REGLA: Las alertas de ETA/DAI se paran por completo si ya tiene Fecha de Llegada registrada
         if (dArriboObj && !hasLlegadaRegistrada) {
             const diffLlegadaDays = Math.round((dArriboObj - today) / (1000 * 60 * 60 * 24));
             if (diffLlegadaDays >= 0 && diffLlegadaDays <= 5) {
@@ -570,7 +568,6 @@ async function generarListaAlertasSistema() {
             }
         }
 
-        // 📌 REGLA: La alerta de DAI vencida (Art. 177) SOLO sale si NO se ha registrado la fecha de llegada
         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
         if (dVencimientoDai && !hasLlegadaRegistrada) {
             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
@@ -583,7 +580,6 @@ async function generarListaAlertasSistema() {
             }
         }
     
-        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión
         const fechaAbandonoRaw = rec.fecha_abandono_legal;
         const dAbandonoObj = parseFechaLocalServidor(fechaAbandonoRaw);
         
