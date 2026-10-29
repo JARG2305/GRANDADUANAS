@@ -467,6 +467,9 @@ async function enviarAlertaTelegramServidorPersonalizado(chatIdDestino, mensajeT
 // ==========================================
 // 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
 // ==========================================
+// ==========================================
+// 2.4 MOTOR CENTRAL DE COMANDOS Y ALERTAS (TELEGRAM / WHATSAPP)
+// ==========================================
 async function generarListaAlertasSistema() {
     const records = await obtenerExpedientesFirestore();
     if (!records || records.length === 0) return [];
@@ -475,10 +478,10 @@ async function generarListaAlertasSistema() {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-   for (const rec of records) {
+    for (const rec of records) {
         if (rec.despacho) continue;
 
-        // 1. Declaración previa de variables y metadatos del expediente
+        // 1. Declaración previa de variables y metadatos del expediente (Única vez)
         const expName = rec.num_expediente || 'S/N';
         const clientName = rec.cliente || 'S/C';
         const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
@@ -496,7 +499,6 @@ async function generarListaAlertasSistema() {
             let fechaLimitePlazo = sumarDiasHabiles(dBasePlazoObj, 5); // Suma 5 días hábiles
             const diffPlazoDays = Math.round((fechaLimitePlazo - today) / (1000 * 60 * 60 * 24));
             
-            // Notifica al menos 2 días antes del vencimiento (<= 2), el día exacto o si está vencido, hasta la transmisión
             if (diffPlazoDays <= 2) {
                 let textoPlazo = "";
                 const tipoViaTexto = esAereoAlerta ? "Vía Aérea (5 días hábiles desde Llegada)" : "Vía Marítima (5 días hábiles desde Acta)";
@@ -570,7 +572,7 @@ async function generarListaAlertasSistema() {
 
         // 📌 REGLA: La alerta de DAI vencida (Art. 177) SOLO sale si NO se ha registrado la fecha de llegada
         const dVencimientoDai = parseFechaLocalServidor(rec.vencimiento_dai);
-        if (dVencimientoDai && !hasLlegadaRegistrada) { // <--- Añadido aquí para que se detenga si ya llegó
+        if (dVencimientoDai && !hasLlegadaRegistrada) {
             const diffVencDays = Math.round((dVencimientoDai - today) / (1000 * 60 * 60 * 24));
             if (diffVencDays < 0) {
                 const diasVencida = Math.abs(diffVencDays);
@@ -580,11 +582,10 @@ async function generarListaAlertasSistema() {
                 });
             }
         }
-	
-        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión (Dentro del bucle for)
+    
+        // 📌 EVALUACIÓN DE ABANDONO LEGAL: Solo se detiene al registrar la Fecha de Transmisión
         const fechaAbandonoRaw = rec.fecha_abandono_legal;
         const dAbandonoObj = parseFechaLocalServidor(fechaAbandonoRaw);
-        const hasTransmisionRegistrada = Boolean(rec.fecha_transmision && rec.fecha_transmision.trim() !== "");
         
         if (dAbandonoObj && !hasTransmisionRegistrada) {
             const diffAbandonoDays = Math.round((dAbandonoObj - today) / (1000 * 60 * 60 * 24));
@@ -606,7 +607,7 @@ async function generarListaAlertasSistema() {
                 });
             }
         }
-    } // <--- Aquí cierra correctamente el bucle for (const rec of records)
+    }
 
     alertasEta.sort((a, b) => a.fechaSort - b.fechaSort);
     alertasVencimientos.sort((a, b) => a.fechaSort - b.fechaSort);
