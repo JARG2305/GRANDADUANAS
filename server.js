@@ -517,9 +517,6 @@ async function generarListaAlertasSistema() {
             }
         }
 
-        const expName = rec.num_expediente || 'S/N';
-        const clientName = rec.cliente || 'S/C';
-        const blInfo = rec.awb_bl || rec.bl || rec.numero_bl || 'S/N'; 
         const fechaEtaRaw = rec.fecha_llegada || rec.eta_la_guaira || 'S/N';
         const fechaEtaFormatted = formatearFechaDDMMYYYY(fechaEtaRaw);
         
