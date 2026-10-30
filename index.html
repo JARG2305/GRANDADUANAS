@@ -1127,33 +1127,33 @@
     hoy.setHours(0,0,0,0);
 
    activeData.forEach(r => {
-        // 1. Alertas de Plazo de 5 Días Hábiles
-        const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
-        const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
-        const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
-        let dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
-        const hasTransmisionWeb = Boolean(r.fecha_transmision && r.fecha_transmision.trim() !== "");
+       // 1. Alertas de Plazo de 5 Días Hábiles
+    const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
+    const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
+    const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
+    let dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
+    const hasTransmisionWeb = Boolean(r.fecha_transmision && r.fecha_transmision.trim() !== "");
 
-        if (dBaseWebObj && !hasTransmisionWeb) {
-            let fechaLimiteWeb = (function(fecha, dias) {
-                let d = new Date(fecha);
-                let count = 0;
-                while (count < dias) {
-                    d.setDate(d.getDate() + 1);
-                    let day = d.getDay();
-                    if (day !== 0 && day !== 6) count++;
-                }
-                return d;
-            })(dBaseWebObj, 5);
-
-            let diffWeb = Math.round((fechaLimiteWeb - hoy) / (1000 * 60 * 60 * 24));
-
-            if (diffWeb <= 2) {
-                let estadoTxt = diffWeb < 0 ? `Vencido hace ${Math.abs(diffWeb)}d` : (diffWeb === 0 ? "Vence HOY" : `Vence en ${diffWeb}d`);
-                let viaTxt = esAereoWeb ? "Aéreo (Llegada)" : "Marítimo (Acta)";
-                alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Plazo 5 días hábiles [${viaTxt}]: ${estadoTxt} (Límite: ${formatearFechaDDMMYYYY(fechaLimiteWeb)})`);
+    if (dBaseWebObj && !hasTransmisionWeb) {
+        let fechaLimiteWeb = (function(fecha, dias) {
+            let d = new Date(fecha);
+            let count = 0;
+            while (count < dias) {
+                d.setDate(d.getDate() + 1);
+                let day = d.getDay();
+                if (day !== 0 && day !== 6) count++;
             }
+            return d;
+        })(dBaseWebObj, 5);
+
+        let diffWeb = Math.round((fechaLimiteWeb - hoy) / (1000 * 60 * 60 * 24));
+
+        if (diffWeb <= 2) {
+            let estadoTxt = diffWeb < 0 ? `Vencido hace ${Math.abs(diffWeb)}d` : (diffWeb === 0 ? "Vence HOY" : `Vence en ${diffWeb}d`);
+            let viaTxt = esAereoWeb ? "Aéreo (Llegada)" : "Marítimo (Acta)";
+            alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Plazo 5 días hábiles [${viaTxt}]: ${estadoTxt} (Límite: ${formatearFechaDDMMYYYY(fechaLimiteWeb)})`);
         }
+    }
         
         // 2. Alertas Operativas (Permisología) - ADENTRO DEL BUCLE
         if (r.permisologia === 'Sí Aplica / Pendiente') {
