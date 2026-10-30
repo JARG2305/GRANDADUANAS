@@ -1072,7 +1072,7 @@
             renderizarAlertasSistema(allRecords);
         };
 	// Alertas de Plazo de 5 Días Hábiles en la Web
-                const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
+
                 const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
                 const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
                 let dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
