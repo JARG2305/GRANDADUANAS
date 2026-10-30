@@ -1126,8 +1126,8 @@
     let hoy = new Date();
     hoy.setHours(0,0,0,0);
 
-    activeData.forEach(r => {
-        // Alertas de Plazo de 5 Días Hábiles en la Web
+   activeData.forEach(r => {
+        // 1. Alertas de Plazo de 5 Días Hábiles
         const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
         const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
         const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
@@ -1155,12 +1155,12 @@
             }
         }
         
-        // Alertas Operativas (Permisología)
+        // 2. Alertas Operativas (Permisología) - ADENTRO DEL BUCLE
         if (r.permisologia === 'Sí Aplica / Pendiente') {
             alertasOp.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
         }
         
-        // Alertas de Almacén / Demoras
+        // 3. Alertas de Almacén / Demoras - ADENTRO DEL BUCLE
         if (r.culminacion_dias_libres) {
             let fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
             if (fCulminacion) {
@@ -1170,7 +1170,7 @@
                 }
             }
         }
-    });
+    }); // <--- AQUÍ CIERRA EL FORACH CORRECTAMENTE
 
     document.getElementById("count_alertasEta").innerText = alertasEta.length;
     document.getElementById("count_alertasOp").innerText = alertasOp.length;
