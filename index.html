@@ -1374,6 +1374,38 @@
             }
         };
 
+	window.toggleBotUnificado = async function(tipoRed) {
+    const btnId = tipoRed === 'whatsapp' ? 'btn-toggle-wsp' : 'btn-toggle-tg';
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+
+    // Detectamos el estado actual basándonos en el texto del botón
+    const estaEncendido = btn.innerText.toLowerCase().includes('encendido');
+    const nuevoEstado = !estaEncendido; // Si estaba encendido, ahora se apaga, y viceversa
+
+    try {
+        // Petición opcional al servidor para guardar la preferencia en el backend / base de datos
+        const response = await fetch(`${BACKEND_URL}/api/config/bots`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ red: tipoRed, activo: nuevoEstado })
+        });
+
+        // Actualizamos de manera visual e inmediata el botón en la interfaz
+        if (nuevoEstado) {
+            btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white shadow-sm";
+            btn.innerText = "Encendido";
+            console.log(`✅ Canal ${tipoRed} activado.`);
+        } else {
+            btn.className = "btn btn-sm px-2.5 py-1 text-xs font-bold rounded bg-slate-500 text-white shadow-sm";
+            btn.innerText = "Apagado";
+            console.log(`⏹️ Canal ${tipoRed} desactivado.`);
+        }
+    } catch (err) {
+        console.error("Error al cambiar el estado del bot:", err);
+        alert("❌ No se pudo actualizar el estado de la red social en el servidor.");
+    }
+};
         window.actualizarListasDatalists = function(data) {
             const campos = ["cliente", "proveedor", "linea", "pais_origen", "buque_origen_vuelo", "puerto_transbordo", "almacen"];
             campos.forEach(campoId => {
