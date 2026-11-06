@@ -2425,6 +2425,18 @@ window.sincronizarActaAlmacen = function(inputElement, expedienteId) {
     const valor = inputElement.value;
     console.log(`Sincronizando acta de almacén para el expediente ${expedienteId}: ${valor}`);
 };
+// ==========================================
+// SINCRONIZACIÓN AUTOMÁTICA DE ACTA DE RECEPCIÓN Y ALMACÉN
+// ==========================================
+const inputActaPrincipal = document.getElementById('recibida_acta_recepcion');
+const inputActaAlmacen = document.getElementById('recibida_acta_recepcion_almacen');
+
+if (inputActaPrincipal && inputActaAlmacen) {
+    inputActaPrincipal.addEventListener('input', (e) => {
+        // Copia exactamente el valor de arriba en el campo de abajo en tiempo real
+        inputActaAlmacen.value = e.target.value;
+    });
+}
 inicializarAppFirebase();
     </script>
 </body>

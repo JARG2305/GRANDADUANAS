@@ -930,6 +930,12 @@ async function procesarComandoLogistica(textoMensaje) {
         const camposActualizados = { ...expedienteEncontrado.fields };
         camposActualizados[campoAModificar] = { stringValue: valorNuevo };
 
+        // Si actualizas por comando en el servidor:
+        if (campoAModificar === "recibida_acta_recepcion") {
+            camposActualizados["recibida_acta_recepcion"] = { stringValue: valorNuevo };
+            camposActualizados["recibida_acta_recepcion_almacen"] = { stringValue: valorNuevo }; // <-- Para que el bot también lo duplique
+        }
+
         // 📌 Cálculo automático de los 15 días de la DAI si se actualiza por comando
         if (campoAModificar === "fecha_registro_dai") {
             const p = valorNuevo.split('/');
@@ -946,6 +952,19 @@ async function procesarComandoLogistica(textoMensaje) {
                 }
             }
         }
+
+        // 📌 DEFINICIÓN DINÁMICA DE LA URL Y EL PATCH PARA FIRESTORE
+        let fieldPathsQuery = `updateMask.fieldPaths=${campoAModificar}`;
+        
+        if (campoAModificar === "recibida_acta_recepcion") {
+            fieldPathsQuery += `&updateMask.fieldPaths=recibida_acta_recepcion_almacen`;
+        } else if (campoAModificar === "fecha_llegada") {
+            fieldPathsQuery += `&updateMask.fieldPaths=fecha_abandono_legal`;
+        } else if (campoAModificar === "fecha_registro_dai") {
+            fieldPathsQuery += `&updateMask.fieldPaths=vencimiento_dai`;
+        }
+
+        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?${fieldPathsQuery}`;
 
         // 📌 Cálculo automático de los 31 días de Abandono Legal si se actualiza la Fecha de Llegada
         if (campoAModificar === "fecha_llegada") {
