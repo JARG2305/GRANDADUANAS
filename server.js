@@ -983,17 +983,7 @@ async function procesarComandoLogistica(textoMensaje) {
             }
         }
 
-        // 📌 DEFINICIÓN DINÁMICA DE LA URL Y EL PATCH PARA FIRESTORE
-        // Esto actualiza tanto el campo principal que modificaste como los calculados (vencimiento_dai o fecha_abandono_legal)
-        let fieldPathsQuery = `updateMask.fieldPaths=${campoAModificar}`;
-        if (campoAModificar === "fecha_llegada") {
-            fieldPathsQuery += `&updateMask.fieldPaths=fecha_abandono_legal`;
-        } else if (campoAModificar === "fecha_registro_dai") {
-            fieldPathsQuery += `&updateMask.fieldPaths=vencimiento_dai`;
-        }
-
-        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${expedienteEncontrado.id}?${fieldPathsQuery}`;
-        
+              
         const patchBody = {
             fields: camposActualizados
         };
