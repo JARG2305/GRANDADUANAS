@@ -2096,8 +2096,8 @@ window.configurarAutoFormatoFechas = function() {
 
             // 2. Autocompleta el formato DD/MM/AAAA mientras escribes
             input.addEventListener("input", function(e) {
-                let v = this.value.replace(/\D/g, ""); // Solo números[cite: 3]
-                if (v.length > 8) v = v.slice(0, 8);   // Máximo 8 dígitos (DDMMAAAA)[cite: 3]
+                let v = this.value.replace(/\D/g, ""); 
+                if (v.length > 8) v = v.slice(0, 8);   
 
                 if (v.length > 4) {
                     this.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
@@ -2107,6 +2107,9 @@ window.configurarAutoFormatoFechas = function() {
                     this.value = v;
                 }
             });
+        }
+    });
+};
 
             // 3. Valida al salir del campo (onblur) que esté completo
             input.addEventListener("blur", function() {
