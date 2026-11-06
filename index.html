@@ -1688,6 +1688,16 @@
         };
 	window.saveExp = async function(e) {
             e.preventDefault();
+	const inputsFechas = document.querySelectorAll('input[maxlength="10"]');
+    for (let input of inputsFechas) {
+        let val = input.value.trim();
+        if (val !== "" && (val.length !== 10 || !val.match(/^\d{2}\/\d{2}\/\d{4}$/))) {
+            alert(`⚠️ El campo "${input.previousElementSibling?.innerText || 'Fecha'}" tiene un formato inválido. Debe ser exactamente DD/MM/AAAA.`);
+            input.focus();
+            return; // Detiene el guardado si hay un error
+        }
+    }
+
             const idVal = document.getElementById("recordId").value;
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
@@ -2059,7 +2069,9 @@ document.getElementById("btnNuevoExp").addEventListener("click", () => {
         window.openModal();
     }
 });
-// Función para autocompletar las barras de fecha mientras escribes (ej: 10062026 -> 10/06/2026)
+// ==========================================
+// MÁSCARA Y VALIDACIÓN ESTRICTA DE FECHAS (DD/MM/AAAA)
+// ==========================================
 window.configurarAutoFormatoFechas = function() {
     const camposFechasIds = [
         "etd_origen", "eta_transbordo", "etd_transbordo", "eta_la_guaira", "fecha_llegada", 
@@ -2071,11 +2083,21 @@ window.configurarAutoFormatoFechas = function() {
 
     camposFechasIds.forEach(id => {
         const input = document.getElementById(id);
-        if (input && !input.dataset.autoformat) {
-            input.dataset.autoformat = "true";
+        if (input && !input.dataset.strictdate) {
+            input.dataset.strictdate = "true";
+            
+            // 1. Bloquea la entrada de letras y símbolos en tiempo real
+            input.addEventListener("keypress", function(e) {
+                const charCode = e.charCode ? e.charCode : e.keyCode;
+                if (charCode < 48 || charCode > 57) {
+                    e.preventDefault();
+                }
+            });
+
+            // 2. Autocompleta el formato DD/MM/AAAA mientras escribes
             input.addEventListener("input", function(e) {
-                let v = this.value.replace(/\D/g, ""); // Solo números
-                if (v.length > 8) v = v.slice(0, 8); // Máximo 8 dígitos (DDMMAAAA)
+                let v = this.value.replace(/\D/g, ""); // Solo números[cite: 3]
+                if (v.length > 8) v = v.slice(0, 8);   // Máximo 8 dígitos (DDMMAAAA)[cite: 3]
 
                 if (v.length > 4) {
                     this.value = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
@@ -2083,6 +2105,15 @@ window.configurarAutoFormatoFechas = function() {
                     this.value = `${v.slice(0, 2)}/${v.slice(2)}`;
                 } else {
                     this.value = v;
+                }
+            });
+
+            // 3. Valida al salir del campo (onblur) que esté completo
+            input.addEventListener("blur", function() {
+                let val = this.value.trim();
+                if (val !== "" && val.length !== 10) {
+                    alert("⚠️ Formato de fecha incompleto o inválido. Debe ser DD/MM/AAAA");
+                    this.focus();
                 }
             });
         }
