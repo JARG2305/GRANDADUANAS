@@ -2107,19 +2107,17 @@ window.configurarAutoFormatoFechas = function() {
                     this.value = v;
                 }
             });
+
+            // 3. Valida al salir del campo (sin bloquear en bucle si está incompleto)
+            input.addEventListener("blur", function() {
+                let val = this.value.trim();
+                if (val !== "" && val.length < 10) {
+                    console.warn("⚠️ Formato de fecha incompleto. Debe ser DD/MM/AAAA");
+                }
+            });
         }
     });
 };
-
-            // 3. Valida al salir del campo (onblur) que esté completo
-            input.addEventListener("blur", function() {
-                let val = this.value.trim();
-                if (val !== "" && val.length !== 10) {
-                    alert("⚠️ Formato de fecha incompleto o inválido. Debe ser DD/MM/AAAA");
-                    this.focus();
-                }
-            });
-   };
 // 1. Función de máscara para fechas (corrige el error maskFecha)
 window.maskFecha = function(input) {
     let v = input.value.replace(/\D/g, ""); 
