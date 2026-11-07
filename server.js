@@ -380,7 +380,7 @@ cron.schedule('0 6,14 * * *', async () => {
     await procesarTrackingExpedientes();
 }, { timezone: "America/Caracas" });
 // ==========================================
-// MÓDULO DE SEGUIMIENTO Y TRACKING AUTOMÁTICO (CON ALERTAS)
+// MÓDULO DE SEGUIMIENTO Y TRACKING AUTOMÁTICO (CON FILTRO DE LLEGADA)
 // ==========================================
 
 async function obtenerCodigoDeRastreo(expediente) {
@@ -409,8 +409,13 @@ async function procesarTrackingExpedientes() {
         const expedientes = await obtenerExpedientesFirestore();
         if (!expedientes || expedientes.length === 0) return;
 
-        // Filtramos expedientes que siguen activos (sin fecha de llegada ni despacho)
-        const expedientesActivos = expedientes.filter(e => !e.fecha_llegada && !e.despacho);
+        // 📌 FILTRO ESTRICTO: Omitir si ya tiene FECHA DE LLEGADA registrada o si ya fue DESPACHADO
+        const expedientesActivos = expedientes.filter(e => {
+            const tieneLlegada = Boolean(e.fecha_llegada && String(e.fecha_llegada).trim() !== "");
+            const estaDespachado = Boolean(e.despacho && String(e.despacho).trim() !== "");
+            return !tieneLlegada && !estaDespachado;
+        });
+
         let actualizadosCount = 0;
 
         for (const exp of expedientesActivos) {
@@ -422,7 +427,6 @@ async function procesarTrackingExpedientes() {
             // 📌 Aquí conectas tu lógica o función de consulta externa:
             // const nuevaEta = await tuFuncionDeConsultaGratuita(datosTracking.codigo);
             // 
-            // 💡 EJEMPLO DE CÓMO FUNCIONARÍA AL DETECTAR UN CAMBIO:
             /*
             const etaActualRegistrada = exp.eta_la_guaira || "";
             
