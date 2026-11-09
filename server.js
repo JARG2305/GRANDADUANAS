@@ -1682,19 +1682,17 @@ cron.schedule('30 16 * * *', async () => {
 }, { timezone: "America/Caracas" });
 
 
-// 3. CRON PARA ALERTAS AUTOMÁTICAS EN TELEGRAM Y WHATSAPP (9, 12, 15, 18, 19 y 20 horas)
+// ==========================================
+// TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (ÚNICA)
+// ==========================================
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
-        console.log("⏰ [CRON BOTS] Generando alertas automáticas para Telegram y WhatsApp...");
         const listaFinalOrdenada = await generarListaAlertasSistema();
         if (listaFinalOrdenada.length > 0) {
             await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE PROGRAMADO AUTOMÁTICO");
-            console.log("✅ [CRON BOTS] Alertas multicanal enviadas con éxito.");
-        } else {
-            console.log("ℹ️ [CRON BOTS] No hay alertas activas en este horario.");
         }
     } catch (error) {
-        console.error("❌ [CRON BOTS] Error en la ejecución programada de alertas:", error);
+        console.error("❌ Error en cron de alertas multicanal:", error);
     }
 }, { timezone: "America/Caracas" });
 
