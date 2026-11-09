@@ -312,11 +312,28 @@ async function enviarCorreoConGoogleScriptDinamico(correoDestino, asuntoCorreo, 
 }
 
 // ==========================================
-// MÓDULO DE SEGUIMIENTO Y TRACKING AUTOMÁTICO
+// MÓDULO DE SCRAPING Y TRACKING AUTOMÁTICO
 // ==========================================
 
 async function obtenerCodigoDeRastreo(expediente) {
-    // 1. Priorizamos el número de contenedor si existe y no está vacío
+    if (expediente.numero_contenedor && expediente.numero_contenedor.trim() !== "" && expediente.numero_contenedor !== "S/N") {
+        return { tipo: "contenedor", codigo: expediente.numero_contenedor.trim() };
+    }
+    if (expediente.awb_bl && expediente.awb_bl.trim() !== "" && expediente.awb_bl !== "S/N") {
+        return { tipo: "bl", codigo: expediente.awb_bl.trim() };
+    }
+    return null;
+}
+
+/**
+ * Función modular para consultar la ETA en la naviera correspondiente.
+ * Aquí es donde implementas el scraping o la petición a la API interna de la línea.
+ */
+// ==========================================
+// MÓDULO DE SEGUIMIENTO Y TRACKING AUTOMÁTICO (MULTINAVIERA)
+// ==========================================
+
+async function obtenerCodigoDeRastreo(expediente) {
     if (expediente.numero_contenedor && expediente.numero_contenedor.trim() !== "" && expediente.numero_contenedor !== "S/N") {
         return {
             tipo: "contenedor",
@@ -324,7 +341,6 @@ async function obtenerCodigoDeRastreo(expediente) {
         };
     }
     
-    // 2. Si no hay contenedor, usamos el B/L o AWB
     if (expediente.awb_bl && expediente.awb_bl.trim() !== "" && expediente.awb_bl !== "S/N") {
         return {
             tipo: "bl",
@@ -332,75 +348,39 @@ async function obtenerCodigoDeRastreo(expediente) {
         };
     }
 
-    return null; // Ninguno de los dos campos tiene datos válidos
+    return null; 
 }
 
-async function procesarTrackingExpedientes() {
+async function consultarEtaNaviera(codigoRastreo, nombreNaviera) {
     try {
-        console.log("🔄 [TRACKING AUTO] Iniciando verificación automática de expedientes...");
-        const expedientes = await obtenerExpedientesFirestore();
-        if (!expedientes || expedientes.length === 0) return;
+        const navieraLower = (nombreNaviera || "").toLowerCase().trim();
+        let nuevaEtaCalculada = null;
+        const headersNavegador = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/plain, */*"
+        };
 
-        // Filtramos expedientes que siguen activos (sin fecha de llegada ni despacho)
-        const expedientesActivos = expedientes.filter(e => !e.fecha_llegada && !e.despacho);
-        let actualizadosCount = 0;
-
-        for (const exp of expedientesActivos) {
-            const datosTracking = await obtenerCodigoDeRastreo(exp);
-            if (!datosTracking) continue;
-
-            console.log(`🔍 Monitoreando Exp: ${exp.num_expediente} usando su ${datosTracking.tipo.toUpperCase()}: ${datosTracking.codigo}`);
-
-            // 📌 NOTA: Aquí puedes integrar tu consulta o lógica web/scraping/API gratuita usando `datosTracking.codigo`
-            // const nuevaEta = await tuFuncionDeConsulta(datosTracking.codigo);
-            // 
-            // Si la `nuevaEta` es diferente a `exp.eta_la_guaira`, haces el PATCH a Firestore:
-            /*
-            if (nuevaEta && nuevaEta !== exp.eta_la_guaira) {
-                const recordId = exp.id;
-                const urlUpdate = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${recordId}?updateMask.fieldPaths=eta_la_guaira`;
-                
-                await fetch(urlUpdate, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fields: { eta_la_guaira: { stringValue: nuevaEta } } })
-                });
-                actualizadosCount++;
-            }
-            */
+        if (navieraLower.includes("msc")) {
+            // Conector MSC
+            // const res = await fetch(`https://www.msc.com/en/track-a-shipment/track-result?trackingNumber=${encodeURIComponent(codigoRastreo)}`, { headers: headersNavegador });
+            // if (res.ok) { const data = await res.json(); nuevaEtaCalculada = data.eta; }
+        } else if (navieraLower.includes("maersk")) {
+            // Conector Maersk
+            // const res = await fetch(`https://api.maersk.com/trackings?shipmentId=${encodeURIComponent(codigoRastreo)}`, { headers: headersNavegador });
+            // if (res.ok) { const data = await res.json(); nuevaEtaCalculada = data.estimatedArrivalTime; }
+        } else if (navieraLower.includes("hapag") || navieraLower.includes("hapag-lloyd")) {
+            // Conector Hapag-Lloyd
+            // const res = await fetch(`https://www.hapag-lloyd.com/watchlist/api/getTracking?trackingId=${encodeURIComponent(codigoRastreo)}`, { headers: headersNavegador });
+            // if (res.ok) { const data = await res.json(); nuevaEtaCalculada = data.eta; }
+        } else {
+            console.log(`ℹ️ La naviera "${nombreNaviera}" no tiene un conector API configurado todavía.`);
         }
-        console.log(`🏁 [TRACKING AUTO] Ciclo finalizado. Expedientes revisados: ${expedientesActivos.length}`);
-    } catch (error) {
-        console.error("❌ Error en procesarTrackingExpedientes:", error);
-    }
-}
 
-// Tarea programada (Cron) para ejecutar el tracking automático (Ej. Todos los días a las 6:00 AM y 2:00 PM)
-cron.schedule('0 6,14 * * *', async () => {
-    await procesarTrackingExpedientes();
-}, { timezone: "America/Caracas" });
-// ==========================================
-// MÓDULO DE SEGUIMIENTO Y TRACKING AUTOMÁTICO (CON FILTRO DE LLEGADA)
-// ==========================================
-
-async function obtenerCodigoDeRastreo(expediente) {
-    // 1. Priorizamos el número de contenedor si existe y no está vacío
-    if (expediente.numero_contenedor && expediente.numero_contenedor.trim() !== "" && expediente.numero_contenedor !== "S/N") {
-        return {
-            tipo: "contenedor",
-            codigo: expediente.numero_contenedor.trim()
-        };
+        return nuevaEtaCalculada; 
+    } catch (err) {
+        console.error(`❌ Error consultando la naviera ${nombreNaviera}:`, err.message);
+        return null;
     }
-    
-    // 2. Si no hay contenedor, usamos el B/L o AWB
-    if (expediente.awb_bl && expediente.awb_bl.trim() !== "" && expediente.awb_bl !== "S/N") {
-        return {
-            tipo: "bl",
-            codigo: expediente.awb_bl.trim()
-        };
-    }
-
-    return null; // Ninguno de los dos campos tiene datos válidos
 }
 
 async function procesarTrackingExpedientes() {
@@ -409,7 +389,7 @@ async function procesarTrackingExpedientes() {
         const expedientes = await obtenerExpedientesFirestore();
         if (!expedientes || expedientes.length === 0) return;
 
-        // 📌 FILTRO ESTRICTO: Omitir si ya tiene FECHA DE LLEGADA registrada o si ya fue DESPACHADO
+        // Filtro estricto: Omitir si ya tiene fecha de llegada o fue despachado
         const expedientesActivos = expedientes.filter(e => {
             const tieneLlegada = Boolean(e.fecha_llegada && String(e.fecha_llegada).trim() !== "");
             const estaDespachado = Boolean(e.despacho && String(e.despacho).trim() !== "");
@@ -422,19 +402,15 @@ async function procesarTrackingExpedientes() {
             const datosTracking = await obtenerCodigoDeRastreo(exp);
             if (!datosTracking) continue;
 
-            console.log(`🔍 Monitoreando Exp: ${exp.num_expediente} usando su ${datosTracking.tipo.toUpperCase()}: ${datosTracking.codigo}`);
+            console.log(`🔍 Monitoreando Exp: ${exp.num_expediente} [Naviera: ${exp.naviera || 'S/N'}] usando ${datosTracking.tipo.toUpperCase()}: ${datosTracking.codigo}`);
 
-            // 📌 Aquí conectas tu lógica o función de consulta externa:
-            // const nuevaEta = await tuFuncionDeConsultaGratuita(datosTracking.codigo);
-            // 
-            /*
+            const nuevaEta = await consultarEtaNaviera(datosTracking.codigo, exp.naviera);
             const etaActualRegistrada = exp.eta_la_guaira || "";
             
             if (nuevaEta && nuevaEta !== etaActualRegistrada) {
                 const recordId = exp.id;
                 if (!recordId) continue;
 
-                // 1. Actualizamos en Firebase Firestore
                 const urlUpdate = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/expedientes/${recordId}?updateMask.fieldPaths=eta_la_guaira`;
                 
                 const resPatch = await fetch(urlUpdate, {
@@ -449,8 +425,6 @@ async function procesarTrackingExpedientes() {
 
                 if (resPatch.ok) {
                     actualizadosCount++;
-                    
-                    // 2. 🚀 DISPARAR ALERTA AUTOMÁTICA POR WHATSAPP Y TELEGRAM
                     const numExp = exp.num_expediente || 'S/N';
                     const clienteExp = exp.cliente || 'S/C';
                     const blContenedorExp = datosTracking.codigo;
@@ -465,9 +439,8 @@ async function procesarTrackingExpedientes() {
                     console.log(`✅ [ETA ACTUALIZADA Y NOTIFICADA] Exp: ${numExp} | Nueva ETA: ${nuevaEta}`);
                 }
             }
-            */
         }
-        console.log(`🏁 [TRACKING AUTO] Ciclo completado. Total de expedientes revisados: ${expedientesActivos.length}`);
+        console.log(`🏁 [TRACKING AUTO] Ciclo completado. Total revisados: ${expedientesActivos.length} | Actualizados: ${actualizadosCount}`);
     } catch (error) {
         console.error("❌ Error en procesarTrackingExpedientes:", error);
     }
