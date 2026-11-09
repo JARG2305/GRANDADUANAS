@@ -1656,16 +1656,32 @@ cron.schedule('30 16 * * *', async () => {
 
 
 // ==========================================
-// TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (ÚNICA)
+// TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (CON BLOQUEO ANTI-DUPLICIDAD)
 // ==========================================
+let estaEjecutandoAlertas = false;
+
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
+    // Candado de exclusión mutua: si ya se está ejecutando, se bloquea el segundo intento simultáneo
+    if (estaEjecutandoAlertas) {
+        console.log("🛡️ [ANTIDUPLICADO] Intento de ejecución simultánea bloqueado.");
+        return;
+    }
+    
+    estaEjecutandoAlertas = true;
+
     try {
+        console.log("⏰ [CRON ALARMAS] Ejecutando reporte programado multicanal...");
         const listaFinalOrdenada = await generarListaAlertasSistema();
         if (listaFinalOrdenada.length > 0) {
             await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE PROGRAMADO AUTOMÁTICO");
         }
     } catch (error) {
         console.error("❌ Error en cron de alertas multicanal:", error);
+    } finally {
+        // Liberamos el candado después de 10 segundos para permitir el siguiente ciclo horario
+        setTimeout(() => {
+            estaEjecutandoAlertas = false;
+        }, 10000);
     }
 }, { timezone: "America/Caracas" });
 
