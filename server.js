@@ -551,15 +551,18 @@ async function iniciarBaileysWhatsApp() {
 iniciarBaileysWhatsApp();
 
 // ==========================================
-// 2.3 INICIALIZACIÓN DE TELEGRAM (POLLING)
+// 2.3 INICIALIZACIÓN DE TELEGRAM (POLLING SECUENCIAL BLINDADO)
 // ==========================================
-async function iniciarTelegramPolling() {
-    if (!TELEGRAM_BOT_TOKEN) return;
-    let offset = 0;
-    
-    console.log("🤖 [TELEGRAM] Iniciando sondeo (Polling) de comandos...");
+let telegramPollingActivo = false;
 
-    setInterval(async () => {
+async function iniciarTelegramPolling() {
+    if (!TELEGRAM_BOT_TOKEN || telegramPollingActivo) return;
+    telegramPollingActivo = true;
+    
+    let offset = 0;
+    console.log("🤖 [TELEGRAM] Iniciando sondeo (Polling) secuencial seguro...");
+
+    while (true) {
         try {
             const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=30`;
             const response = await fetch(url);
@@ -567,7 +570,9 @@ async function iniciarTelegramPolling() {
 
             if (data.ok && data.result.length > 0) {
                 for (const update of data.result) {
+                    // Actualizamos el offset inmediatamente para este update ID
                     offset = update.update_id + 1;
+                    
                     if (!update.message || !update.message.text) continue;
 
                     const chatId = String(update.message.chat.id);
@@ -581,8 +586,13 @@ async function iniciarTelegramPolling() {
                     }
                 }
             }
-        } catch (err) {}
-    }, 4000);
+        } catch (err) {
+            // Pausa de seguridad de 5 segundos si ocurre un fallo de red antes de reintentar
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        // Pequeña pausa de 1 segundo entre peticiones continuas para evitar saturación
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
 }
 iniciarTelegramPolling();
 
