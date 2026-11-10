@@ -1661,7 +1661,7 @@ cron.schedule('30 16 * * *', async () => {
 let estaEjecutandoAlertas = false;
 
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
-    // Candado de exclusión mutua: si ya se está ejecutando, se bloquea el segundo intento simultáneo
+    // Si ya se está ejecutando en este mismo milisegundo, bloquea el segundo intento
     if (estaEjecutandoAlertas) {
         console.log("🛡️ [ANTIDUPLICADO] Intento de ejecución simultánea bloqueado.");
         return;
@@ -1678,7 +1678,7 @@ cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     } catch (error) {
         console.error("❌ Error en cron de alertas multicanal:", error);
     } finally {
-        // Liberamos el candado después de 10 segundos para permitir el siguiente ciclo horario
+        // Libera el candado tras 10 segundos para el siguiente ciclo horario
         setTimeout(() => {
             estaEjecutandoAlertas = false;
         }, 10000);
