@@ -1666,32 +1666,46 @@ cron.schedule('30 16 * * *', async () => {
 
 
 // ==========================================
-// TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (CON BLOQUEO ANTI-DUPLICIDAD)
+// TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (CON BLOQUEO ATÓMICO EN NUBE)
 // ==========================================
-let estaEjecutandoAlertas = false;
-
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
-    // Si ya se está ejecutando en este mismo milisegundo, bloquea el segundo intento
-    if (estaEjecutandoAlertas) {
-        console.log("🛡️ [ANTIDUPLICADO] Intento de ejecución simultánea bloqueado.");
-        return;
-    }
-    
-    estaEjecutandoAlertas = true;
-
     try {
-        console.log("⏰ [CRON ALARMAS] Ejecutando reporte programado multicanal...");
+        const ahora = new Date();
+        // Clave única basada en el minuto exacto (Ej: "2026-11-10-18-00")
+        const claveHoraActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}-${String(ahora.getHours()).padStart(2, '0')}-${String(ahora.getMinutes()).padStart(2, '0')}`;
+
+        const urlControl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/bloqueo_alertas`;
+        
+        // Consultamos el semáforo en Firestore
+        const resCheck = await fetch(urlControl);
+        if (resCheck.ok) {
+            const dataCheck = await resCheck.json();
+            const ultimaClaveRegistrada = dataCheck.fields?.ultimaClave?.stringValue || "";
+            
+            if (ultimaClaveRegistrada === claveHoraActual) {
+                console.log("🛡️ [BLOQUEO NUBE] Esta alerta ya fue procesada en este minuto exacto. Omitiendo duplicado.");
+                return;
+            }
+        }
+
+        // Bloqueamos el minuto actual de inmediato en Firestore
+        await fetch(urlControl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fields: {
+                    ultimaClave: { stringValue: claveHoraActual }
+                }
+            })
+        });
+
+        console.log("⏰ [CRON UNICO] Ejecutando reporte programado multicanal...");
         const listaFinalOrdenada = await generarListaAlertasSistema();
         if (listaFinalOrdenada.length > 0) {
             await enviarAlertaMulticanal(listaFinalOrdenada, "REPORTE PROGRAMADO AUTOMÁTICO");
         }
     } catch (error) {
         console.error("❌ Error en cron de alertas multicanal:", error);
-    } finally {
-        // Libera el candado tras 10 segundos para el siguiente ciclo horario
-        setTimeout(() => {
-            estaEjecutandoAlertas = false;
-        }, 10000);
     }
 }, { timezone: "America/Caracas" });
 
