@@ -1042,38 +1042,64 @@ async function procesarComandoLogistica(textoMensaje) {
             return generarPlantillaClienteNuevo(terminoBuscado);
         }
 
-        const f = expedienteEncontrado.fields;
-        const hasEta = Boolean(f.eta_la_guaira?.stringValue && f.eta_la_guaira.stringValue.trim() !== "");
-        const hasLlegada = Boolean(f.fecha_llegada?.stringValue && f.fecha_llegada.stringValue.trim() !== "");
-        const hasActa = Boolean(f.recibida_acta_recepcion?.stringValue && f.recibida_acta_recepcion.stringValue.trim() !== "");
-        const hasTransmision = Boolean(f.fecha_transmision?.stringValue && f.fecha_transmision.stringValue.trim() !== "");
-        const hasCanal = Boolean(f.canal?.stringValue && f.canal.stringValue.trim() !== "");
-        const hasReconocimiento = Boolean(f.reconocimiento?.stringValue && f.reconocimiento.stringValue.trim() !== "");
-        const hasValidacion = Boolean(f.validacion?.stringValue && f.validacion.stringValue.trim() !== "");
+       const f = expedienteEncontrado.fields;
+        const hasEta = Boolean(f.eta_la_guaira?.stringValue?.trim());
+        const hasLlegada = Boolean(f.fecha_llegada?.stringValue?.trim());
+        const hasActa = Boolean(
+            f.recibida_acta_recepcion?.stringValue?.trim() ||
+            f.recibida_acta_recepcion_almacen?.stringValue?.trim()
+        );
+        const hasTransmision = Boolean(f.fecha_transmision?.stringValue?.trim());
+        const hasCanal = Boolean(f.canal?.stringValue?.trim());
+        const hasReconocimiento = Boolean(f.reconocimiento?.stringValue?.trim());
+        const hasValidacion = Boolean(f.validacion?.stringValue?.trim());
+        const hasDespacho = Boolean(f.despacho?.stringValue?.trim());
 
-        if (campoAModificar === "fecha_llegada" && !hasEta) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Llegada* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **ETA**.`;
+        // 1. Impedir borrar un campo si ya existen etapas posteriores registradas
+        if (esBorrar) {
+            if (campoAModificar === "fecha_llegada" && (hasActa || hasTransmision || hasReconocimiento || hasValidacion || hasDespacho)) {
+                return `⚠️ *No se puede borrar la Fecha de Llegada* porque el expediente *${expedienteEncontrado.numExpediente}* ya tiene etapas posteriores registradas.`;
+            }
+            if (campoAModificar === "recibida_acta_recepcion" && (hasTransmision || hasReconocimiento || hasValidacion || hasDespacho)) {
+                return `⚠️ *No se puede borrar el Acta de Recepción* porque el expediente *${expedienteEncontrado.numExpediente}* ya tiene transmisión o etapas posteriores.`;
+            }
+            if (campoAModificar === "fecha_transmision" && (hasReconocimiento || hasValidacion || hasDespacho)) {
+                return `⚠️ *No se puede borrar la Fecha de Transmisión* porque el expediente *${expedienteEncontrado.numExpediente}* ya tiene reconocimiento, validación o despacho.`;
+            }
+            if (campoAModificar === "reconocimiento" && (hasValidacion || hasDespacho)) {
+                return `⚠️ *No se puede borrar el Reconocimiento* porque el expediente *${expedienteEncontrado.numExpediente}* ya tiene validación o despacho.`;
+            }
+            if (campoAModificar === "validacion" && hasDespacho) {
+                return `⚠️ *No se puede borrar la Validación* porque el expediente *${expedienteEncontrado.numExpediente}* ya tiene despacho registrado.`;
+            }
         }
-        if (campoAModificar === "recibida_acta_recepcion" && !hasLlegada) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Acta de Recepción* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Llegada**.`;
-        }
-        if (campoAModificar === "fecha_transmision" && !hasActa) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Transmisión* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada el **Acta de Recepción**.`;
-        }
-        if (esCanal && !hasTransmision) {
-            return `⚠️ *Secuencia Requerida:* No se puede asignar el *Canal* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
-        }
-        if (campoAModificar === "reconocimiento" && !hasTransmision) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Reconocimiento* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
-        }
-        if (campoAModificar === "validacion" && !hasReconocimiento) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar la *Validación* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **Reconocimiento**.`;
-        }
-        if (campoAModificar === "despacho" && !hasValidacion) {
-            return `⚠️ *Secuencia Requerida:* No se puede registrar el *Despacho* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Validación**.`;
-        }
-        if (esFuncionario && !hasCanal) {
-            return `⚠️ *Secuencia Requerida:* No se puede asignar el *Funcionario* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene asignado un **Canal** aduanero.`;
+
+        // 2. Exigir secuencia estricta al registrar o actualizar un campo
+        if (!esBorrar) {
+            if (campoAModificar === "fecha_llegada" && !hasEta) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Llegada* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **ETA**.`;
+            }
+            if (campoAModificar === "recibida_acta_recepcion" && !hasLlegada) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar el *Acta de Recepción* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Llegada**.`;
+            }
+            if (campoAModificar === "fecha_transmision" && !hasActa) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar la *Fecha de Transmisión* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada el **Acta de Recepción**.`;
+            }
+            if (esCanal && !hasTransmision) {
+                return `⚠️ *Secuencia Requerida:* No se puede asignar el *Canal* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
+            }
+            if (campoAModificar === "reconocimiento" && !hasTransmision) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar el *Reconocimiento* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Fecha de Transmisión**.`;
+            }
+            if (campoAModificar === "validacion" && !hasReconocimiento) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar la *Validación* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrado el **Reconocimiento**.`;
+            }
+            if (campoAModificar === "despacho" && !hasValidacion) {
+                return `⚠️ *Secuencia Requerida:* No se puede registrar el *Despacho* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene registrada la **Validación**.`;
+            }
+            if (esFuncionario && !hasCanal) {
+                return `⚠️ *Secuencia Requerida:* No se puede asignar el *Funcionario* porque el expediente *${expedienteEncontrado.numExpediente}* no tiene asignado un **Canal** aduanero.`;
+            }
         }
 
         const camposActualizados = { ...expedienteEncontrado.fields };
@@ -1667,40 +1693,84 @@ cron.schedule('30 16 * * *', async () => {
     }
 }, { timezone: "America/Caracas" });
 
+function obtenerClaveCaracas() {
+    const partes = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Caracas',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(new Date());
 
+    const map = Object.fromEntries(partes.map(p => [p.type, p.value]));
+    return `${map.year}-${map.month}-${map.day}-${map.hour}-${map.minute}`;
+}
+
+async function adquirirBloqueoMinuto(claveMinuto) {
+    const docPath = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/bloqueo_alertas`;
+    const urlGet = `https://firestore.googleapis.com/v1/${docPath}`;
+    const urlCommit = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+
+    const resGet = await fetch(urlGet);
+    if (resGet.ok) {
+        const doc = await resGet.json();
+        const ultimaClave = doc.fields?.ultimaClave?.stringValue || "";
+        if (ultimaClave === claveMinuto) {
+            return false; // Ya se envió en este minuto
+        }
+
+        // Escritura condicional: solo tiene éxito si nadie más modificó el documento desde que lo leímos
+        const resCommit = await fetch(urlCommit, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                writes: [{
+                    update: {
+                        name: doc.name,
+                        fields: {
+                            ultimaClave: { stringValue: claveMinuto },
+                            actualizadoEn: { stringValue: new Date().toISOString() }
+                        }
+                    },
+                    currentDocument: { updateTime: doc.updateTime }
+                }]
+            })
+        });
+        return resCommit.ok;
+    }
+
+    // Si el documento aún no existe, crearlo solo si no existe
+    const resCreate = await fetch(urlCommit, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            writes: [{
+                update: {
+                    name: docPath,
+                    fields: {
+                        ultimaClave: { stringValue: claveMinuto },
+                        actualizadoEn: { stringValue: new Date().toISOString() }
+                    }
+                },
+                currentDocument: { exists: false }
+            }]
+        })
+    });
+    return resCreate.ok;
+}
 // ==========================================
 // TAREA PROGRAMADA: ALERTAS AUTOMÁTICAS MULTICANAL (CON BLOQUEO ATÓMICO EN NUBE)
 // ==========================================
 cron.schedule('0 9,12,15,18,19,20 * * *', async () => {
     try {
-        const ahora = new Date();
-        // Clave única basada en el minuto exacto (Ej: "2026-11-10-18-00")
-        const claveHoraActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}-${String(ahora.getHours()).padStart(2, '0')}-${String(ahora.getMinutes()).padStart(2, '0')}`;
-
-        const urlControl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/configuracion/bloqueo_alertas`;
-        
-        // Consultamos el semáforo en Firestore
-        const resCheck = await fetch(urlControl);
-        if (resCheck.ok) {
-            const dataCheck = await resCheck.json();
-            const ultimaClaveRegistrada = dataCheck.fields?.ultimaClave?.stringValue || "";
-            
-            if (ultimaClaveRegistrada === claveHoraActual) {
-                console.log("🛡️ [BLOQUEO NUBE] Esta alerta ya fue procesada en este minuto exacto. Omitiendo duplicado.");
-                return;
-            }
+        const claveMinuto = obtenerClaveCaracas();
+        const ganoBloqueo = await adquirirBloqueoMinuto(claveMinuto);
+        if (!ganoBloqueo) {
+            console.log("🛡️ [BLOQUEO ATÓMICO] Alerta ya tomada o enviada en este minuto. Omitiendo.");
+            return;
         }
-
-        // Bloqueamos el minuto actual de inmediato en Firestore
-        await fetch(urlControl, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: {
-                    ultimaClave: { stringValue: claveHoraActual }
-                }
-            })
-        });
 
         console.log("⏰ [CRON UNICO] Ejecutando reporte programado multicanal...");
         const listaFinalOrdenada = await generarListaAlertasSistema();
