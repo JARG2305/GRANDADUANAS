@@ -1686,6 +1686,47 @@
             const navieraEl = document.getElementById("naviera");
             if (navieraEl) navieraEl.value = lineaVal;
         };
+
+	function tieneValor(v) {
+    return v !== undefined && v !== null && String(v).trim() !== "";
+}
+
+function validarSecuenciaWeb(actual, propuestos) {
+    const d = { ...actual, ...propuestos };
+
+    const hasEta = tieneValor(d.eta_la_guaira);
+    const hasLlegada = tieneValor(d.fecha_llegada);
+    const hasActa = tieneValor(d.recibida_acta_recepcion) || tieneValor(d.recibida_acta_recepcion_almacen);
+    const hasTransmision = tieneValor(d.fecha_transmision);
+    const hasCanal = tieneValor(d.canal);
+    const hasReconocimiento = tieneValor(d.reconocimiento);
+    const hasValidacion = tieneValor(d.validacion);
+    const hasDespacho = tieneValor(d.despacho);
+
+    if (hasLlegada && !hasEta) {
+        return "No puedes registrar Fecha de Llegada sin tener registrado el ETA.";
+    }
+    if (hasActa && !hasLlegada) {
+        return "No puedes registrar Acta de Recepción sin tener registrada la Fecha de Llegada.";
+    }
+    if (hasTransmision && !hasActa) {
+        return "No puedes registrar Fecha de Transmisión sin tener registrada el Acta de Recepción.";
+    }
+    if (hasCanal && !hasTransmision) {
+        return "No puedes asignar Canal sin tener registrada la Fecha de Transmisión.";
+    }
+    if (hasReconocimiento && !hasTransmision) {
+        return "No puedes registrar Reconocimiento sin tener registrada la Fecha de Transmisión.";
+    }
+    if (hasValidacion && !hasReconocimiento) {
+        return "No puedes registrar Validación sin tener registrado el Reconocimiento.";
+    }
+    if (hasDespacho && !hasValidacion) {
+        return "No puedes registrar Despacho sin tener registrada la Validación.";
+    }
+
+    return null;
+}
 	window.saveExp = async function(e) {
             e.preventDefault();
 	const inputsFechas = document.querySelectorAll('input[maxlength="10"]');
@@ -1698,13 +1739,20 @@
         }
     }
 
-            const idVal = document.getElementById("recordId").value;
+                      
+	    const idVal = document.getElementById("recordId").value;
             const record = {};
             fieldsList.forEach(f => { record[f] = document.getElementById(f)?.value.trim() || ""; });
-	    record.proveedor = document.getElementById("proveedor")?.value.trim() || "S/N";
+            record.proveedor = document.getElementById("proveedor")?.value.trim() || "S/N";
+
+            const expedienteOriginal = idVal ? (allRecords.find(r => r.id === idVal) || {}) : {};
+            const errorSecuencia = validarSecuenciaWeb(expedienteOriginal, record);
+            if (errorSecuencia) {
+                alert("⚠️ " + errorSecuencia);
+                return;
+            }
 
             const nombreCliente = record.cliente;
-
             try {
                 // 1. Guardamos o actualizamos en Firestore
                 if (idVal) {
