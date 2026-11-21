@@ -2515,6 +2515,344 @@ if (inputActaPrincipal && inputActaAlmacen) {
         inputActaAlmacen.value = e.target.value;
     });
 }
+// ==========================================
+// 1. ARCHIVO HISTÓRICO (>30 DÍAS DESPACHADOS)
+// ==========================================
+window.openArchiveModal = function() {
+    const modal = document.getElementById("archiveModal");
+    if (!modal) return;
+    const search = document.getElementById("archiveSearchInput");
+    if (search) search.value = "";
+    modal.classList.remove("hidden");
+    window.filterArchiveData();
+};
+
+window.closeArchiveModal = function() {
+    const modal = document.getElementById("archiveModal");
+    if (modal) modal.classList.add("hidden");
+};
+
+window.filterArchiveData = function() {
+    const tbody = document.getElementById("archiveTableBody");
+    if (!tbody) return;
+
+    const q = (document.getElementById("archiveSearchInput")?.value || "").toLowerCase().trim();
+    const archivados = allRecords.filter(r => {
+        if (!esHistoricoArchivado(r)) return false;
+        if (!q) return true;
+        return Object.values(r).some(v => String(v || "").toLowerCase().includes(q));
+    });
+
+    if (archivados.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No hay expedientes en el archivo histórico.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = archivados.map(rec => `
+        <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs">
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="window.closeArchiveModal(); window.editRecord('${rec.id}');" class="text-blue-600 font-bold" title="Editar">✏️</button>
+            </td>
+            <td class="p-2.5 font-semibold">${rec.num_expediente || ""}</td>
+            <td class="p-2.5">${rec.cliente || ""}</td>
+            <td class="p-2.5">${rec.proveedor || ""}</td>
+            <td class="p-2.5">${rec.awb_bl || ""}</td>
+            <td class="p-2.5">${rec.modo_transporte || "Marítimo"}</td>
+            <td class="p-2.5">${formatearFechaDDMMYYYY(rec.fecha_llegada || "")}</td>
+            <td class="p-2.5">${formatearFechaDDMMYYYY(rec.despacho || "")}</td>
+            <td class="p-2.5">${rec.observaciones || ""}</td>
+        </tr>
+    `).join("");
+};
+
+// ==========================================
+// 2. EXPEDIENTES CON MULTAS (ART. 177 LOA)
+// ==========================================
+function tieneMultaExtemporanea(rec) {
+    const obs = String(rec.observaciones || "").toLowerCase();
+    if (obs.includes("multa") || obs.includes("177") || obs.includes("extempor")) return true;
+
+    const dVencDai = parseFechaLocal(rec.vencimiento_dai);
+    const dLlegada = parseFechaLocal(rec.fecha_llegada);
+    const dTransmision = parseFechaLocal(rec.fecha_transmision);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    if (dVencDai && !dLlegada && dVencDai < hoy) return true;
+    if (dLlegada && dTransmision) {
+        const diffDias = Math.round((dTransmision - dLlegada) / (1000 * 60 * 60 * 24));
+        if (diffDias > 5) return true;
+    }
+    return false;
+}
+
+window.openMultasModal = function() {
+    const modal = document.getElementById("multasModal");
+    if (!modal) return;
+    const search = document.getElementById("multasSearchInput");
+    if (search) search.value = "";
+    modal.classList.remove("hidden");
+    window.filterMultasData();
+};
+
+window.closeMultasModal = function() {
+    const modal = document.getElementById("multasModal");
+    if (modal) modal.classList.add("hidden");
+};
+
+window.filterMultasData = function() {
+    const tbody = document.getElementById("multasTableBody");
+    if (!tbody) return;
+
+    const q = (document.getElementById("multasSearchInput")?.value || "").toLowerCase().trim();
+    const conMulta = allRecords.filter(r => {
+        if (!tieneMultaExtemporanea(r)) return false;
+        if (!q) return true;
+        return Object.values(r).some(v => String(v || "").toLowerCase().includes(q));
+    });
+
+    if (conMulta.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">No hay expedientes con multas registradas.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = conMulta.map(rec => `
+        <tr class="hover:bg-red-50/40 border-b border-slate-100 text-xs">
+            <td class="p-2.5 text-center">
+                <button type="button" onclick="window.closeMultasModal(); window.editRecord('${rec.id}');" class="text-blue-600 font-bold" title="Editar">✏️</button>
+            </td>
+            <td class="p-2.5 font-semibold">${rec.num_expediente || ""}</td>
+            <td class="p-2.5">${rec.cliente || ""}</td>
+            <td class="p-2.5">${rec.proveedor || ""}</td>
+            <td class="p-2.5">${rec.awb_bl || ""}</td>
+            <td class="p-2.5">${rec.modo_transporte || "Marítimo"}</td>
+            <td class="p-2.5">${formatearFechaDDMMYYYY(rec.fecha_llegada || "")}</td>
+            <td class="p-2.5">${formatearFechaDDMMYYYY(rec.fecha_transmision || "")}</td>
+            <td class="p-2.5 text-red-700 font-medium">${rec.observaciones || "Posible extemporaneidad / vencimiento de plazo"}</td>
+        </tr>
+    `).join("");
+};
+
+// ==========================================
+// 3. FORZAR ALERTAS TELEGRAM
+// ==========================================
+window.enviarAlertasPendientes = async function() {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/alertas/forzar`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ canales: { telegram: true, whatsapp: false } })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            alert("✅ Alertas enviadas a Telegram correctamente.");
+        } else {
+            alert("⚠️ " + (data.message || "No se pudieron enviar las alertas."));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("❌ Error de red al forzar alertas de Telegram.");
+    }
+};
+
+// ==========================================
+// 4. RENDIMIENTO Y ANALÍTICA POR FECHAS
+// ==========================================
+function contarDiasHabilesEntre(fechaInicio, fechaFin) {
+    if (!fechaInicio || !fechaFin || fechaFin < fechaInicio) return 0;
+    let dias = 0;
+    const cursor = new Date(fechaInicio.getTime());
+    while (cursor < fechaFin) {
+        cursor.setDate(cursor.getDate() + 1);
+        const dow = cursor.getDay();
+        if (dow !== 0 && dow !== 6) dias++;
+    }
+    return dias;
+}
+
+window.calcularAnaliticaPorFechas = function() {
+    const desdeStr = document.getElementById("filtroFechaDesde")?.value;
+    const hastaStr = document.getElementById("filtroFechaHasta")?.value;
+
+    const fDesde = desdeStr ? new Date(`${desdeStr}T00:00:00`) : null;
+    const fHasta = hastaStr ? new Date(`${hastaStr}T23:59:59`) : null;
+
+    const filtrados = allRecords.filter(r => {
+        const fDesp = parseFechaLocal(r.despacho);
+        if (!fDesp) return false;
+        if (fDesde && fDesp < fDesde) return false;
+        if (fHasta && fDesp > fHasta) return false;
+        return true;
+    });
+
+    let totalContenedores = 0;
+    let sumaDiasHabiles = 0;
+    let cuentaTiempos = 0;
+    let verde = 0, rojo = 0, amarillo = 0;
+    let maritimo = 0, aereo = 0;
+
+    filtrados.forEach(r => {
+        if (r.numero_contenedor && String(r.numero_contenedor).trim() !== "") {
+            const listaCont = String(r.numero_contenedor).split(",").map(s => s.trim()).filter(Boolean);
+            totalContenedores += listaCont.length;
+        }
+
+        const fBase = parseFechaLocal(r.recibida_acta_recepcion || r.fecha_llegada);
+        const fDesp = parseFechaLocal(r.despacho);
+        if (fBase && fDesp && fDesp >= fBase) {
+            sumaDiasHabiles += contarDiasHabilesEntre(fBase, fDesp);
+            cuentaTiempos++;
+        }
+
+        const canal = String(r.canal || "").toUpperCase().trim();
+        if (canal === "VERDE") verde++;
+        else if (canal === "ROJO") rojo++;
+        else if (canal === "AMARILLO") amarillo++;
+
+        const via = String(r.modo_transporte || "").toLowerCase();
+        if (via.includes("aéreo") || via.includes("aereo")) aereo++;
+        else maritimo++;
+    });
+
+    const promedio = cuentaTiempos > 0 ? (sumaDiasHabiles / cuentaTiempos).toFixed(1) : "0";
+
+    document.getElementById("analiticaTotalDocs").innerText = filtrados.length;
+    document.getElementById("analiticaTotalContenedores").innerText = totalContenedores;
+    document.getElementById("analiticaTiempoPromedio").innerText = `${promedio} días hábiles`;
+    document.getElementById("cVerde").innerText = verde;
+    document.getElementById("cRojo").innerText = rojo;
+    document.getElementById("cAmarillo").innerText = amarillo;
+    document.getElementById("analiticaVias").innerText = `🚢: ${maritimo} | ✈: ${aereo}`;
+};
+
+window.limpiarAnaliticaFechas = function() {
+    const desde = document.getElementById("filtroFechaDesde");
+    const hasta = document.getElementById("filtroFechaHasta");
+    if (desde) desde.value = "";
+    if (hasta) hasta.value = "";
+    window.calcularAnaliticaPorFechas();
+};
+
+// ==========================================
+// 5. ENVIAR ALERTAS POR WHATSAPP (PESTAÑA / TODAS)
+// ==========================================
+function obtenerTextosAlertasWeb(soloPestanaActual) {
+    const items = [...document.querySelectorAll("#alertsContainer > div > div")].map(el => el.innerText.trim()).filter(Boolean);
+    if (items.length > 0) return items;
+    if (soloPestanaActual) return [];
+    return [];
+}
+
+window.enviarWhatsAppPestanaActual = async function() {
+    const alertas = obtenerTextosAlertasWeb(true);
+    if (alertas.length === 0) {
+        alert("⚠️ No hay alertas en la pestaña actual para enviar.");
+        return;
+    }
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/alertas/forzar`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ canales: { whatsapp: true, telegram: false } })
+        });
+        const data = await res.json();
+        alert(data.success ? "✅ Enviado por WhatsApp." : "⚠️ " + (data.message || "No se pudo enviar por WhatsApp."));
+    } catch (err) {
+        alert("❌ Error de red al enviar por WhatsApp.");
+    }
+};
+
+window.enviarWhatsAppTodas = async function() {
+    try {
+        const res = await fetch(`${BACKEND_URL}/api/alertas/forzar`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ canales: { whatsapp: true, telegram: false } })
+        });
+        const data = await res.json();
+        alert(data.success ? "✅ Todas las alertas activas enviadas por WhatsApp." : "⚠️ " + (data.message || "No se pudo enviar por WhatsApp."));
+    } catch (err) {
+        alert("❌ Error de red al enviar por WhatsApp.");
+    }
+};
+
+// ==========================================
+// 6. DESPLAZAMIENTO HORIZONTAL DE COLUMNAS
+// ==========================================
+window.scrollColumns = function(direccion) {
+    const container = document.getElementById("tableScrollContainer");
+    if (!container) return;
+    const paso = 220;
+    container.scrollLeft += (direccion * paso);
+};
+
+// ==========================================
+// 7. EVENTOS DEL FORMULARIO DE EXPEDIENTE
+// ==========================================
+window.onModoTransporteChange = function() {
+    const modo = document.getElementById("modo_transporte")?.value || "Marítimo";
+    const esAereo = modo.toLowerCase().includes("aéreo") || modo.toLowerCase().includes("aereo");
+    const contInput = document.getElementById("numero_contenedor");
+    if (contInput) {
+        contInput.disabled = esAereo;
+        if (esAereo) contInput.value = "";
+    }
+};
+
+window.toggleFechaPermisologia = function() {
+    const sel = document.getElementById("permisologia")?.value || "No Aplica";
+    const box = document.getElementById("container_fecha_permisologia");
+    if (!box) return;
+    if (sel === "No Aplica") {
+        box.classList.add("hidden");
+        const fInput = document.getElementById("fecha_recibido_permisologia");
+        if (fInput) fInput.value = "";
+    } else {
+        box.classList.remove("hidden");
+    }
+};
+
+function sumarDiasCalendario(fechaStr, dias) {
+    const base = parseFechaLocal(fechaStr);
+    if (!base || isNaN(dias)) return "";
+    const d = new Date(base.getTime());
+    d.setDate(d.getDate() + dias);
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+window.calcularCulminacionDiasLibres = function() {
+    const inicioInput = document.getElementById("inicio_dias_libres");
+    const culminaInput = document.getElementById("culminacion_dias_libres");
+    const diasVal = parseInt(document.getElementById("dias_libres_almacen")?.value, 10);
+
+    if (inicioInput && !inicioInput.value) {
+        const base = document.getElementById("fecha_llegada")?.value || document.getElementById("recibida_acta_recepcion")?.value || "";
+        if (base) inicioInput.value = base;
+    }
+
+    if (culminaInput) {
+        culminaInput.value = (inicioInput?.value && !isNaN(diasVal))
+            ? sumarDiasCalendario(inicioInput.value, diasVal)
+            : "";
+    }
+};
+
+window.calcularCulminacionDiasLibresNaviera = function() {
+    const inicioInput = document.getElementById("inicio_dias_libres_naviera");
+    const culminaInput = document.getElementById("culminacion_dias_libres_naviera");
+    const diasVal = parseInt(document.getElementById("dias_libres_naviera")?.value, 10);
+
+    if (inicioInput && !inicioInput.value) {
+        const base = document.getElementById("fecha_llegada")?.value || document.getElementById("eta_la_guaira")?.value || "";
+        if (base) inicioInput.value = base;
+    }
+
+    if (culminaInput) {
+        culminaInput.value = (inicioInput?.value && !isNaN(diasVal))
+            ? sumarDiasCalendario(inicioInput.value, diasVal)
+            : "";
+    }
+};
 inicializarAppFirebase();
     </script>
 </body>
