@@ -2853,6 +2853,89 @@ window.calcularCulminacionDiasLibresNaviera = function() {
             : "";
     }
 };
+function construirMensajeWhatsAppWeb(titulo, alertas) {
+    const encabezado = `🚨 *${titulo}* (${alertas.length})\n\n`;
+    const cuerpo = alertas.map((a, i) => `${i + 1}. ${a}`).join("\n");
+    return `${encabezado}${cuerpo}`.trim();
+}
+
+function abrirSelectorPersonaWhatsAppWeb(texto) {
+    const url = `https://web.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+}
+
+window.enviarWhatsAppPestanaActual = function() {
+    const alertas = obtenerTextosAlertasWeb(true);
+    if (alertas.length === 0) {
+        alert("⚠️ No hay alertas en la pestaña actual para enviar.");
+        return;
+    }
+
+    const nombrePestana =
+        subTabAlertaActual === "eta"
+            ? "ALERTAS ETA"
+            : subTabAlertaActual === "operativas"
+            ? "ALERTAS OPERATIVAS"
+            : "VENCIMIENTO ALMACÉN Y DEMORAS";
+
+    const mensaje = construirMensajeWhatsAppWeb(`LOGISTATUS PRO - ${nombrePestana}`, alertas);
+    abrirSelectorPersonaWhatsAppWeb(mensaje);
+};
+
+window.enviarWhatsAppTodas = function() {
+    const activeData = allRecords.filter(r => !esHistoricoArchivado(r) && !Boolean(r.despacho));
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const todasLasAlertas = [];
+
+    activeData.forEach(r => {
+        const modoBrutoWeb = (r.modo_transporte || "").toLowerCase().trim();
+        const esAereoWeb = modoBrutoWeb.includes("aéreo") || modoBrutoWeb.includes("aereo");
+        const fechaBaseWebRaw = esAereoWeb ? r.fecha_llegada : r.recibida_acta_recepcion;
+        const dBaseWebObj = parseFechaLocal(fechaBaseWebRaw);
+        const hasTransmisionWeb = Boolean(r.fecha_transmision && r.fecha_transmision.trim() !== "");
+
+        if (dBaseWebObj && !hasTransmisionWeb) {
+            let fechaLimiteWeb = new Date(dBaseWebObj);
+            let count = 0;
+            while (count < 5) {
+                fechaLimiteWeb.setDate(fechaLimiteWeb.getDate() + 1);
+                const day = fechaLimiteWeb.getDay();
+                if (day !== 0 && day !== 6) count++;
+            }
+            const diffWeb = Math.round((fechaLimiteWeb - hoy) / (1000 * 60 * 60 * 24));
+            if (diffWeb <= 2) {
+                const estadoTxt = diffWeb < 0 ? `Vencido hace ${Math.abs(diffWeb)}d` : (diffWeb === 0 ? "Vence HOY" : `Vence en ${diffWeb}d`);
+                const viaTxt = esAereoWeb ? "Aéreo (Llegada)" : "Marítimo (Acta)";
+                todasLasAlertas.push(`Exp ${r.num_expediente} (${r.cliente}) - Plazo 5 días hábiles [${viaTxt}]: ${estadoTxt} (Límite: ${formatearFechaDDMMYYYY(fechaLimiteWeb)})`);
+            }
+        }
+
+        if (r.permisologia === "Sí Aplica / Pendiente") {
+            todasLasAlertas.push(`Exp ${r.num_expediente} (${r.cliente}) - Permisología pendiente de aprobación.`);
+        }
+
+        if (r.culminacion_dias_libres) {
+            const fCulminacion = parseFechaLocal(r.culminacion_dias_libres);
+            if (fCulminacion) {
+                const diffAlm = Math.round((fCulminacion - hoy) / (1000 * 60 * 60 * 24));
+                if (diffAlm <= 2) {
+                    todasLasAlertas.push(`Exp ${r.num_expediente} (${r.cliente}) - Vencimiento de días libres de almacén en ${diffAlm} día(s).`);
+                }
+            }
+        }
+    });
+
+    if (todasLasAlertas.length === 0) {
+        alert("⚠️ No hay alertas activas para enviar.");
+        return;
+    }
+
+    const mensaje = construirMensajeWhatsAppWeb("LOGISTATUS PRO - TODAS LAS ALERTAS ACTIVAS", todasLasAlertas);
+    abrirSelectorPersonaWhatsAppWeb(mensaje);
+};
+
 inicializarAppFirebase();
     </script>
 </body>
